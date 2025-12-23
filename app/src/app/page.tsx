@@ -4,6 +4,7 @@ import PatternGrid from '@/components/PatternGrid'
 import SearchBar from '@/components/SearchBar'
 import KeywordFilter from '@/components/KeywordFilter'
 import Pagination from '@/components/Pagination'
+import AuthButton from '@/components/AuthButton'
 
 const PAGE_SIZE = 50
 
@@ -105,6 +106,7 @@ export default async function Home({ searchParams }: PageProps) {
               <Suspense fallback={<div className="h-10 w-28 bg-stone-100 rounded-lg animate-pulse" />}>
                 <KeywordFilter keywords={keywords} />
               </Suspense>
+              <AuthButton />
             </div>
           </div>
         </div>
