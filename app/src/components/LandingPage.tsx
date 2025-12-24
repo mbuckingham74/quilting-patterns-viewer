@@ -1,8 +1,7 @@
 import Image from 'next/image'
-import { signInWithGoogle } from '@/app/auth/actions'
+import Link from 'next/link'
 
 export default function LandingPage() {
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-50 to-stone-100">
       {/* Header */}
@@ -42,11 +41,10 @@ export default function LandingPage() {
           </p>
 
           {/* Sign in button */}
-          <form action={signInWithGoogle}>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-3 bg-white border border-stone-300 rounded-lg px-6 py-3 text-stone-700 hover:bg-stone-50 hover:border-stone-400 transition-all font-medium shadow-sm cursor-pointer"
-            >
+          <Link
+            href="/auth/signin"
+            className="inline-flex items-center gap-3 bg-white border border-stone-300 rounded-lg px-6 py-3 text-stone-700 hover:bg-stone-50 hover:border-stone-400 transition-all font-medium shadow-sm cursor-pointer"
+          >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
@@ -65,9 +63,8 @@ export default function LandingPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-              Sign in with Google
-            </button>
-          </form>
+            Sign in with Google
+          </Link>
 
           <p className="mt-4 text-sm text-stone-500">
             Access is limited to authorized users only.
