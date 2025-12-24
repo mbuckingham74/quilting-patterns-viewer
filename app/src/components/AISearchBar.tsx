@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import SaveSearchButton from './SaveSearchButton'
 
 interface AISearchBarProps {
   onSearch?: (patterns: Pattern[], query: string) => void
@@ -23,6 +24,18 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
+
+  // Check if there's an AI search in the URL
+  const aiSearchParam = searchParams.get('ai_search')
+
+  // Initialize query from URL param
+  useEffect(() => {
+    if (aiSearchParam) {
+      setQuery(aiSearchParam)
+      setHasSearched(true)
+    }
+  }, [aiSearchParam])
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,6 +65,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
       const params = new URLSearchParams()
       params.set('ai_search', query)
       router.push(`/browse?${params.toString()}`)
+      setHasSearched(true)
     } catch (err) {
       console.error('AI search error:', err)
       setError('Search failed. Please try again.')
@@ -63,6 +77,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
   const handleClear = useCallback(() => {
     setQuery('')
     setError(null)
+    setHasSearched(false)
     if (onClear) {
       onClear()
     }
@@ -127,9 +142,14 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
         <p className="mt-2 text-sm text-red-500">{error}</p>
       )}
 
-      <p className="mt-2 text-xs text-stone-500">
-        Search by visual description, pattern name, or author
-      </p>
+      <div className="mt-2 flex items-center justify-between">
+        <p className="text-xs text-stone-500">
+          Search by visual description, pattern name, or author
+        </p>
+        {hasSearched && query.trim() && !isSearching && (
+          <SaveSearchButton query={query} />
+        )}
+      </div>
     </div>
   )
 }

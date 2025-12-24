@@ -3,14 +3,23 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { Pattern } from '@/lib/types'
+import FavoriteButton from './FavoriteButton'
 
 interface PatternCardProps {
   pattern: Pattern
+  isFavorited?: boolean
+  onToggleFavorite?: (patternId: number, newState: boolean) => void
 }
 
-export default function PatternCard({ pattern }: PatternCardProps) {
+export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite }: PatternCardProps) {
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
+
+  const handleToggleFavorite = (patternId: number, newState: boolean) => {
+    if (onToggleFavorite) {
+      onToggleFavorite(patternId, newState)
+    }
+  }
 
   return (
     <Link
@@ -39,14 +48,25 @@ export default function PatternCard({ pattern }: PatternCardProps) {
           {displayName}
         </h3>
         <div className="mt-1 flex items-center justify-between text-xs text-stone-500">
-          {pattern.author && (
-            <span className="truncate max-w-[60%]">{pattern.author}</span>
-          )}
-          {extension && (
-            <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-600 uppercase">
-              {extension}
-            </span>
-          )}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {pattern.author && (
+              <span className="truncate">{pattern.author}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {extension && (
+              <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-600 uppercase">
+                {extension}
+              </span>
+            )}
+            {onToggleFavorite && (
+              <FavoriteButton
+                patternId={pattern.id}
+                isFavorited={isFavorited}
+                onToggle={handleToggleFavorite}
+              />
+            )}
+          </div>
         </div>
       </div>
     </Link>

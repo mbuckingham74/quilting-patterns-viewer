@@ -45,3 +45,22 @@ export interface FilterOptions {
   fileExtensions?: string[]
   author?: string
 }
+
+export interface UserFavorite {
+  id: number
+  user_id: string
+  pattern_id: number
+  created_at: string
+}
+
+export interface SavedSearch {
+  id: number
+  user_id: string
+  query: string
+  name: string | null
+  created_at: string
+}
+
+export interface UserFavoriteWithPattern extends UserFavorite {
+  patterns: Pattern
+}

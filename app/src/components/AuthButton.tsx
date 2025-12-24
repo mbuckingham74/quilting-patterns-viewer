@@ -44,6 +44,12 @@ export default function AuthButton() {
         <span className="text-sm text-stone-600 hidden sm:block">
           {user.email}
         </span>
+        <Link
+          href="/account"
+          className="px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors font-medium"
+        >
+          Account
+        </Link>
         <button
           onClick={handleSignOut}
           className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"

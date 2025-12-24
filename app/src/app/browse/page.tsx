@@ -3,10 +3,9 @@ import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import PatternGrid from '@/components/PatternGrid'
+import BrowseContent from '@/components/BrowseContent'
 import AISearchBar from '@/components/AISearchBar'
 import KeywordSidebar from '@/components/KeywordSidebar'
-import Pagination from '@/components/Pagination'
 import AuthButton from '@/components/AuthButton'
 
 const PAGE_SIZE = 50
@@ -107,6 +106,16 @@ async function getKeywords() {
   return keywords || []
 }
 
+async function getUserFavoriteIds(userId: string): Promise<number[]> {
+  const supabase = await createClient()
+  const { data: favorites } = await supabase
+    .from('user_favorites')
+    .select('pattern_id')
+    .eq('user_id', userId)
+
+  return favorites?.map(f => f.pattern_id) || []
+}
+
 export default async function BrowsePage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -117,9 +126,10 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   }
 
   const resolvedParams = await searchParams
-  const [{ patterns, count, page, totalPages, error: patternsError }, keywords] = await Promise.all([
+  const [{ patterns, count, page, totalPages, error: patternsError }, keywords, favoriteIds] = await Promise.all([
     getPatterns(resolvedParams),
     getKeywords(),
+    getUserFavoriteIds(user.id),
   ])
 
   const isAISearch = !!resolvedParams.ai_search
@@ -171,10 +181,14 @@ export default async function BrowsePage({ searchParams }: PageProps) {
                 </p>
               </div>
             )}
-            <PatternGrid patterns={patterns} error={patternsError} />
-            <Suspense fallback={null}>
-              <Pagination currentPage={page} totalPages={totalPages} totalCount={count} />
-            </Suspense>
+            <BrowseContent
+              patterns={patterns}
+              error={patternsError}
+              currentPage={page}
+              totalPages={totalPages}
+              totalCount={count}
+              initialFavoriteIds={favoriteIds}
+            />
           </main>
         </div>
       </div>
