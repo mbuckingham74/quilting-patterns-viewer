@@ -10,6 +10,7 @@ import Pagination from '@/components/Pagination'
 import AuthButton from '@/components/AuthButton'
 
 const PAGE_SIZE = 50
+const NO_THUMBNAIL_KEYWORD_ID = 616  // Keyword ID for patterns without thumbnails
 
 interface PageProps {
   searchParams: Promise<{
@@ -60,6 +61,9 @@ async function getPatterns(searchParams: { search?: string; keywords?: string; p
   let query = supabase
     .from('patterns')
     .select('*', { count: 'exact' })
+
+  // Exclude patterns without thumbnails by default
+  query = query.not('thumbnail_url', 'is', null)
 
   // Text search
   if (searchParams.search) {
