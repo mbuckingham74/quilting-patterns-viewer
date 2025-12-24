@@ -49,7 +49,7 @@ async function getPatterns(searchParams: { search?: string; keywords?: string; p
         query = query.in('id', patternIds)
       } else {
         // No patterns match the keywords
-        return { patterns: [], count: 0, page, totalPages: 0 }
+        return { patterns: [], count: 0, page, totalPages: 0, error: null }
       }
     }
   }
@@ -63,7 +63,12 @@ async function getPatterns(searchParams: { search?: string; keywords?: string; p
 
   if (error) {
     console.error('Error fetching patterns:', error)
-    return { patterns: [], count: 0, page, totalPages: 0 }
+    // Check for JWT-related errors that require re-authentication
+    const isAuthError = error.message?.includes('JWT') ||
+                        error.code === 'PGRST303' ||
+                        error.message?.includes('expired') ||
+                        error.message?.includes('invalid token')
+    return { patterns: [], count: 0, page, totalPages: 0, error: isAuthError ? 'auth' : 'unknown' }
   }
 
   return {
@@ -71,6 +76,7 @@ async function getPatterns(searchParams: { search?: string; keywords?: string; p
     count: count || 0,
     page,
     totalPages: Math.ceil((count || 0) / PAGE_SIZE),
+    error: null,
   }
 }
 
@@ -94,7 +100,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   }
 
   const resolvedParams = await searchParams
-  const [{ patterns, count, page, totalPages }, keywords] = await Promise.all([
+  const [{ patterns, count, page, totalPages, error: patternsError }, keywords] = await Promise.all([
     getPatterns(resolvedParams),
     getKeywords(),
   ])
@@ -133,7 +139,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
 
       {/* Main content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PatternGrid patterns={patterns} />
+        <PatternGrid patterns={patterns} error={patternsError} />
         <Suspense fallback={null}>
           <Pagination currentPage={page} totalPages={totalPages} totalCount={count} />
         </Suspense>
