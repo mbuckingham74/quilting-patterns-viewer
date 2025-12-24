@@ -72,54 +72,30 @@ ALTER TABLE keyword_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE keyword_group_keywords ENABLE ROW LEVEL SECURITY;
 
 -- Patterns: Only authenticated users can view
--- Note: Service role bypasses RLS, so migration scripts still work
+-- No INSERT/UPDATE/DELETE policies = only service role can modify (service role bypasses RLS)
 CREATE POLICY "Patterns are viewable by authenticated users"
   ON patterns FOR SELECT
   USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Service role can insert patterns"
-  ON patterns FOR INSERT
-  WITH CHECK (true);
-
-CREATE POLICY "Service role can update patterns"
-  ON patterns FOR UPDATE
-  USING (true);
 
 -- Keywords: Only authenticated users can view
 CREATE POLICY "Keywords are viewable by authenticated users"
   ON keywords FOR SELECT
   USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Service role can insert keywords"
-  ON keywords FOR INSERT
-  WITH CHECK (true);
-
 -- Pattern Keywords: Only authenticated users can view
 CREATE POLICY "Pattern keywords are viewable by authenticated users"
   ON pattern_keywords FOR SELECT
   USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Service role can insert pattern keywords"
-  ON pattern_keywords FOR INSERT
-  WITH CHECK (true);
 
 -- Keyword Groups: Only authenticated users can view
 CREATE POLICY "Keyword groups are viewable by authenticated users"
   ON keyword_groups FOR SELECT
   USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Service role can insert keyword groups"
-  ON keyword_groups FOR INSERT
-  WITH CHECK (true);
-
 -- Keyword Group Keywords: Only authenticated users can view
 CREATE POLICY "Keyword group keywords are viewable by authenticated users"
   ON keyword_group_keywords FOR SELECT
   USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Service role can insert keyword group keywords"
-  ON keyword_group_keywords FOR INSERT
-  WITH CHECK (true);
 
 -- ============================================
 -- 4. STORAGE BUCKETS
@@ -135,23 +111,17 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('patterns', 'patterns', false)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies for thumbnails (public read)
+-- Storage policies for thumbnails (public read, service role upload only)
+-- No INSERT policy = only service role can upload (service role bypasses RLS)
 CREATE POLICY "Thumbnails are publicly accessible"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'thumbnails');
 
-CREATE POLICY "Service role can upload thumbnails"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'thumbnails');
-
--- Storage policies for pattern files (authenticated download)
+-- Storage policies for pattern files (authenticated download, service role upload only)
+-- No INSERT policy = only service role can upload (service role bypasses RLS)
 CREATE POLICY "Authenticated users can download patterns"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'patterns' AND auth.role() = 'authenticated');
-
-CREATE POLICY "Service role can upload patterns"
-  ON storage.objects FOR INSERT
-  WITH CHECK (bucket_id = 'patterns');
 
 -- ============================================
 -- Done! Tables, indexes, RLS policies, and
