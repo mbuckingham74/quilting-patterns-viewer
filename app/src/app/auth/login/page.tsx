@@ -2,35 +2,83 @@
 
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import Image from 'next/image'
+import { useEffect, useState } from 'react'
 
 export default function LoginPage() {
-  const handleGoogleLogin = async () => {
-    const supabase = createClient()
+  const [isLoading, setIsLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      if (error) {
+        console.error('OAuth error:', error)
+        setIsLoading(false)
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setIsLoading(false)
+    }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-sm border border-stone-200 p-8">
+            <div className="text-center">Loading...</div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="min-h-screen bg-stone-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-lg shadow-sm border border-stone-200 p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-semibold text-stone-800">
-              Sign in to Quilting Patterns
-            </h1>
+    <div className="min-h-screen bg-stone-50">
+      {/* Header with logo */}
+      <header className="bg-white border-b border-stone-200">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-start">
+          <Link href="/">
+            <Image
+              src="/logo.png"
+              alt="Quilting Patterns"
+              width={120}
+              height={40}
+              className="h-10 w-auto"
+            />
+          </Link>
+        </div>
+      </header>
+
+      <div className="flex items-center justify-center px-4 py-16">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-lg shadow-sm border border-stone-200 p-8">
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-semibold text-stone-800">
+                Sign in to Quilting Patterns
+              </h1>
             <p className="mt-2 text-stone-600">
               Sign in to download patterns
             </p>
           </div>
 
           <button
+            type="button"
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-white border border-stone-300 rounded-lg px-4 py-3 text-stone-700 hover:bg-stone-50 transition-colors font-medium"
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-3 bg-white border border-stone-300 rounded-lg px-4 py-3 text-stone-700 hover:bg-stone-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -50,7 +98,7 @@ export default function LoginPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
+            {isLoading ? 'Redirecting...' : 'Continue with Google'}
           </button>
 
           <div className="mt-6 text-center">
@@ -58,6 +106,7 @@ export default function LoginPage() {
               ← Back to browsing
             </Link>
           </div>
+        </div>
         </div>
       </div>
     </div>

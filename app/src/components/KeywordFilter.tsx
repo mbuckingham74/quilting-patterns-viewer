@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Keyword } from '@/lib/types'
 
 interface KeywordFilterProps {
@@ -11,6 +11,7 @@ interface KeywordFilterProps {
 export default function KeywordFilter({ keywords }: KeywordFilterProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
 
   const selectedKeywords = searchParams.get('keywords')?.split(',').map(Number).filter(Boolean) || []
@@ -31,15 +32,15 @@ export default function KeywordFilter({ keywords }: KeywordFilterProps) {
       params.delete('keywords')
     }
     params.delete('page')
-    router.push(`/?${params.toString()}`)
-  }, [selectedKeywords, searchParams, router])
+    router.push(`${pathname}?${params.toString()}`)
+  }, [selectedKeywords, searchParams, router, pathname])
 
   const clearAll = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('keywords')
     params.delete('page')
-    router.push(`/?${params.toString()}`)
-  }, [searchParams, router])
+    router.push(`${pathname}?${params.toString()}`)
+  }, [searchParams, router, pathname])
 
   return (
     <div className="relative">

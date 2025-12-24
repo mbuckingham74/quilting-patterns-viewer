@@ -1,11 +1,12 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
 export default function SearchBar() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const [search, setSearch] = useState(searchParams.get('search') || '')
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
@@ -17,16 +18,16 @@ export default function SearchBar() {
       params.delete('search')
     }
     params.delete('page') // Reset to first page on new search
-    router.push(`/?${params.toString()}`)
-  }, [search, searchParams, router])
+    router.push(`${pathname}?${params.toString()}`)
+  }, [search, searchParams, router, pathname])
 
   const handleClear = useCallback(() => {
     setSearch('')
     const params = new URLSearchParams(searchParams.toString())
     params.delete('search')
     params.delete('page')
-    router.push(`/?${params.toString()}`)
-  }, [searchParams, router])
+    router.push(`${pathname}?${params.toString()}`)
+  }, [searchParams, router, pathname])
 
   return (
     <form onSubmit={handleSubmit} className="relative">

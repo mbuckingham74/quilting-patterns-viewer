@@ -38,3 +38,6 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Claude context file (contains deployment secrets)
+.claude-context
