@@ -1,4 +1,5 @@
-FROM node:20-alpine AS base
+# Use Node 20.19+ to satisfy vitest's engine requirement (^20.19.0 || >=22.12.0)
+FROM node:20.19-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps

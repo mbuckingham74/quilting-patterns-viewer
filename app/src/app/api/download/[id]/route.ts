@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { sanitizeFilenameForHeader } from '@/lib/filename'
 
 export async function GET(
   request: NextRequest,
@@ -50,14 +51,15 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to download pattern file' }, { status: 500 })
   }
 
-  // Determine filename
-  const filename = pattern.file_name || `pattern-${pattern.id}.${pattern.file_extension || 'bin'}`
+  // Determine filename and sanitize for Content-Disposition header
+  const rawFilename = pattern.file_name || `pattern-${pattern.id}.${pattern.file_extension || 'bin'}`
+  const { contentDisposition } = sanitizeFilenameForHeader(rawFilename)
 
   // Return file with appropriate headers
   return new NextResponse(fileData, {
     headers: {
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Disposition': contentDisposition,
     },
   })
 }
