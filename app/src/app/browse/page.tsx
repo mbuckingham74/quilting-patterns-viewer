@@ -24,6 +24,38 @@ async function getPatterns(searchParams: { search?: string; keywords?: string; p
   const page = parseInt(searchParams.page || '1', 10)
   const offset = (page - 1) * PAGE_SIZE
 
+  // If keyword filter is active, use the RPC function to avoid URI too large errors
+  if (searchParams.keywords) {
+    const keywordIds = searchParams.keywords.split(',').map(Number).filter(Boolean)
+    if (keywordIds.length > 0) {
+      const { data, error } = await supabase.rpc('get_patterns_by_keywords', {
+        keyword_ids: keywordIds,
+        page_offset: offset,
+        page_limit: PAGE_SIZE,
+        search_term: searchParams.search || null,
+      })
+
+      if (error) {
+        console.error('Error fetching patterns:', error)
+        const isAuthError = error.message?.includes('JWT') ||
+                            error.code === 'PGRST303' ||
+                            error.message?.includes('expired') ||
+                            error.message?.includes('invalid token')
+        return { patterns: [], count: 0, page, totalPages: 0, error: isAuthError ? 'auth' : 'unknown' }
+      }
+
+      const totalCount = data?.[0]?.total_count || 0
+      return {
+        patterns: data || [],
+        count: totalCount,
+        page,
+        totalPages: Math.ceil(totalCount / PAGE_SIZE),
+        error: null,
+      }
+    }
+  }
+
+  // No keyword filter - use regular query
   let query = supabase
     .from('patterns')
     .select('*', { count: 'exact' })
@@ -32,26 +64,6 @@ async function getPatterns(searchParams: { search?: string; keywords?: string; p
   if (searchParams.search) {
     const searchTerm = searchParams.search.toLowerCase()
     query = query.or(`file_name.ilike.%${searchTerm}%,author.ilike.%${searchTerm}%,notes.ilike.%${searchTerm}%`)
-  }
-
-  // Keyword filter
-  if (searchParams.keywords) {
-    const keywordIds = searchParams.keywords.split(',').map(Number).filter(Boolean)
-    if (keywordIds.length > 0) {
-      // Get pattern IDs that have any of the selected keywords
-      const { data: patternKeywords } = await supabase
-        .from('pattern_keywords')
-        .select('pattern_id')
-        .in('keyword_id', keywordIds)
-
-      if (patternKeywords && patternKeywords.length > 0) {
-        const patternIds = [...new Set(patternKeywords.map(pk => pk.pattern_id))]
-        query = query.in('id', patternIds)
-      } else {
-        // No patterns match the keywords
-        return { patterns: [], count: 0, page, totalPages: 0, error: null }
-      }
-    }
   }
 
   // Order and paginate
