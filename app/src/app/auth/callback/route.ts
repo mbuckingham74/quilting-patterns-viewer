@@ -1,17 +1,34 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { headers } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+
+// Allowlist of valid origins for OAuth redirects
+const ALLOWED_ORIGINS = [
+  'https://patterns.tachyonfuture.com',
+  // Add localhost for development
+  ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : []),
+]
+
+const DEFAULT_ORIGIN = 'https://patterns.tachyonfuture.com'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/browse'
+  const nextParam = searchParams.get('next') ?? '/browse'
 
-  // Get the origin from headers (handles reverse proxy correctly)
-  const headersList = await headers()
-  const host = headersList.get('x-forwarded-host') || headersList.get('host') || 'patterns.tachyonfuture.com'
-  const protocol = headersList.get('x-forwarded-proto') || 'https'
-  const origin = `${protocol}://${host}`
+  // Validate 'next' parameter to prevent open redirects
+  // Only allow relative paths starting with /
+  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/browse'
+
+  // Validate and sanitize the origin
+  // Use x-forwarded headers but validate against allowlist to prevent host-header spoofing
+  const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  const requestedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : null
+
+  // Only use the requested origin if it's in our allowlist, otherwise use default
+  const origin = requestedOrigin && ALLOWED_ORIGINS.includes(requestedOrigin)
+    ? requestedOrigin
+    : DEFAULT_ORIGIN
 
   // No code = error, but don't redirect to login to avoid loop
   if (!code) {
