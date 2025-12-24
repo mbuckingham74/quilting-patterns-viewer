@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import PatternGrid from '@/components/PatternGrid'
 import SearchBar from '@/components/SearchBar'
-import KeywordFilter from '@/components/KeywordFilter'
+import AISearchBar from '@/components/AISearchBar'
+import KeywordSidebar from '@/components/KeywordSidebar'
 import Pagination from '@/components/Pagination'
 import AuthButton from '@/components/AuthButton'
 
@@ -16,6 +17,7 @@ interface PageProps {
     search?: string
     keywords?: string
     page?: string
+    ai_search?: string
   }>
 }
 
@@ -117,45 +119,74 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     getKeywords(),
   ])
 
+  const isAISearch = !!resolvedParams.ai_search
+
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-10">
+      <header className="bg-white/90 backdrop-blur-sm border-b border-stone-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <Link href="/">
-                <Image
-                  src="/logo.png"
-                  alt="Quilting Patterns"
-                  width={120}
-                  height={40}
-                  className="h-10 w-auto"
-                />
-              </Link>
-              <div className="flex-1 sm:w-64">
-                <Suspense fallback={<div className="h-10 bg-stone-100 rounded-lg animate-pulse" />}>
-                  <SearchBar />
-                </Suspense>
-              </div>
-              <Suspense fallback={<div className="h-10 w-28 bg-stone-100 rounded-lg animate-pulse" />}>
-                <KeywordFilter keywords={keywords} />
+          {/* Top row - Logo and Auth */}
+          <div className="flex items-center justify-between mb-4">
+            <Link href="/" className="flex items-center gap-3">
+              <Image
+                src="/logo.png"
+                alt="Quilting Patterns"
+                width={120}
+                height={40}
+                className="h-10 w-auto"
+              />
+            </Link>
+            <AuthButton />
+          </div>
+
+          {/* AI Search Bar - Full Width */}
+          <div className="mb-3">
+            <Suspense fallback={<div className="h-14 bg-stone-100 rounded-xl animate-pulse" />}>
+              <AISearchBar />
+            </Suspense>
+          </div>
+
+          {/* Traditional search bar - smaller */}
+          <div className="flex items-center gap-2">
+            <div className="flex-1 max-w-md">
+              <Suspense fallback={<div className="h-10 bg-stone-100 rounded-lg animate-pulse" />}>
+                <SearchBar />
               </Suspense>
             </div>
-            <div className="flex items-center gap-4">
-              <AuthButton />
-            </div>
+            <span className="text-sm text-stone-400">or use keywords in the sidebar</span>
           </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PatternGrid patterns={patterns} error={patternsError} />
-        <Suspense fallback={null}>
-          <Pagination currentPage={page} totalPages={totalPages} totalCount={count} />
-        </Suspense>
-      </main>
+      {/* Main content with sidebar */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex gap-6">
+          {/* Sidebar */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-36">
+              <Suspense fallback={<div className="h-96 bg-white/80 rounded-xl animate-pulse" />}>
+                <KeywordSidebar keywords={keywords} />
+              </Suspense>
+            </div>
+          </aside>
+
+          {/* Main content area */}
+          <main className="flex-1 min-w-0">
+            {isAISearch && (
+              <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-sm text-purple-700">
+                  Showing AI search results for: <strong>{resolvedParams.ai_search}</strong>
+                </p>
+              </div>
+            )}
+            <PatternGrid patterns={patterns} error={patternsError} />
+            <Suspense fallback={null}>
+              <Pagination currentPage={page} totalPages={totalPages} totalCount={count} />
+            </Suspense>
+          </main>
+        </div>
+      </div>
     </div>
   )
 }

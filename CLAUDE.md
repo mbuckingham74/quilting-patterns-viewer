@@ -29,6 +29,9 @@ This app replaces the legacy Windows-only PVM (Pattern Viewer and Manager) softw
 ## Database Schema (Supabase Postgres)
 
 ```sql
+-- Enable pgvector extension for semantic search
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Users table (managed by Supabase Auth, extended with profile)
 CREATE TABLE profiles (
   id UUID REFERENCES auth.users PRIMARY KEY,
@@ -49,8 +52,13 @@ CREATE TABLE patterns (
   notes TEXT,
   thumbnail_url TEXT,
   pattern_file_url TEXT,
+  embedding vector(1024),        -- Voyage multimodal embedding for semantic search
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Index for fast vector similarity search
+CREATE INDEX idx_patterns_embedding ON patterns USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 100);
 
 -- Keywords for filtering
 CREATE TABLE keywords (
@@ -181,12 +189,131 @@ patterns/
 - Protected routes for downloads
 - Simple profile (just email/name)
 
+## Natural Language Search (Voyage AI + pgvector)
+
+Users can describe patterns in natural language (e.g., "butterflies with swirls", "floral border patterns") and get visually relevant results.
+
+### Architecture
+
+1. **Embedding Generation (one-time)**
+   - Use Voyage AI's `voyage-multimodal-3` model to embed all 15,350 thumbnails
+   - Cost: ~$1.80 total (images ~1k tokens each, $0.12/1M tokens)
+   - Store 1024-dimensional vectors in `patterns.embedding` column
+
+2. **Search Flow**
+   - User enters natural language query
+   - Embed query text using `voyage-multimodal-3`
+   - Vector similarity search (cosine) returns top N matches
+   - (Optional) Claude re-ranks or explains why patterns match
+
+### Implementation
+
+**Embedding Script** (`scripts/generate_embeddings.py`):
+```python
+import voyageai
+from supabase import create_client
+import base64
+
+vo = voyageai.Client(api_key=VOYAGE_API_KEY)
+supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+# Fetch patterns without embeddings
+patterns = supabase.table('patterns').select('id, thumbnail_url').is_('embedding', None).execute()
+
+for pattern in patterns.data:
+    # Download thumbnail
+    img_bytes = download_image(pattern['thumbnail_url'])
+    img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+    
+    # Generate embedding
+    result = vo.multimodal_embed(
+        inputs=[[{'type': 'image', 'data': img_base64, 'encoding': 'base64'}]],
+        model='voyage-multimodal-3'
+    )
+    embedding = result.embeddings[0]
+    
+    # Store in Supabase
+    supabase.table('patterns').update({'embedding': embedding}).eq('id', pattern['id']).execute()
+```
+
+**Search API Route** (`app/api/search/route.ts`):
+```typescript
+import { createClient } from '@supabase/supabase-js';
+import VoyageAI from 'voyageai';
+
+const voyage = new VoyageAI({ apiKey: process.env.VOYAGE_API_KEY });
+
+export async function POST(request: Request) {
+  const { query } = await request.json();
+  
+  // Embed the text query
+  const embeddingResult = await voyage.multimodalEmbed({
+    inputs: [[{ type: 'text', text: query }]],
+    model: 'voyage-multimodal-3'
+  });
+  const queryEmbedding = embeddingResult.embeddings[0];
+  
+  // Vector similarity search in Supabase
+  const { data: patterns } = await supabase.rpc('match_patterns', {
+    query_embedding: queryEmbedding,
+    match_threshold: 0.3,
+    match_count: 50
+  });
+  
+  return Response.json({ patterns });
+}
+```
+
+**Supabase RPC Function**:
+```sql
+CREATE OR REPLACE FUNCTION match_patterns(
+  query_embedding vector(1024),
+  match_threshold float DEFAULT 0.3,
+  match_count int DEFAULT 50
+)
+RETURNS TABLE (
+  id int,
+  file_name text,
+  thumbnail_url text,
+  similarity float
+)
+LANGUAGE sql STABLE
+AS $
+  SELECT
+    patterns.id,
+    patterns.file_name,
+    patterns.thumbnail_url,
+    1 - (patterns.embedding <=> query_embedding) AS similarity
+  FROM patterns
+  WHERE 1 - (patterns.embedding <=> query_embedding) > match_threshold
+  ORDER BY patterns.embedding <=> query_embedding
+  LIMIT match_count;
+$;
+```
+
+### Environment Variables
+
+Add to `.env.local`:
+```bash
+VOYAGE_API_KEY=<your_voyage_api_key>
+```
+
+### UI Component
+
+Add a search bar that:
+- Accepts natural language input
+- Shows loading state while embedding + searching
+- Displays results in the same grid format
+- Optionally shows similarity score or "why this matched"
+
 ## Phase 2 Features (Future)
 
 - Upload new patterns (accept .zip, extract, add to DB)
+  - Auto-generate embedding for new uploads
 - User favorites/collections
 - Pattern sharing links
 - Admin panel for Pam to manage patterns
+- Claude-powered "explain this match" feature
 
 ## Docker Configuration
 
