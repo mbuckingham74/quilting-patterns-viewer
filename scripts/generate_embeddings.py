@@ -108,10 +108,10 @@ def main():
     # Initialize Voyage client
     vo = voyageai.Client(api_key=VOYAGE_API_KEY)
 
-    print(f"Using Voyage model: {VOYAGE_MODEL} (multimodal)")
-    print(f"Supabase URL: {SUPABASE_URL}")
-    print(f"Batch size: {VOYAGE_BATCH_SIZE}")
-    print()
+    print(f"Using Voyage model: {VOYAGE_MODEL} (multimodal)", flush=True)
+    print(f"Supabase URL: {SUPABASE_URL}", flush=True)
+    print(f"Batch size: {VOYAGE_BATCH_SIZE}", flush=True)
+    print(flush=True)
 
     total_processed = 0
     total_errors = 0
@@ -124,7 +124,7 @@ def main():
             print("\nAll patterns have embeddings!")
             break
 
-        print(f"Processing {len(patterns)} patterns (starting at ID {patterns[0]['id']})...")
+        print(f"Processing {len(patterns)} patterns (starting at ID {patterns[0]['id']})...", flush=True)
 
         # Process one image at a time to avoid issues
         for pattern in patterns:
@@ -146,7 +146,7 @@ def main():
                 # Update database
                 update_pattern_embedding(pattern["id"], embedding)
                 total_processed += 1
-                print(f"  ✓ Pattern {pattern['id']} ({total_processed} done, {total_errors} errors)")
+                print(f"  ✓ Pattern {pattern['id']} ({total_processed} done, {total_errors} errors)", flush=True)
 
                 # Rate limiting - wait between each API call
                 time.sleep(RATE_LIMIT_DELAY)

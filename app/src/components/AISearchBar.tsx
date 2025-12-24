@@ -77,7 +77,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Describe what you're looking for... (e.g., 'butterflies with flowers')"
+            placeholder="Search by description or filename... (e.g., 'butterflies' or 'floral border')"
             disabled={isSearching}
             className="w-full px-4 py-3 pl-12 pr-24 rounded-xl border-2 border-purple-200 bg-white/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-stone-800 placeholder-stone-400 text-lg disabled:opacity-50 shadow-sm"
           />
@@ -128,7 +128,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
       )}
 
       <p className="mt-2 text-xs text-stone-500">
-        Use natural language to find patterns by describing what you see
+        Search by visual description, pattern name, or author
       </p>
     </div>
   )

@@ -4,7 +4,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import PatternGrid from '@/components/PatternGrid'
-import SearchBar from '@/components/SearchBar'
 import AISearchBar from '@/components/AISearchBar'
 import KeywordSidebar from '@/components/KeywordSidebar'
 import Pagination from '@/components/Pagination'
@@ -141,21 +140,9 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           </div>
 
           {/* AI Search Bar - Full Width */}
-          <div className="mb-3">
-            <Suspense fallback={<div className="h-14 bg-stone-100 rounded-xl animate-pulse" />}>
-              <AISearchBar />
-            </Suspense>
-          </div>
-
-          {/* Traditional search bar - smaller */}
-          <div className="flex items-center gap-2">
-            <div className="flex-1 max-w-md">
-              <Suspense fallback={<div className="h-10 bg-stone-100 rounded-lg animate-pulse" />}>
-                <SearchBar />
-              </Suspense>
-            </div>
-            <span className="text-sm text-stone-400">or use keywords in the sidebar</span>
-          </div>
+          <Suspense fallback={<div className="h-14 bg-stone-100 rounded-xl animate-pulse" />}>
+            <AISearchBar />
+          </Suspense>
         </div>
       </header>
 
