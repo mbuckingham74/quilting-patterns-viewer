@@ -127,7 +127,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   return (
     <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-white/90 backdrop-blur-sm border-b border-stone-200 sticky top-0 z-10">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-purple-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {/* Top row - Logo and Auth */}
           <div className="flex items-center justify-between mb-4">

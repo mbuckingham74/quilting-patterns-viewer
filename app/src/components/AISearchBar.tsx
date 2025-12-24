@@ -79,11 +79,11 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by description or filename... (e.g., 'butterflies' or 'floral border')"
             disabled={isSearching}
-            className="w-full px-4 py-3 pl-12 pr-24 rounded-xl border-2 border-purple-200 bg-white/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-stone-800 placeholder-stone-400 text-lg disabled:opacity-50 shadow-sm"
+            className="w-full px-4 py-3 pl-12 pr-24 rounded-xl border-2 border-purple-300 bg-purple-50/80 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-stone-800 placeholder-stone-500 text-lg disabled:opacity-50 shadow-md"
           />
           {/* Sparkle icon for AI */}
           <svg
-            className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-500"
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-purple-600"
             fill="currentColor"
             viewBox="0 0 24 24"
           >
@@ -94,7 +94,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
           <button
             type="submit"
             disabled={isSearching || !query.trim()}
-            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-purple-500 hover:bg-purple-600 disabled:bg-purple-300 text-white rounded-lg text-sm font-medium transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
           >
             {isSearching ? (
               <span className="flex items-center gap-2">
