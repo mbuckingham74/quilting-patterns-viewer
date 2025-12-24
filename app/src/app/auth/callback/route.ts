@@ -21,110 +21,29 @@ export async function GET(request: NextRequest) {
   const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/browse'
 
   // Validate and sanitize the origin
-  // Use x-forwarded headers but validate against allowlist to prevent host-header spoofing
   const forwardedHost = request.headers.get('x-forwarded-host') || request.headers.get('host')
   const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
   const requestedOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : null
 
-  // Only use the requested origin if it's in our allowlist, otherwise use default
   const origin = requestedOrigin && ALLOWED_ORIGINS.includes(requestedOrigin)
     ? requestedOrigin
     : DEFAULT_ORIGIN
 
-  // No code = error, but don't redirect to login to avoid loop
+  // Log cookies received for debugging
+  const allCookies = request.cookies.getAll()
+  console.log('Callback received cookies:', allCookies.map(c => c.name).join(', '))
+  const hasVerifier = allCookies.some(c => c.name.includes('code-verifier'))
+  console.log('Has PKCE verifier cookie:', hasVerifier)
+
   if (!code) {
     return NextResponse.redirect(`${origin}/?error=no_code`)
   }
 
-  // Create a mutable response - we'll update the redirect location later
+  // Create response first - we'll set cookies on it
   let redirectUrl = `${origin}${next}`
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          // We'll set these on the final response
-        },
-      },
-    }
-  )
-
-  const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
-
-  if (error) {
-    console.error('Exchange code error:', error)
-    return NextResponse.redirect(`${origin}/?error=auth_failed`)
-  }
-
-  const user = sessionData?.user
-  if (!user) {
-    return NextResponse.redirect(`${origin}/?error=no_user`)
-  }
-
-  // Check if profile exists
-  const { data: existingProfile } = await supabase
-    .from('profiles')
-    .select('id, is_approved, is_admin')
-    .eq('id', user.id)
-    .single()
-
-  let isApproved = existingProfile?.is_approved ?? false
-  let isNewUser = false
-
-  if (!existingProfile) {
-    // New user - create profile
-    isNewUser = true
-    const userEmail = user.email?.toLowerCase() || ''
-    const isAdmin = ADMIN_EMAILS.includes(userEmail)
-
-    // Admins are auto-approved
-    isApproved = isAdmin
-
-    const { error: insertError } = await supabase
-      .from('profiles')
-      .insert({
-        id: user.id,
-        email: user.email,
-        display_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
-        is_approved: isApproved,
-        is_admin: isAdmin,
-        approved_at: isApproved ? new Date().toISOString() : null,
-      })
-
-    if (insertError) {
-      console.error('Error creating profile:', insertError)
-      // Don't fail the login, but log the error
-    }
-
-    // Send admin notification for new non-admin users
-    if (!isAdmin) {
-      try {
-        await fetch(`${origin}/api/admin/notify-signup`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: user.email }),
-        })
-      } catch (e) {
-        console.error('Failed to send admin notification:', e)
-      }
-    }
-  }
-
-  // Redirect based on approval status
-  if (!isApproved) {
-    redirectUrl = `${origin}/pending-approval`
-  }
-
-  // Create the response with the correct redirect
   const response = NextResponse.redirect(redirectUrl)
 
-  // Re-create supabase client to set cookies on the response
-  const supabaseWithCookies = createServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
@@ -146,8 +65,69 @@ export async function GET(request: NextRequest) {
     }
   )
 
-  // Re-exchange to set cookies properly
-  await supabaseWithCookies.auth.exchangeCodeForSession(code)
+  const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
+
+  if (error) {
+    console.error('Exchange code error:', error)
+    return NextResponse.redirect(`${origin}/?error=auth_failed`)
+  }
+
+  const user = sessionData?.user
+  if (!user) {
+    return NextResponse.redirect(`${origin}/?error=no_user`)
+  }
+
+  console.log('User authenticated:', user.email)
+
+  // Check if profile exists
+  const { data: existingProfile } = await supabase
+    .from('profiles')
+    .select('id, is_approved, is_admin')
+    .eq('id', user.id)
+    .single()
+
+  let isApproved = existingProfile?.is_approved ?? false
+
+  if (!existingProfile) {
+    // New user - create profile
+    const userEmail = user.email?.toLowerCase() || ''
+    const isAdmin = ADMIN_EMAILS.includes(userEmail)
+    isApproved = isAdmin
+
+    const { error: insertError } = await supabase
+      .from('profiles')
+      .insert({
+        id: user.id,
+        email: user.email,
+        display_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+        is_approved: isApproved,
+        is_admin: isAdmin,
+        approved_at: isApproved ? new Date().toISOString() : null,
+      })
+
+    if (insertError) {
+      console.error('Error creating profile:', insertError)
+    }
+
+    // Send admin notification for new non-admin users
+    if (!isAdmin) {
+      try {
+        await fetch(`${origin}/api/admin/notify-signup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: user.email }),
+        })
+      } catch (e) {
+        console.error('Failed to send admin notification:', e)
+      }
+    }
+  }
+
+  // Redirect based on approval status
+  if (!isApproved) {
+    // Update the redirect location for pending users
+    response.headers.set('Location', `${origin}/pending-approval`)
+  }
 
   return response
 }
