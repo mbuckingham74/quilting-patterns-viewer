@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
   let redirectUrl = `${origin}${next}`
   const response = NextResponse.redirect(redirectUrl)
 
+  const cookiesToSetLater: Array<{ name: string; value: string; options: Record<string, unknown> }> = []
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -52,13 +54,9 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
+          console.log('Setting cookies:', cookiesToSet.map(c => c.name).join(', '))
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, {
-              ...options,
-              path: '/',
-              sameSite: 'lax',
-              secure: true,
-            })
+            cookiesToSetLater.push({ name, value, options: options || {} })
           })
         },
       },
@@ -66,6 +64,17 @@ export async function GET(request: NextRequest) {
   )
 
   const { data: sessionData, error } = await supabase.auth.exchangeCodeForSession(code)
+
+  // Apply all cookies that were set during the exchange
+  cookiesToSetLater.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, {
+      ...options,
+      path: '/',
+      sameSite: 'lax',
+      secure: true,
+    })
+  })
+  console.log('Applied cookies to response:', cookiesToSetLater.map(c => c.name).join(', '))
 
   if (error) {
     console.error('Exchange code error:', error)
