@@ -6,27 +6,33 @@ import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
 export default function AuthButton() {
+  const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    setMounted(true)
     const supabase = createClient()
 
     // Get initial user and check admin status
     const initAuth = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user)
 
-      if (user) {
-        // Check if user is admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
+        if (user) {
+          // Check if user is admin
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single()
 
-        setIsAdmin(profile?.is_admin ?? false)
+          setIsAdmin(profile?.is_admin ?? false)
+        }
+      } catch (error) {
+        console.error('Auth init error:', error)
       }
 
       setLoading(false)
@@ -58,7 +64,8 @@ export default function AuthButton() {
     window.location.href = '/'
   }
 
-  if (loading) {
+  // Prevent hydration mismatch - render nothing until mounted on client
+  if (!mounted || loading) {
     return (
       <div className="h-9 w-20 bg-stone-100 rounded-lg animate-pulse" />
     )
