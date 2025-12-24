@@ -7,20 +7,46 @@ import type { User } from '@supabase/supabase-js'
 
 export default function AuthButton() {
   const [user, setUser] = useState<User | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const supabase = createClient()
 
-    // Get initial user
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    // Get initial user and check admin status
+    const initAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
       setUser(user)
+
+      if (user) {
+        // Check if user is admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+
+        setIsAdmin(profile?.is_admin ?? false)
+      }
+
       setLoading(false)
-    })
+    }
+
+    initAuth()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('is_admin')
+          .eq('id', session.user.id)
+          .single()
+        setIsAdmin(profile?.is_admin ?? false)
+      } else {
+        setIsAdmin(false)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -44,6 +70,14 @@ export default function AuthButton() {
         <span className="text-sm text-stone-600 hidden sm:block">
           {user.email}
         </span>
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="px-3 py-1.5 text-sm text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition-colors font-medium"
+          >
+            Admin
+          </Link>
+        )}
         <Link
           href="/account"
           className="px-3 py-1.5 text-sm text-purple-600 hover:text-purple-800 hover:bg-purple-50 rounded-lg transition-colors font-medium"

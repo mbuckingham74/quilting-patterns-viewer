@@ -64,3 +64,20 @@ export interface SavedSearch {
 export interface UserFavoriteWithPattern extends UserFavorite {
   patterns: Pattern
 }
+
+export interface Profile {
+  id: string
+  email: string
+  display_name: string | null
+  is_approved: boolean
+  is_admin: boolean
+  approved_by: string | null
+  approved_at: string | null
+  created_at: string
+}
+
+// Admin emails that get auto-approved
+export const ADMIN_EMAILS = [
+  'michael.buckingham74@gmail.com',
+  'pamncharlie@gmail.com',
+]
