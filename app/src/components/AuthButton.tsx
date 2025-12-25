@@ -29,12 +29,14 @@ export default function AuthButton() {
     const initAuth = async () => {
       console.log('AuthButton: initAuth starting')
       try {
-        // Use getSession instead of getUser - it reads from local storage/cookies first
-        // which is much faster than making a network request
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        // First try getSession (reads from storage, fast)
+        let { data: { session }, error: sessionError } = await supabase.auth.getSession()
         console.log('AuthButton: getSession result', { user: session?.user?.email, error: sessionError?.message })
 
+        // If no session from storage, the onAuthStateChange listener will handle it
+        // when it fires with the session from cookies
         const user = session?.user ?? null
+        console.log('AuthButton: setting user to', user?.email ?? 'null')
         setUser(user)
 
         if (user) {
@@ -59,7 +61,8 @@ export default function AuthButton() {
     initAuth()
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('AuthButton: onAuthStateChange', { event, user: session?.user?.email })
       setUser(session?.user ?? null)
       if (session?.user) {
         const { data: profile } = await supabase
