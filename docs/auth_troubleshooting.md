@@ -152,7 +152,69 @@ Then restart auth: `docker compose restart auth`
 
 ---
 
-## Quick Reference: AuthButton Pattern
+## RECOMMENDED: Server-Side Auth Pattern
+
+The most robust approach is to fetch auth on the server and pass it to a minimal client component:
+
+**AuthButtonServer.tsx** (Server Component - fetches auth):
+```typescript
+import { createClient } from '@/lib/supabase/server'
+import AuthButtonClient from './AuthButtonClient'
+
+export default async function AuthButtonServer() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return <Link href="/auth/login">Sign in</Link>
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  return (
+    <AuthButtonClient
+      email={user.email || ''}
+      isAdmin={profile?.is_admin ?? false}
+    />
+  )
+}
+```
+
+**AuthButtonClient.tsx** (Client Component - only for sign out):
+```typescript
+'use client'
+
+export default function AuthButtonClient({ email, isAdmin }) {
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
+
+  return (
+    <div>
+      <span>{email}</span>
+      {isAdmin && <Link href="/admin">Admin</Link>}
+      <Link href="/account">Account</Link>
+      <button onClick={handleSignOut}>Sign out</button>
+    </div>
+  )
+}
+```
+
+**Why this is better:**
+- Auth fetched during SSR (same request as page data)
+- No client-side network calls
+- No loading skeleton - instant render
+- No hydration mismatches
+
+---
+
+## Fallback: Client-Side AuthButton Pattern
 
 ```typescript
 'use client'
