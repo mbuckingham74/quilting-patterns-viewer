@@ -5,6 +5,11 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
+// Loading skeleton - shown during SSR and initial client load
+function LoadingSkeleton() {
+  return <div className="h-9 w-20 bg-stone-100 rounded-lg animate-pulse" />
+}
+
 export default function AuthButton() {
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<User | null>(null)
@@ -13,28 +18,46 @@ export default function AuthButton() {
 
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
     const supabase = createClient()
 
     // Get initial user and check admin status
     const initAuth = async () => {
+      console.log('AuthButton: initAuth starting')
+      console.log('AuthButton: Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        // Add timeout to detect hanging requests
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('getUser timeout after 10s')), 10000)
+        )
+
+        const getUserPromise = supabase.auth.getUser()
+        const result = await Promise.race([getUserPromise, timeoutPromise]) as Awaited<ReturnType<typeof supabase.auth.getUser>>
+
+        const { data: { user }, error: userError } = result
+        console.log('AuthButton: getUser result', { user: user?.email, error: userError?.message })
         setUser(user)
 
         if (user) {
           // Check if user is admin
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('profiles')
             .select('is_admin')
             .eq('id', user.id)
             .single()
 
+          console.log('AuthButton: profile result', { profile, error: profileError?.message })
           setIsAdmin(profile?.is_admin ?? false)
         }
       } catch (error) {
         console.error('Auth init error:', error)
       }
 
+      console.log('AuthButton: setting loading to false')
       setLoading(false)
     }
 
@@ -56,7 +79,7 @@ export default function AuthButton() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [mounted])
 
   const handleSignOut = async () => {
     const supabase = createClient()
@@ -64,11 +87,10 @@ export default function AuthButton() {
     window.location.href = '/'
   }
 
-  // Prevent hydration mismatch - render nothing until mounted on client
+  // Always render skeleton on server and during initial client mount
+  // This prevents hydration mismatch
   if (!mounted || loading) {
-    return (
-      <div className="h-9 w-20 bg-stone-100 rounded-lg animate-pulse" />
-    )
+    return <LoadingSkeleton />
   }
 
   if (user) {
