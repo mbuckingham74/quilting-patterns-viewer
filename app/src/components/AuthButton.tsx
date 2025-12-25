@@ -28,18 +28,13 @@ export default function AuthButton() {
     // Get initial user and check admin status
     const initAuth = async () => {
       console.log('AuthButton: initAuth starting')
-      console.log('AuthButton: Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
       try {
-        // Add timeout to detect hanging requests
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('getUser timeout after 10s')), 10000)
-        )
+        // Use getSession instead of getUser - it reads from local storage/cookies first
+        // which is much faster than making a network request
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('AuthButton: getSession result', { user: session?.user?.email, error: sessionError?.message })
 
-        const getUserPromise = supabase.auth.getUser()
-        const result = await Promise.race([getUserPromise, timeoutPromise]) as Awaited<ReturnType<typeof supabase.auth.getUser>>
-
-        const { data: { user }, error: userError } = result
-        console.log('AuthButton: getUser result', { user: user?.email, error: userError?.message })
+        const user = session?.user ?? null
         setUser(user)
 
         if (user) {
