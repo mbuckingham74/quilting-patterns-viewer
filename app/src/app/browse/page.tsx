@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/server'
 import BrowseContent from '@/components/BrowseContent'
 import AISearchBar from '@/components/AISearchBar'
 import KeywordSidebar from '@/components/KeywordSidebar'
-import AuthButton from '@/components/AuthButton'
+import AuthButtonServer from '@/components/AuthButtonServer'
 
 const PAGE_SIZE = 50
 const NO_THUMBNAIL_KEYWORD_ID = 616  // Keyword ID for patterns without thumbnails
@@ -150,7 +150,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
                 className="h-10 w-auto"
               />
             </Link>
-            <AuthButton />
+            <AuthButtonServer />
           </div>
 
           {/* AI Search Bar - Full Width */}
