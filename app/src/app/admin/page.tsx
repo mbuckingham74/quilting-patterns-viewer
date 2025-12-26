@@ -118,7 +118,7 @@ export default async function AdminDashboardPage() {
         {/* Quick Links */}
         <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-6">
           <h2 className="text-lg font-semibold text-stone-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Link
               href="/admin/users"
               className="flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
@@ -130,13 +130,28 @@ export default async function AdminDashboardPage() {
               </div>
               <div>
                 <p className="font-medium text-stone-800">Manage Users</p>
-                <p className="text-sm text-stone-500">Approve or reject user accounts</p>
+                <p className="text-sm text-stone-500">Approve or reject accounts</p>
               </div>
               {pendingUsers > 0 && (
                 <span className="ml-auto bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
                   {pendingUsers}
                 </span>
               )}
+            </Link>
+
+            <Link
+              href="/admin/upload"
+              className="flex items-center gap-3 p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-green-200 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-stone-800">Upload Patterns</p>
+                <p className="text-sm text-stone-500">Add new patterns from ZIP</p>
+              </div>
             </Link>
 
             <Link
