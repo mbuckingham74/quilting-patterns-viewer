@@ -33,6 +33,10 @@ Thumbs.db
 files/patterns.db.*
 files/PVM_Thumbnails/
 
+# Script logs and temp files
+scripts/*.log
+upload_example/
+
 # Python
 __pycache__/
 *.pyc
