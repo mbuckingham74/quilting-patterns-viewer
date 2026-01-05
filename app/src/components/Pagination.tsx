@@ -44,10 +44,7 @@ export default function Pagination({ currentPage, totalPages, totalCount }: Pagi
   }
 
   return (
-    <div className="flex items-center justify-between mt-8 pt-6 border-t border-stone-200">
-      <p className="text-sm text-stone-500">
-        {totalCount.toLocaleString()} patterns total
-      </p>
+    <div className="flex items-center justify-center mt-8 pt-6 border-t border-stone-200">
       <div className="flex items-center gap-1">
         <button
           onClick={() => goToPage(currentPage - 1)}

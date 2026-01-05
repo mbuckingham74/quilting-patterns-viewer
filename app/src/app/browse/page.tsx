@@ -139,17 +139,23 @@ export default async function BrowsePage({ searchParams }: PageProps) {
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-purple-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          {/* Top row - Logo and Auth */}
+          {/* Top row - Logo, Title, Count and Auth */}
           <div className="flex items-center justify-between mb-4">
-            <Link href="/" className="flex items-center gap-3">
-              <Image
-                src="/logo.png"
-                alt="Quilting Patterns"
-                width={120}
-                height={40}
-                className="h-10 w-auto"
-              />
-            </Link>
+            <div className="flex items-center gap-4">
+              <Link href="/" className="flex items-center gap-3">
+                <Image
+                  src="/logo.png"
+                  alt="Quilting Patterns"
+                  width={120}
+                  height={40}
+                  className="h-10 w-auto"
+                />
+              </Link>
+              <div className="hidden sm:block border-l border-purple-300 pl-4">
+                <h1 className="text-lg font-semibold text-purple-900">Pam&apos;s Custom Quilts</h1>
+                <p className="text-sm text-purple-600">{count.toLocaleString()} patterns</p>
+              </div>
+            </div>
             <AuthButtonServer />
           </div>
 
