@@ -111,6 +111,6 @@ describe('POST /api/admin/notify-signup', () => {
     })
   })
 
-  // NOTE: Authentication tests for x-internal-secret will be added after PR #8 is merged
-  // PR #8 adds the secret validation to prevent external abuse of this endpoint
+  // NOTE: Authentication tests (x-internal-secret header) will be added after
+  // PR #8 is merged. PR #8 adds secret validation to prevent external abuse.
 })

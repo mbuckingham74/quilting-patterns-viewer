@@ -15,8 +15,17 @@ describe('POST /api/search - input validation', () => {
     vi.clearAllMocks()
   })
 
-  function createMockSupabase() {
+  function createMockSupabase(options: { authenticated?: boolean } = {}) {
+    const { authenticated = true } = options
     return {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: authenticated ? { id: 'test-user-id', email: 'test@example.com' } : null,
+          },
+          error: null,
+        }),
+      },
       rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
     }
   }
@@ -29,38 +38,38 @@ describe('POST /api/search - input validation', () => {
     })
   }
 
-  it('returns 400 for missing query', async () => {
-    const mockSupabase = createMockSupabase()
-    mockCreateClient.mockResolvedValue(mockSupabase as ReturnType<typeof createClient>)
+  describe('query validation', () => {
+    it('returns 400 for missing query', async () => {
+      const mockSupabase = createMockSupabase()
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
-    // Dynamic import to avoid module-level env var issues
-    const { POST } = await import('./route')
-    const response = await POST(createRequest({}))
+      const { POST } = await import('./route')
+      const response = await POST(createRequest({}))
 
-    expect(response.status).toBe(400)
-    const json = await response.json()
-    expect(json.error).toBe('Query is required')
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.error).toBe('Query is required')
+    })
+
+    it('returns 400 for non-string query', async () => {
+      const mockSupabase = createMockSupabase()
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+
+      const { POST } = await import('./route')
+      const response = await POST(createRequest({ query: 123 }))
+
+      expect(response.status).toBe(400)
+      const json = await response.json()
+      expect(json.error).toBe('Query is required')
+    })
   })
 
-  it('returns 400 for non-string query', async () => {
-    const mockSupabase = createMockSupabase()
-    mockCreateClient.mockResolvedValue(mockSupabase as ReturnType<typeof createClient>)
-
-    const { POST } = await import('./route')
-    const response = await POST(createRequest({ query: 123 }))
-
-    expect(response.status).toBe(400)
-    const json = await response.json()
-    expect(json.error).toBe('Query is required')
-  })
-
-  // NOTE: Tests that require VOYAGE_API_KEY to be set need a test setup file
-  // to set the env var before module load. The Voyage API integration and
-  // error handling tests are skipped here due to module-level env var capture.
+  // NOTE: Authentication tests will be added after PR #7 is merged.
+  // PR #7 adds auth requirement (401 for unauthenticated), rate limiting,
+  // query length validation (2-500 chars), and limit clamping (max 100).
   //
-  // Full test coverage will be added after PR #7 is merged, which includes:
-  // - Authentication requirement (401 for unauthenticated)
-  // - Limit clamping to MAX_RESULTS (100)
-  // - Query length validation (2-500 chars)
-  // - Voyage API integration tests
+  // Rate limit unit tests are in rateLimit.test.ts (on the PR #7 branch).
+  //
+  // Tests that require VOYAGE_API_KEY need a test setup file to set the
+  // env var before module load, as the module captures it at load time.
 })
