@@ -394,6 +394,36 @@ cd scripts
 python migrate.py
 ```
 
+## Security
+
+### API Security
+
+- **Search API** (`/api/search`): Requires authentication. Rate-limited to 60 requests/minute per user with HTTP 429 responses and Retry-After headers. Query length validated (2-500 chars), results capped at 100.
+
+- **Admin Notify Signup** (`/api/admin/notify-signup`): Internal-only endpoint protected by `x-internal-secret` header (uses SUPABASE_SERVICE_ROLE_KEY as shared secret). Only called by OAuth callback.
+
+- **Admin Upload** (`/api/admin/upload`): Requires admin role. Uses service-role client to bypass RLS for storage operations.
+
+- **Download API** (`/api/download/[id]`): Requires authentication. Sanitizes filenames before use in Content-Disposition headers.
+
+### Database Security
+
+- **RLS Policies**: All tables restrict SELECT to authenticated users only (not PUBLIC/anon).
+- **Pattern IDs**: Use PostgreSQL sequence (`patterns_id_seq`) to prevent race conditions. Migration: `scripts/011_pattern_id_sequence.sql`
+- **Profile Protection**: RLS policies and triggers prevent users from self-promoting to admin via email spoofing. Migrations: `scripts/009_fix_profile_self_promotion.sql`, `scripts/010_fix_security_definer_bypass.sql`
+
+### Migrations Required
+
+Run these in Supabase SQL Editor before deploying new security features:
+```bash
+# Pattern ID sequence (prevents race conditions in uploads)
+scripts/011_pattern_id_sequence.sql
+
+# Profile self-promotion fix
+scripts/009_fix_profile_self_promotion.sql
+scripts/010_fix_security_definer_bypass.sql
+```
+
 ## Notes
 
 - Original PVM stored patterns as .NET BinaryFormatter serialized blobs — we extracted the raw files during migration
