@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+// Internal API secret - must match the caller (OAuth callback)
+// Uses SUPABASE_SERVICE_ROLE_KEY as the shared secret since it's already available
+// in both locations and is appropriately secret
+const INTERNAL_API_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY
+
 // POST /api/admin/notify-signup - Send email notification to admins
+// This is an internal-only endpoint called by the OAuth callback
 export async function POST(request: NextRequest) {
   try {
+    // Validate internal API secret to prevent external abuse
+    const authHeader = request.headers.get('x-internal-secret')
+    if (!INTERNAL_API_SECRET || authHeader !== INTERNAL_API_SECRET) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { email } = await request.json()
 
     if (!email) {
