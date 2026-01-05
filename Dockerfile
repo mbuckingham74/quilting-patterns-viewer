@@ -1,5 +1,6 @@
 # Use Node 20.19+ to satisfy vitest's engine requirement (^20.19.0 || >=22.12.0)
-FROM node:20.19-alpine AS base
+# Target linux/amd64 for production server deployment
+FROM --platform=linux/amd64 node:20.19-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
