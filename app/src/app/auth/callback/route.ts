@@ -127,7 +127,10 @@ export async function GET(request: NextRequest) {
       try {
         await fetch(`${origin}/api/admin/notify-signup`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+          },
           body: JSON.stringify({ email: user.email }),
         })
       } catch (e) {
