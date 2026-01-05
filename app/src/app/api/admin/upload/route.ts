@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import JSZip from 'jszip'
 
 // Supported file extensions
@@ -8,6 +8,7 @@ const PDF_EXTENSION = '.pdf'
 
 // POST /api/admin/upload - Upload patterns from ZIP file
 export async function POST(request: NextRequest) {
+  // Use anon client for auth check (respects user session)
   const supabase = await createClient()
 
   // Check if current user is admin
@@ -24,6 +25,14 @@ export async function POST(request: NextRequest) {
 
   if (!adminProfile?.is_admin) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  }
+
+  // Use service-role client for storage/DB operations (bypasses RLS)
+  let serviceClient
+  try {
+    serviceClient = createServiceClient()
+  } catch {
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
   }
 
   try {
@@ -76,8 +85,8 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Get existing pattern names for duplicate detection
-    const existingNames = await getExistingPatternNames(supabase)
+    // Get existing pattern names for duplicate detection (use service client for full access)
+    const existingNames = await getExistingPatternNames(serviceClient)
 
     // Filter out duplicates
     const newPatterns = validPatterns.filter(p => !existingNames.has(p.name))
@@ -97,23 +106,11 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Get next pattern ID
-    const { data: lastPattern } = await supabase
-      .from('patterns')
-      .select('id')
-      .order('id', { ascending: false })
-      .limit(1)
-      .single()
-
-    let nextId = (lastPattern?.id || 0) + 1
-
     // Process each new pattern
     const uploaded: Array<{ id: number; name: string; hasThumbnail: boolean }> = []
     const errors: Array<{ name: string; error: string }> = []
 
     for (const pattern of newPatterns) {
-      const patternId = nextId++
-
       try {
         // Read QLI file
         const qliData = await zip.file(pattern.qli!)!.async('uint8array')
@@ -121,6 +118,51 @@ export async function POST(request: NextRequest) {
 
         // Extract author info from QLI
         const authorInfo = extractAuthorFromQli(qliData)
+
+        // Create display name
+        const displayName = pattern.name.replace(/-/g, ' ').replace(/_/g, ' ')
+          .split(' ')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(' ')
+
+        // Insert pattern record first to get DB-assigned ID (prevents race conditions)
+        const { data: insertedPattern, error: insertError } = await serviceClient
+          .from('patterns')
+          .insert({
+            // id is auto-assigned by sequence
+            file_name: `${pattern.name}.qli`,
+            file_extension: 'qli',
+            file_size: qliSize,
+            author: authorInfo.author,
+            author_url: authorInfo.authorUrl,
+            author_notes: authorInfo.authorNotes,
+            notes: displayName,
+            thumbnail_url: null, // Will update after storage upload
+            pattern_file_url: null, // Will update after storage upload
+          })
+          .select('id')
+          .single()
+
+        if (insertError || !insertedPattern) {
+          throw insertError || new Error('Failed to create pattern record')
+        }
+
+        const patternId = insertedPattern.id
+
+        // Upload pattern file (no upsert - fail if collision)
+        const patternPath = `${patternId}.qli`
+        const { error: patternUploadError } = await serviceClient.storage
+          .from('patterns')
+          .upload(patternPath, qliData, {
+            contentType: 'application/octet-stream',
+            upsert: false, // Fail on collision instead of silent overwrite
+          })
+
+        if (patternUploadError) {
+          // Clean up the DB record if storage upload failed
+          await serviceClient.from('patterns').delete().eq('id', patternId)
+          throw patternUploadError
+        }
 
         // Generate thumbnail from PDF if available
         let thumbnailUrl: string | null = null
@@ -130,47 +172,29 @@ export async function POST(request: NextRequest) {
             const thumbnailData = await renderPdfToThumbnail(pdfData)
 
             if (thumbnailData) {
-              // Upload thumbnail
+              // Upload thumbnail (no upsert)
               const thumbPath = `${patternId}.png`
-              await supabase.storage.from('thumbnails').upload(thumbPath, thumbnailData, {
-                contentType: 'image/png',
-                upsert: true
-              })
-              thumbnailUrl = supabase.storage.from('thumbnails').getPublicUrl(thumbPath).data.publicUrl
+              const { error: thumbError } = await serviceClient.storage
+                .from('thumbnails')
+                .upload(thumbPath, thumbnailData, {
+                  contentType: 'image/png',
+                  upsert: false,
+                })
+
+              if (!thumbError) {
+                thumbnailUrl = serviceClient.storage.from('thumbnails').getPublicUrl(thumbPath).data.publicUrl
+              }
             }
           } catch (e) {
             console.warn(`Could not generate thumbnail for ${pattern.name}:`, e)
           }
         }
 
-        // Upload pattern file
-        const patternPath = `${patternId}.qli`
-        await supabase.storage.from('patterns').upload(patternPath, qliData, {
-          contentType: 'application/octet-stream',
-          upsert: true
-        })
-
-        // Create display name
-        const displayName = pattern.name.replace(/-/g, ' ').replace(/_/g, ' ')
-          .split(' ')
-          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(' ')
-
-        // Insert pattern record
-        const { error: insertError } = await supabase.from('patterns').insert({
-          id: patternId,
-          file_name: `${pattern.name}.qli`,
-          file_extension: 'qli',
-          file_size: qliSize,
-          author: authorInfo.author,
-          author_url: authorInfo.authorUrl,
-          author_notes: authorInfo.authorNotes,
-          notes: displayName,
+        // Update pattern with storage URLs
+        await serviceClient.from('patterns').update({
           thumbnail_url: thumbnailUrl,
           pattern_file_url: patternPath,
-        })
-
-        if (insertError) throw insertError
+        }).eq('id', patternId)
 
         uploaded.push({
           id: patternId,
@@ -210,7 +234,8 @@ export async function POST(request: NextRequest) {
 }
 
 // Helper: Get existing pattern names for duplicate detection
-async function getExistingPatternNames(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Set<string>> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getExistingPatternNames(supabase: any): Promise<Set<string>> {
   const existing = new Set<string>()
   let offset = 0
   const batchSize = 1000
