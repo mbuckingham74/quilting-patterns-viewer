@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ADMIN_EMAILS } from '@/lib/types'
+import { createClient } from '@supabase/supabase-js'
 
 // POST /api/admin/notify-signup - Send email notification to admins
 export async function POST(request: NextRequest) {
@@ -16,6 +16,28 @@ export async function POST(request: NextRequest) {
       console.log('RESEND_API_KEY not configured, skipping email notification')
       return NextResponse.json({ success: true, skipped: true })
     }
+
+    // Guard against missing service role key
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY not configured, cannot fetch admin emails')
+      return NextResponse.json({ success: true, skipped: true, reason: 'missing_service_key' })
+    }
+
+    // Fetch admin emails from database using service role
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
+
+    const { data: adminEmails } = await supabase
+      .from('admin_emails')
+      .select('email')
+
+    if (!adminEmails || adminEmails.length === 0) {
+      console.log('No admin emails found in database')
+      return NextResponse.json({ success: true, skipped: true })
+    }
+
+    const adminEmailList = adminEmails.map(a => a.email)
 
     // Send email to all admin addresses
     const adminPanelUrl = 'https://patterns.tachyonfuture.com/admin/users'
@@ -40,7 +62,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         from: 'Quilting Patterns <noreply@tachyonfuture.com>',
-        to: ADMIN_EMAILS,
+        to: adminEmailList,
         subject: `New Signup: ${email} - Quilting Patterns`,
         html: emailBody,
       }),

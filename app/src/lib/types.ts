@@ -76,8 +76,6 @@ export interface Profile {
   created_at: string
 }
 
-// Admin emails that get auto-approved
-export const ADMIN_EMAILS = [
-  'michael.buckingham74@gmail.com',
-  'pamncharlie@gmail.com',
-]
+// NOTE: Admin emails are now stored in the database (admin_emails table)
+// and checked via an AFTER INSERT trigger on profiles.
+// This prevents client-side manipulation of admin/approval status.

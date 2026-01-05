@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { ADMIN_EMAILS } from '@/lib/types'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -53,28 +52,32 @@ export default function SignupPage() {
         return
       }
 
-      // Check if this is an admin email
-      const userEmail = email.toLowerCase()
-      const isAdmin = ADMIN_EMAILS.includes(userEmail)
-      const isApproved = isAdmin
-
-      // Create profile
+      // Create profile with safe defaults
+      // Database trigger handles admin detection server-side
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
           id: user.id,
           email: email,
-          is_approved: isApproved,
-          is_admin: isAdmin,
-          approved_at: isApproved ? new Date().toISOString() : null,
+          is_approved: false,
+          is_admin: false,
         })
 
       if (profileError) {
         console.error('Error creating profile:', profileError)
       }
 
+      // Fetch the profile to check if trigger marked as admin
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('is_approved, is_admin')
+        .eq('id', user.id)
+        .single()
+
+      const isApproved = profile?.is_approved ?? false
+
       // Send admin notification for new non-admin users
-      if (!isAdmin) {
+      if (!profile?.is_admin) {
         try {
           await fetch('/api/admin/notify-signup', {
             method: 'POST',
