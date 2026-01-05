@@ -69,7 +69,19 @@ def connect_supabase() -> Client:
 
 
 def get_next_pattern_id(supabase: Client) -> int:
-    """Get the next available pattern ID."""
+    """
+    Get the next available pattern ID using the database sequence.
+    Falls back to max(id)+1 if sequence doesn't exist yet.
+    """
+    # Try to use the sequence (migration 011)
+    try:
+        result = supabase.rpc('get_next_pattern_id').execute()
+        if result.data is not None:
+            return result.data
+    except Exception:
+        pass  # Sequence not yet created, fall back to max+1
+
+    # Fallback: get max ID + 1
     result = supabase.table('patterns').select('id').order('id', desc=True).limit(1).execute()
     if result.data:
         return result.data[0]['id'] + 1
@@ -269,10 +281,6 @@ def process_zip(zip_path: Path, supabase: Client) -> dict:
 
         print(f"  {len(new_patterns)} new patterns to upload")
 
-        # Get next pattern ID
-        next_id = get_next_pattern_id(supabase)
-        print(f"  Starting pattern ID: {next_id}")
-
         # Process each pattern
         results = {
             'uploaded': [],
@@ -281,8 +289,6 @@ def process_zip(zip_path: Path, supabase: Client) -> dict:
         }
 
         for i, (pattern_name, files) in enumerate(new_patterns.items()):
-            pattern_id = next_id + i
-
             try:
                 # Read QLI file
                 qli_data = zf.read(files['qli'])
@@ -291,39 +297,12 @@ def process_zip(zip_path: Path, supabase: Client) -> dict:
                 # Extract author info from QLI
                 author_info = extract_author_from_qli(qli_data)
 
-                # Generate thumbnail from PDF if available
-                thumbnail_url = None
-                if files['pdf']:
-                    try:
-                        pdf_data = zf.read(files['pdf'])
-                        thumbnail_data = render_pdf_to_thumbnail(pdf_data)
-
-                        # Upload thumbnail
-                        thumb_path = f"{pattern_id}.png"
-                        supabase.storage.from_('thumbnails').upload(
-                            thumb_path,
-                            thumbnail_data,
-                            file_options={"content-type": "image/png", "upsert": "true"}
-                        )
-                        thumbnail_url = supabase.storage.from_('thumbnails').get_public_url(thumb_path)
-
-                    except Exception as e:
-                        print(f"  ⚠️  Warning: Could not generate thumbnail for {pattern_name}: {e}")
-
-                # Upload pattern file
-                pattern_path = f"{pattern_id}.qli"
-                supabase.storage.from_('patterns').upload(
-                    pattern_path,
-                    qli_data,
-                    file_options={"content-type": "application/octet-stream", "upsert": "true"}
-                )
-
                 # Create display name from filename
                 display_name = pattern_name.replace('-', ' ').replace('_', ' ').title()
 
-                # Insert pattern record
+                # Insert pattern record first to get DB-assigned ID (prevents race conditions)
                 pattern_record = {
-                    'id': pattern_id,
+                    # id is auto-assigned by sequence
                     'file_name': f"{pattern_name}.qli",
                     'file_extension': 'qli',
                     'file_size': qli_size,
@@ -331,11 +310,54 @@ def process_zip(zip_path: Path, supabase: Client) -> dict:
                     'author_url': author_info.get('author_url'),
                     'author_notes': author_info.get('author_notes'),
                     'notes': display_name,
-                    'thumbnail_url': thumbnail_url,
-                    'pattern_file_url': pattern_path,
+                    'thumbnail_url': None,  # Will update after storage upload
+                    'pattern_file_url': None,  # Will update after storage upload
                 }
 
-                supabase.table('patterns').insert(pattern_record).execute()
+                # Use .select('id') to ensure we get the inserted row back
+                insert_result = supabase.table('patterns').insert(pattern_record).select('id').execute()
+                if not insert_result.data or 'id' not in insert_result.data[0]:
+                    raise Exception("Failed to insert pattern record or retrieve ID")
+
+                pattern_id = insert_result.data[0]['id']
+
+                # Upload pattern file (no upsert - fail if collision)
+                pattern_path = f"{pattern_id}.qli"
+                try:
+                    supabase.storage.from_('patterns').upload(
+                        pattern_path,
+                        qli_data,
+                        file_options={"content-type": "application/octet-stream"}
+                    )
+                except Exception as upload_err:
+                    # Clean up DB record if storage upload failed
+                    supabase.table('patterns').delete().eq('id', pattern_id).execute()
+                    raise upload_err
+
+                # Generate thumbnail from PDF if available
+                thumbnail_url = None
+                if files['pdf']:
+                    try:
+                        pdf_data = zf.read(files['pdf'])
+                        thumbnail_data = render_pdf_to_thumbnail(pdf_data)
+
+                        # Upload thumbnail (no upsert)
+                        thumb_path = f"{pattern_id}.png"
+                        supabase.storage.from_('thumbnails').upload(
+                            thumb_path,
+                            thumbnail_data,
+                            file_options={"content-type": "image/png"}
+                        )
+                        thumbnail_url = supabase.storage.from_('thumbnails').get_public_url(thumb_path)
+
+                    except Exception as e:
+                        print(f"  ⚠️  Warning: Could not generate thumbnail for {pattern_name}: {e}")
+
+                # Update pattern with storage URLs
+                supabase.table('patterns').update({
+                    'thumbnail_url': thumbnail_url,
+                    'pattern_file_url': pattern_path,
+                }).eq('id', pattern_id).execute()
 
                 results['uploaded'].append({
                     'id': pattern_id,
