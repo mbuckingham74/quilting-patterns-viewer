@@ -394,6 +394,24 @@ cd scripts
 python migrate.py
 ```
 
+## Deployment
+
+**IMPORTANT**: Always use the deploy script. Do not run docker build manually.
+
+```bash
+# Deploy to production (from project root)
+./scripts/deploy.sh
+```
+
+The deploy script handles:
+- Building for linux/amd64 (server architecture)
+- Passing NEXT_PUBLIC_* build args (required at compile time for Next.js)
+- Transferring image to server
+- Restarting container with correct env vars
+- Verifying HTTP 200 response
+
+The server runs at https://patterns.tachyonfuture.com via Nginx Proxy Manager.
+
 ## Security
 
 ### API Security
