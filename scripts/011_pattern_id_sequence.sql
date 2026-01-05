@@ -45,10 +45,13 @@ ALTER TABLE patterns ALTER COLUMN id SET DEFAULT nextval('patterns_id_seq');
 -- ============================================
 
 -- Function to get next pattern ID (for cases where we need ID before insert)
+-- Uses SECURITY DEFINER so authenticated users can call it without needing
+-- direct USAGE permission on the sequence
 CREATE OR REPLACE FUNCTION get_next_pattern_id()
 RETURNS INTEGER
 LANGUAGE sql
-SECURITY INVOKER
+SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT nextval('patterns_id_seq')::INTEGER;
 $$;

@@ -144,6 +144,11 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (insertError || !insertedPattern) {
+          // If migration 011 hasn't been applied, id column has no default and insert fails
+          const errorMsg = insertError?.message || 'Failed to create pattern record'
+          if (errorMsg.includes('null value') && errorMsg.includes('id')) {
+            throw new Error('Database migration required: run 011_pattern_id_sequence.sql')
+          }
           throw insertError || new Error('Failed to create pattern record')
         }
 
@@ -191,10 +196,21 @@ export async function POST(request: NextRequest) {
         }
 
         // Update pattern with storage URLs
-        await serviceClient.from('patterns').update({
+        const { error: updateError } = await serviceClient.from('patterns').update({
           thumbnail_url: thumbnailUrl,
           pattern_file_url: patternPath,
         }).eq('id', patternId)
+
+        if (updateError) {
+          // Storage uploads succeeded but DB update failed - pattern is in inconsistent state
+          // Clean up storage files and DB record
+          await serviceClient.storage.from('patterns').remove([patternPath])
+          if (thumbnailUrl) {
+            await serviceClient.storage.from('thumbnails').remove([`${patternId}.png`])
+          }
+          await serviceClient.from('patterns').delete().eq('id', patternId)
+          throw new Error(`Failed to update pattern URLs: ${updateError.message}`)
+        }
 
         uploaded.push({
           id: patternId,

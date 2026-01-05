@@ -314,9 +314,10 @@ def process_zip(zip_path: Path, supabase: Client) -> dict:
                     'pattern_file_url': None,  # Will update after storage upload
                 }
 
-                insert_result = supabase.table('patterns').insert(pattern_record).execute()
-                if not insert_result.data:
-                    raise Exception("Failed to insert pattern record")
+                # Use .select('id') to ensure we get the inserted row back
+                insert_result = supabase.table('patterns').insert(pattern_record).select('id').execute()
+                if not insert_result.data or 'id' not in insert_result.data[0]:
+                    raise Exception("Failed to insert pattern record or retrieve ID")
 
                 pattern_id = insert_result.data[0]['id']
 
