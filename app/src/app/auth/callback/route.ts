@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
-import { ADMIN_EMAILS } from '@/lib/types'
 
 // Allowlist of valid origins for OAuth redirects
 const ALLOWED_ORIGINS = [
@@ -98,28 +97,33 @@ export async function GET(request: NextRequest) {
   let isApproved = existingProfile?.is_approved ?? false
 
   if (!existingProfile) {
-    // New user - create profile
-    const userEmail = user.email?.toLowerCase() || ''
-    const isAdmin = ADMIN_EMAILS.includes(userEmail)
-    isApproved = isAdmin
-
+    // New user - create profile with safe defaults
+    // Database trigger handles admin detection server-side
     const { error: insertError } = await supabase
       .from('profiles')
       .insert({
         id: user.id,
         email: user.email,
         display_name: user.user_metadata?.full_name || user.user_metadata?.name || null,
-        is_approved: isApproved,
-        is_admin: isAdmin,
-        approved_at: isApproved ? new Date().toISOString() : null,
+        is_approved: false,
+        is_admin: false,
       })
 
     if (insertError) {
       console.error('Error creating profile:', insertError)
     }
 
+    // Re-fetch profile to get trigger-updated values
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .select('is_approved, is_admin')
+      .eq('id', user.id)
+      .single()
+
+    isApproved = newProfile?.is_approved ?? false
+
     // Send admin notification for new non-admin users
-    if (!isAdmin) {
+    if (!newProfile?.is_admin) {
       try {
         await fetch(`${origin}/api/admin/notify-signup`, {
           method: 'POST',
