@@ -56,7 +56,8 @@ AS $$
   SELECT nextval('patterns_id_seq')::INTEGER;
 $$;
 
--- Grant execute to authenticated users (admins will use this)
+-- Revoke default PUBLIC access, then grant only to authenticated users
+REVOKE EXECUTE ON FUNCTION get_next_pattern_id() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION get_next_pattern_id() TO authenticated;
 
 -- ============================================

@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Use service-role client for storage/DB operations (bypasses RLS)
-  let serviceClient
+  let serviceClient: ReturnType<typeof createServiceClient>
   try {
     serviceClient = createServiceClient()
   } catch {
