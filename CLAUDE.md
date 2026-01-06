@@ -23,6 +23,8 @@ This app replaces the legacy Windows-only PVM (Pattern Viewer and Manager) softw
 - **Auth**: Supabase Auth with Google OAuth
 - **Database**: Supabase Postgres
 - **Storage**: Supabase Storage (for thumbnails and pattern files)
+- **AI Search**: Voyage AI multimodal embeddings + pgvector
+- **Error Monitoring**: Sentry (production only)
 - **Deployment**: Docker container on VPS at patterns.tachyonfuture.com
 - **Reverse Proxy**: Nginx Proxy Manager (NPM) handles SSL
 
@@ -148,13 +150,20 @@ patterns/
 │   │   ├── PatternCard.tsx
 │   │   ├── KeywordFilter.tsx
 │   │   ├── SearchBar.tsx
-│   │   └── AuthButton.tsx
+│   │   ├── AuthButton.tsx
+│   │   ├── Toast.tsx           # Toast notification system
+│   │   └── ErrorBoundary.tsx   # React error boundary
 │   ├── lib/
 │   │   ├── supabase/
 │   │   │   ├── client.ts       # Browser client
 │   │   │   ├── server.ts       # Server client
 │   │   │   └── middleware.ts
+│   │   ├── errors.ts           # Error codes, parsing, Sentry integration
+│   │   ├── api-response.ts     # API route response helpers
+│   │   ├── fetch-with-retry.ts # Fetch wrapper with retry logic
 │   │   └── utils.ts
+│   ├── hooks/
+│   │   └── useFetch.ts         # React hook for fetch with retry
 │   ├── public/
 │   ├── package.json
 │   ├── next.config.js
@@ -357,6 +366,11 @@ services:
 NEXT_PUBLIC_SUPABASE_URL=https://base.tachyonfuture.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
 SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
+VOYAGE_API_KEY=<voyage_api_key>              # For AI semantic search
+
+# Production only (optional)
+NEXT_PUBLIC_SENTRY_DSN=<sentry_dsn>          # Error monitoring
+RESEND_API_KEY=<resend_api_key>              # Admin email notifications
 ```
 
 ## NPM (Nginx Proxy Manager) Setup
@@ -440,6 +454,58 @@ scripts/011_pattern_id_sequence.sql
 # Profile self-promotion fix
 scripts/009_fix_profile_self_promotion.sql
 scripts/010_fix_security_definer_bypass.sql
+```
+
+## Error Handling
+
+The app has a comprehensive error handling system. See `docs/ERROR_HANDLING.md` for full details.
+
+### Key Components
+
+| File | Purpose |
+|------|---------|
+| `lib/errors.ts` | Error codes, parsing, Sentry integration |
+| `lib/api-response.ts` | Standardized API error responses |
+| `lib/fetch-with-retry.ts` | Automatic retry with exponential backoff |
+| `hooks/useFetch.ts` | React hook for fetch with retry |
+| `components/Toast.tsx` | User-friendly toast notifications |
+| `components/ErrorBoundary.tsx` | React error boundary for crash recovery |
+| `app/error.tsx` | Next.js route-level error page |
+| `app/global-error.tsx` | Next.js root error page |
+
+### Sentry Integration
+
+Errors are automatically sent to Sentry in production when `NEXT_PUBLIC_SENTRY_DSN` is configured.
+
+```typescript
+import { logError, setErrorUser, addErrorBreadcrumb } from '@/lib/errors'
+
+// Log errors with context (auto-sends to Sentry in production)
+logError(error, { component: 'PatternGrid', action: 'load_patterns', userId })
+
+// Set user context for better debugging
+setErrorUser(userId, email)
+
+// Add breadcrumbs to trace user actions
+addErrorBreadcrumb('Downloaded pattern', 'user', { patternId: 123 })
+```
+
+### Graceful Degradation
+
+**AI Search Fallback**: When Voyage AI is unavailable, search automatically falls back to text-based search:
+- Falls back on: API key missing, network error, rate limit, timeout
+- Text search matches: `file_name`, `author`, `notes` fields
+- UI shows indicator: "Using text search (AI search temporarily unavailable)"
+- Response includes: `searchMethod: 'semantic' | 'text'` and `fallbackUsed: boolean`
+
+### Toast Notifications
+
+```typescript
+import { useToast } from '@/components/Toast'
+
+const { showError, showSuccess } = useToast()
+showSuccess('Pattern downloaded!')
+showError(error, 'Download failed')  // Auto-parses error for user-friendly message
 ```
 
 ## Notes

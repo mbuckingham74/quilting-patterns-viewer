@@ -10,6 +10,8 @@ The app uses a centralized error handling system that provides:
 - React error boundaries for crash recovery
 - Automatic retry for transient failures
 - Structured logging for debugging
+- **Sentry integration** for production error monitoring
+- **Graceful degradation** for AI search (falls back to text search)
 
 ## Architecture
 
@@ -294,7 +296,7 @@ Log output includes:
 - Context metadata
 - Original error details (name, message, stack)
 
-In development, logs go to console. In production, extend `logError()` to send to a service like Sentry.
+In development, logs go to console. In production, errors are automatically sent to Sentry (see below).
 
 ## Retry Behavior
 
@@ -389,7 +391,7 @@ export default function GlobalError({ error, reset }) {
 
 | File | Purpose |
 |------|---------|
-| `lib/errors.ts` | Error codes, parsing, classification |
+| `lib/errors.ts` | Error codes, parsing, Sentry integration |
 | `lib/api-response.ts` | API route response helpers |
 | `lib/fetch-with-retry.ts` | Fetch wrapper with retry logic |
 | `hooks/useFetch.ts` | React hook for fetch with retry |
@@ -397,6 +399,9 @@ export default function GlobalError({ error, reset }) {
 | `components/ErrorBoundary.tsx` | React error boundary |
 | `app/error.tsx` | Next.js route error page |
 | `app/global-error.tsx` | Next.js global error page |
+| `sentry.client.config.ts` | Browser-side Sentry initialization |
+| `sentry.server.config.ts` | Server-side Sentry initialization |
+| `sentry.edge.config.ts` | Edge runtime Sentry initialization |
 
 ## Extending the System
 
@@ -407,22 +412,9 @@ export default function GlobalError({ error, reset }) {
 3. Update `isRetryableError()` if needed
 4. Update `httpStatusToErrorCode()` if HTTP-related
 
-### Integrating External Logging
+### Sentry Integration
 
-Modify `logError()` in `lib/errors.ts`:
-
-```typescript
-export function logError(error: unknown, context?: ErrorLogContext): void {
-  const parsed = parseError(error)
-
-  if (process.env.NODE_ENV === 'production') {
-    // Send to Sentry, LogRocket, etc.
-    Sentry.captureException(error, { extra: { ...parsed, context } })
-  }
-
-  console.error('[AppError]', parsed)
-}
-```
+Sentry is already integrated. See the next section for details.
 
 ### Custom Toast Types
 
@@ -440,3 +432,157 @@ const config = {
   },
 }
 ```
+
+## Sentry Integration
+
+The app uses [Sentry](https://sentry.io) for production error monitoring. Errors are automatically captured and sent to Sentry with context.
+
+### Configuration Files
+
+| File | Purpose |
+|------|---------|
+| `sentry.client.config.ts` | Browser-side Sentry initialization |
+| `sentry.server.config.ts` | Server-side Sentry initialization |
+| `sentry.edge.config.ts` | Edge runtime Sentry initialization |
+
+### Setup
+
+1. Create a Sentry project at https://sentry.io
+2. Get your DSN from Project Settings → Client Keys
+3. Add to environment variables:
+
+```bash
+# Production environment (.env or docker-compose)
+NEXT_PUBLIC_SENTRY_DSN=https://xxx@xxx.ingest.sentry.io/xxx
+```
+
+Sentry only activates in production when `NEXT_PUBLIC_SENTRY_DSN` is set. In development, errors only log to console.
+
+### How Errors Are Captured
+
+The `logError()` function in `lib/errors.ts` automatically sends errors to Sentry:
+
+```typescript
+import { logError } from '@/lib/errors'
+
+try {
+  await riskyOperation()
+} catch (error) {
+  logError(error, {
+    component: 'PatternUpload',
+    action: 'upload_file',
+    userId: user.id,
+  })
+}
+```
+
+This captures:
+- Error message and stack trace
+- Error code tag (e.g., `AUTH_EXPIRED`, `RATE_LIMITED`)
+- Retryable flag
+- Component and action tags
+- User ID (if provided)
+- Custom context as extras
+
+### User Context
+
+Set user context after login for better debugging:
+
+```typescript
+import { setErrorUser, clearErrorUser } from '@/lib/errors'
+
+// After successful login
+setErrorUser(user.id, user.email)
+
+// After logout
+clearErrorUser()
+```
+
+### Breadcrumbs
+
+Add breadcrumbs to trace user actions leading to errors:
+
+```typescript
+import { addErrorBreadcrumb } from '@/lib/errors'
+
+// Track user actions
+addErrorBreadcrumb('Clicked download button', 'user', { patternId: 123 })
+addErrorBreadcrumb('API request started', 'http', { endpoint: '/api/download' })
+```
+
+### Filtering in Sentry
+
+Use tags to filter errors:
+- `error_code`: Filter by error type (e.g., `RATE_LIMITED`)
+- `component`: Filter by component name
+- `action`: Filter by action type
+- `retryable`: Filter by retryable status
+
+## Graceful Degradation
+
+The app implements graceful degradation for critical features to ensure functionality even when external services fail.
+
+### AI Search Fallback
+
+When the Voyage AI embedding service is unavailable, search automatically falls back to text-based search:
+
+**How it works:**
+
+1. User enters search query
+2. App tries semantic search via Voyage AI
+3. If Voyage API fails (network error, rate limit, timeout), falls back to text search
+4. Text search matches against `file_name`, `author`, and `notes` fields
+5. UI shows subtle indicator: "Using text search (AI search temporarily unavailable)"
+
+**Response Format:**
+
+```json
+{
+  "patterns": [...],
+  "searchMethod": "semantic" | "text",
+  "fallbackUsed": true | false
+}
+```
+
+**Fallback triggers:**
+- `VOYAGE_API_KEY` not configured
+- Voyage API returns non-2xx response
+- Network error or timeout
+- Any exception during embedding
+
+**UI Indicator:**
+
+The `AISearchBar` component shows an amber message when fallback is used:
+
+```
+ⓘ Using text search (AI search temporarily unavailable)
+```
+
+This appears below the search bar after a search completes with fallback.
+
+### Implementing Fallback for Other Services
+
+Follow this pattern for other external services:
+
+```typescript
+async function serviceWithFallback<T>(
+  primary: () => Promise<T>,
+  fallback: () => Promise<T>,
+  context: string
+): Promise<{ result: T; usedFallback: boolean }> {
+  try {
+    const result = await primary()
+    return { result, usedFallback: false }
+  } catch (error) {
+    logError(error, { component: context, action: 'primary_service_failed' })
+    const result = await fallback()
+    return { result, usedFallback: true }
+  }
+}
+```
+
+### Future Graceful Degradation Candidates
+
+- **Thumbnail loading**: Fall back to placeholder on storage errors
+- **Email notifications**: Queue for retry if Resend API fails
+- **Auth refresh**: Graceful session recovery on token expiry
