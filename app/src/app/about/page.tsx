@@ -16,11 +16,11 @@ export default function AboutPage() {
               className="h-10 w-auto"
             />
           </Link>
-          <nav className="flex gap-6 text-sm">
-            <Link href="/about" className="text-rose-600 font-medium">
+          <nav className="flex gap-6 text-base font-medium">
+            <Link href="/about" className="text-rose-700">
               About
             </Link>
-            <Link href="/contact" className="text-stone-600 hover:text-stone-900">
+            <Link href="/contact" className="text-rose-600 hover:text-rose-700">
               Contact
             </Link>
           </nav>
@@ -48,7 +48,7 @@ export default function AboutPage() {
 
       {/* Footer */}
       <footer className="border-t border-stone-200 bg-white/50 mt-auto">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-sm text-stone-500">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-base font-medium text-rose-600">
           Pam&apos;s Custom Quilts
         </div>
       </footer>

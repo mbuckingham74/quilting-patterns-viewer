@@ -8,11 +8,11 @@ export default function LandingPage() {
       {/* Header - minimal with nav links */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-stone-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-end">
-          <nav className="flex gap-6 text-sm">
-            <Link href="/about" className="text-stone-600 hover:text-stone-900">
+          <nav className="flex gap-6 text-base font-medium">
+            <Link href="/about" className="text-rose-600 hover:text-rose-700">
               About
             </Link>
-            <Link href="/contact" className="text-stone-600 hover:text-stone-900">
+            <Link href="/contact" className="text-rose-600 hover:text-rose-700">
               Contact
             </Link>
           </nav>
@@ -82,7 +82,7 @@ export default function LandingPage() {
 
       {/* Footer - simple brand */}
       <footer className="border-t border-stone-200 bg-white/50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-sm text-stone-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-base font-medium text-rose-600">
           Pam&apos;s Custom Quilts
         </div>
       </footer>
