@@ -72,6 +72,132 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph Client["🖥️ Client Browser"]
+        UI[Next.js App]
+        Toast[Toast Notifications]
+        EB[Error Boundaries]
+    end
+
+    subgraph Server["🐳 Docker Container"]
+        Next[Next.js Server]
+        API[API Routes]
+        Sentry[Sentry SDK]
+    end
+
+    subgraph Supabase["☁️ Supabase"]
+        Auth[Auth Service]
+        DB[(PostgreSQL + pgvector)]
+        Storage[Storage Buckets]
+    end
+
+    subgraph External["🌐 External Services"]
+        Voyage[Voyage AI]
+        Google[Google OAuth]
+        Resend[Resend Email]
+        SentryCloud[Sentry.io]
+    end
+
+    UI --> Next
+    Next --> API
+    API --> Auth
+    API --> DB
+    API --> Storage
+    API --> Voyage
+    Auth --> Google
+    API --> Resend
+    Sentry --> SentryCloud
+
+    Toast -.-> UI
+    EB -.-> UI
+```
+
+### Request Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant N as Next.js
+    participant A as Supabase Auth
+    participant V as Voyage AI
+    participant D as PostgreSQL
+    participant S as Storage
+
+    U->>N: Search "floral patterns"
+    N->>A: Verify JWT
+    A-->>N: User authenticated
+
+    alt AI Search Available
+        N->>V: Generate text embedding
+        V-->>N: 1024-dim vector
+        N->>D: Vector similarity search (pgvector)
+    else Fallback to Text Search
+        N->>D: ILIKE query on file_name, author, notes
+    end
+
+    D-->>N: Matching patterns
+    N-->>U: Results + searchMethod indicator
+
+    U->>N: Download pattern #123
+    N->>A: Verify JWT
+    N->>D: Get pattern metadata
+    N->>S: Fetch pattern file
+    S-->>N: Binary file data
+    N-->>U: File download
+```
+
+### Data Model
+
+```mermaid
+erDiagram
+    PROFILES ||--o{ FAVORITES : has
+    PROFILES ||--o{ SAVED_SEARCHES : has
+    PATTERNS ||--o{ PATTERN_KEYWORDS : has
+    PATTERNS ||--o{ FAVORITES : in
+    KEYWORDS ||--o{ PATTERN_KEYWORDS : has
+    KEYWORD_GROUPS ||--o{ KEYWORD_GROUP_KEYWORDS : has
+    KEYWORDS ||--o{ KEYWORD_GROUP_KEYWORDS : in
+
+    PATTERNS {
+        int id PK
+        text file_name
+        text file_extension
+        text author
+        text thumbnail_url
+        text pattern_file_url
+        vector embedding
+    }
+
+    KEYWORDS {
+        int id PK
+        text value UK
+    }
+
+    PROFILES {
+        uuid id PK
+        text email
+        text display_name
+        text role
+        boolean approved
+    }
+
+    FAVORITES {
+        uuid user_id FK
+        int pattern_id FK
+    }
+
+    SAVED_SEARCHES {
+        int id PK
+        uuid user_id FK
+        text query
+    }
+```
+
+---
+
 ## Quick Start
 
 ### Prerequisites
