@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, badRequest, rateLimited, serviceUnavailable, internalError } from '@/lib/api-response'
+import { unauthorized, badRequest, rateLimited, internalError } from '@/lib/api-response'
+import { logError, addErrorBreadcrumb } from '@/lib/errors'
 
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY
 const VOYAGE_MODEL = 'voyage-multimodal-3'
@@ -58,6 +59,153 @@ export function checkRateLimit(userId: string): { allowed: boolean; retryAfter?:
   return { allowed: true }
 }
 
+// ============================================================================
+// Search Types
+// ============================================================================
+
+type SearchMethod = 'semantic' | 'text'
+
+interface SearchResult {
+  patterns: Pattern[]
+  query: string
+  count: number
+  searchMethod: SearchMethod
+  fallbackUsed?: boolean
+}
+
+interface Pattern {
+  id: number
+  file_name: string
+  file_extension: string
+  author: string
+  thumbnail_url: string
+  similarity?: number
+}
+
+// ============================================================================
+// Text-based fallback search (when AI is unavailable)
+// ============================================================================
+
+async function textSearch(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  query: string,
+  limit: number
+): Promise<Pattern[]> {
+  addErrorBreadcrumb('Using text search fallback', 'search')
+
+  // Search across file_name, author, and notes using ilike
+  // Split query into words for better matching
+  const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length >= 2)
+
+  if (searchTerms.length === 0) {
+    return []
+  }
+
+  // Build a query that matches any of the search terms
+  // Using textSearch would be better but requires full-text search setup
+  // For now, use ilike with OR conditions
+  const { data: patterns, error } = await supabase
+    .from('patterns')
+    .select('id, file_name, file_extension, author, thumbnail_url')
+    .or(
+      searchTerms.map(term =>
+        `file_name.ilike.%${term}%,author.ilike.%${term}%,notes.ilike.%${term}%`
+      ).join(',')
+    )
+    .limit(limit)
+
+  if (error) {
+    logError(error, { action: 'text_search', query })
+    throw error
+  }
+
+  return patterns || []
+}
+
+// ============================================================================
+// Semantic search using Voyage AI embeddings
+// ============================================================================
+
+async function semanticSearch(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  query: string,
+  limit: number,
+  userId: string
+): Promise<{ patterns: Pattern[]; fallbackUsed: boolean }> {
+  // Check if Voyage API is configured
+  if (!VOYAGE_API_KEY) {
+    console.log('Voyage API key not configured, using text search fallback')
+    const patterns = await textSearch(supabase, query, limit)
+    return { patterns, fallbackUsed: true }
+  }
+
+  try {
+    addErrorBreadcrumb('Calling Voyage AI API', 'search', { query })
+
+    // Embed the text query using Voyage AI
+    const embeddingResponse = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${VOYAGE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: VOYAGE_MODEL,
+        inputs: [[{ type: 'text', text: query }]],
+        input_type: 'query',
+      }),
+    })
+
+    if (!embeddingResponse.ok) {
+      const errorText = await embeddingResponse.text()
+      logError(new Error(`Voyage API error: ${errorText}`), {
+        action: 'voyage_embedding',
+        status: embeddingResponse.status,
+        userId,
+      })
+
+      // Fall back to text search
+      console.log('Voyage API failed, falling back to text search')
+      const patterns = await textSearch(supabase, query, limit)
+      return { patterns, fallbackUsed: true }
+    }
+
+    const embeddingData = await embeddingResponse.json()
+    const queryEmbedding = embeddingData.data[0].embedding
+
+    addErrorBreadcrumb('Voyage embedding received, searching database', 'search')
+
+    // Search for similar patterns using pgvector
+    const { data: patterns, error } = await supabase.rpc('search_patterns_semantic', {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.2,
+      match_count: limit,
+    })
+
+    if (error) {
+      logError(error, { action: 'semantic_search_rpc', userId, query })
+
+      // Fall back to text search if semantic search fails
+      console.log('Semantic search RPC failed, falling back to text search')
+      const textPatterns = await textSearch(supabase, query, limit)
+      return { patterns: textPatterns, fallbackUsed: true }
+    }
+
+    return { patterns: patterns || [], fallbackUsed: false }
+
+  } catch (error) {
+    // Network errors, timeouts, etc - fall back to text search
+    logError(error, { action: 'semantic_search', userId, query })
+    console.log('Semantic search failed with exception, falling back to text search')
+    const patterns = await textSearch(supabase, query, limit)
+    return { patterns, fallbackUsed: true }
+  }
+}
+
+// ============================================================================
+// Main POST handler
+// ============================================================================
+
 export async function POST(request: NextRequest) {
   try {
     // Require authentication
@@ -92,49 +240,21 @@ export async function POST(request: NextRequest) {
     // Clamp limit to prevent expensive queries
     const safeLimit = Math.min(Math.max(1, Number(limit) || 50), MAX_RESULTS)
 
-    if (!VOYAGE_API_KEY) {
-      return serviceUnavailable('Search service not configured')
-    }
+    addErrorBreadcrumb('Starting search', 'search', { query, limit: safeLimit })
 
-    // Embed the text query using Voyage AI
-    const embeddingResponse = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${VOYAGE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: VOYAGE_MODEL,
-        inputs: [[{ type: 'text', text: query }]],
-        input_type: 'query',  // This is a search query
-      }),
-    })
+    // Try semantic search with fallback to text search
+    const { patterns, fallbackUsed } = await semanticSearch(supabase, query, safeLimit, user.id)
 
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text()
-      console.error('Voyage API error:', errorText)
-      return serviceUnavailable('AI search service temporarily unavailable')
-    }
-
-    const embeddingData = await embeddingResponse.json()
-    const queryEmbedding = embeddingData.data[0].embedding
-
-    // Search for similar patterns using pgvector (reuse supabase client from auth check)
-    const { data: patterns, error } = await supabase.rpc('search_patterns_semantic', {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.2,  // Lower threshold to get more results
-      match_count: safeLimit,
-    })
-
-    if (error) {
-      return internalError(error, { action: 'search_patterns', userId: user.id, query })
-    }
-
-    return NextResponse.json({
-      patterns: patterns || [],
+    const result: SearchResult = {
+      patterns,
       query,
-      count: patterns?.length || 0,
-    })
+      count: patterns.length,
+      searchMethod: fallbackUsed ? 'text' : 'semantic',
+      fallbackUsed,
+    }
+
+    return NextResponse.json(result)
+
   } catch (error) {
     return internalError(error, { action: 'search' })
   }

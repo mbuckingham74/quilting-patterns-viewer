@@ -6,8 +6,14 @@ import SaveSearchButton from './SaveSearchButton'
 import { useToast } from './Toast'
 import { parseResponseError } from '@/lib/errors'
 
+interface SearchResult {
+  patterns: Pattern[]
+  searchMethod?: 'semantic' | 'text'
+  fallbackUsed?: boolean
+}
+
 interface AISearchBarProps {
-  onSearch?: (patterns: Pattern[], query: string) => void
+  onSearch?: (patterns: Pattern[], query: string, searchResult?: SearchResult) => void
   onClear?: () => void
 }
 
@@ -26,6 +32,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
+  const [usedFallback, setUsedFallback] = useState(false)
   const { showError } = useToast()
 
   // Check if there's an AI search in the URL
@@ -57,10 +64,13 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
         throw new Error(error.message)
       }
 
-      const data = await response.json()
+      const data = await response.json() as SearchResult
+
+      // Track if fallback was used
+      setUsedFallback(data.fallbackUsed ?? false)
 
       if (onSearch) {
-        onSearch(data.patterns, query)
+        onSearch(data.patterns, query, data)
       }
 
       // Update URL to reflect AI search mode
@@ -79,6 +89,7 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
   const handleClear = useCallback(() => {
     setQuery('')
     setHasSearched(false)
+    setUsedFallback(false)
     if (onClear) {
       onClear()
     }
@@ -140,9 +151,18 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
       </form>
 
       <div className="mt-2 flex items-center justify-between">
-        <p className="text-xs text-stone-500">
-          Search by visual description, pattern name, or author
-        </p>
+        {usedFallback && hasSearched && !isSearching ? (
+          <p className="text-xs text-amber-600 flex items-center gap-1">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Using text search (AI search temporarily unavailable)
+          </p>
+        ) : (
+          <p className="text-xs text-stone-500">
+            Search by visual description, pattern name, or author
+          </p>
+        )}
         {hasSearched && query.trim() && !isSearching && (
           <SaveSearchButton query={query} />
         )}

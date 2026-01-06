@@ -285,8 +285,10 @@ export function parseError(error: unknown): ParsedError {
 }
 
 // ============================================================================
-// Error logging (stub for now - can be extended with Sentry, etc.)
+// Error logging with Sentry integration
 // ============================================================================
+
+import * as Sentry from '@sentry/nextjs'
 
 export interface ErrorLogContext {
   component?: string
@@ -295,6 +297,11 @@ export interface ErrorLogContext {
   [key: string]: unknown
 }
 
+/**
+ * Log an error with optional context.
+ * In production, errors are sent to Sentry.
+ * In development, errors are logged to console.
+ */
 export function logError(error: unknown, context?: ErrorLogContext): void {
   const parsed = parseError(error)
   const logEntry = {
@@ -304,12 +311,62 @@ export function logError(error: unknown, context?: ErrorLogContext): void {
     raw: error instanceof Error ? { name: error.name, message: error.message, stack: error.stack } : error,
   }
 
-  // In development, log to console
-  if (process.env.NODE_ENV === 'development') {
-    console.error('[AppError]', logEntry)
-  } else {
-    // In production, you could send to a logging service
-    // Example: sendToSentry(logEntry)
-    console.error('[AppError]', JSON.stringify(logEntry))
+  // Always log to console for debugging
+  console.error('[AppError]', logEntry)
+
+  // In production, send to Sentry
+  if (process.env.NODE_ENV === 'production') {
+    // Set error context as tags and extra data
+    Sentry.withScope((scope) => {
+      // Set error code as a tag for filtering
+      scope.setTag('error_code', parsed.code)
+      scope.setTag('retryable', String(parsed.retryable))
+
+      // Add context as extra data
+      if (context) {
+        if (context.component) scope.setTag('component', context.component)
+        if (context.action) scope.setTag('action', context.action)
+        if (context.userId) scope.setUser({ id: context.userId })
+
+        scope.setExtras(context)
+      }
+
+      // Capture the error
+      if (error instanceof Error) {
+        Sentry.captureException(error)
+      } else {
+        Sentry.captureMessage(parsed.message, 'error')
+      }
+    })
   }
+}
+
+/**
+ * Set user context for Sentry (call after login)
+ */
+export function setErrorUser(userId: string, email?: string): void {
+  Sentry.setUser({ id: userId, email })
+}
+
+/**
+ * Clear user context from Sentry (call after logout)
+ */
+export function clearErrorUser(): void {
+  Sentry.setUser(null)
+}
+
+/**
+ * Add breadcrumb for debugging error context
+ */
+export function addErrorBreadcrumb(
+  message: string,
+  category: string = 'app',
+  data?: Record<string, unknown>
+): void {
+  Sentry.addBreadcrumb({
+    message,
+    category,
+    data,
+    level: 'info',
+  })
 }
