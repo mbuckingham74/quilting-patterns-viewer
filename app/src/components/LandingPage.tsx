@@ -5,16 +5,17 @@ import AuthTabs from './AuthTabs'
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-50 to-stone-100 flex flex-col">
-      {/* Header */}
+      {/* Header - minimal with nav links */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-stone-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-start">
-          <Image
-            src="/logo.png"
-            alt="Quilting Patterns"
-            width={120}
-            height={40}
-            className="h-10 w-auto"
-          />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-end">
+          <nav className="flex gap-6 text-sm">
+            <Link href="/about" className="text-stone-600 hover:text-stone-900">
+              About
+            </Link>
+            <Link href="/contact" className="text-stone-600 hover:text-stone-900">
+              Contact
+            </Link>
+          </nav>
         </div>
       </header>
 
@@ -79,10 +80,10 @@ export default function LandingPage() {
         </div>
       </main>
 
-      {/* Footer */}
+      {/* Footer - simple brand */}
       <footer className="border-t border-stone-200 bg-white/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-sm text-stone-500">
-          15,651 patterns available
+          Pam&apos;s Custom Quilts
         </div>
       </footer>
     </div>
