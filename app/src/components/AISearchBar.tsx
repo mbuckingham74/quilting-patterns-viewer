@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import SaveSearchButton from './SaveSearchButton'
+import { useToast } from './Toast'
+import { parseResponseError } from '@/lib/errors'
 
 interface AISearchBarProps {
   onSearch?: (patterns: Pattern[], query: string) => void
@@ -23,8 +25,8 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
   const searchParams = useSearchParams()
   const [query, setQuery] = useState('')
   const [isSearching, setIsSearching] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
+  const { showError } = useToast()
 
   // Check if there's an AI search in the URL
   const aiSearchParam = searchParams.get('ai_search')
@@ -42,7 +44,6 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
     if (!query.trim()) return
 
     setIsSearching(true)
-    setError(null)
 
     try {
       const response = await fetch('/api/search', {
@@ -52,7 +53,8 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
       })
 
       if (!response.ok) {
-        throw new Error('Search failed')
+        const error = await parseResponseError(response)
+        throw new Error(error.message)
       }
 
       const data = await response.json()
@@ -68,15 +70,14 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
       setHasSearched(true)
     } catch (err) {
       console.error('AI search error:', err)
-      setError('Search failed. Please try again.')
+      showError(err, 'Search failed')
     } finally {
       setIsSearching(false)
     }
-  }, [query, onSearch, router])
+  }, [query, onSearch, router, showError])
 
   const handleClear = useCallback(() => {
     setQuery('')
-    setError(null)
     setHasSearched(false)
     if (onClear) {
       onClear()
@@ -137,10 +138,6 @@ export default function AISearchBar({ onSearch, onClear }: AISearchBarProps) {
           </button>
         )}
       </form>
-
-      {error && (
-        <p className="mt-2 text-sm text-red-500">{error}</p>
-      )}
 
       <div className="mt-2 flex items-center justify-between">
         <p className="text-xs text-stone-500">

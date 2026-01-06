@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { useToast } from './Toast'
+import { parseResponseError } from '@/lib/errors'
 
 interface FavoriteButtonProps {
   patternId: number
@@ -11,6 +13,7 @@ interface FavoriteButtonProps {
 export default function FavoriteButton({ patternId, isFavorited, onToggle }: FavoriteButtonProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [optimisticFavorited, setOptimisticFavorited] = useState(isFavorited)
+  const { showError } = useToast()
 
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -35,7 +38,8 @@ export default function FavoriteButton({ patternId, isFavorited, onToggle }: Fav
         })
 
         if (!response.ok) {
-          throw new Error('Failed to add favorite')
+          const error = await parseResponseError(response)
+          throw new Error(error.message)
         }
       } else {
         // Remove from favorites
@@ -44,7 +48,8 @@ export default function FavoriteButton({ patternId, isFavorited, onToggle }: Fav
         })
 
         if (!response.ok) {
-          throw new Error('Failed to remove favorite')
+          const error = await parseResponseError(response)
+          throw new Error(error.message)
         }
       }
 
@@ -53,6 +58,7 @@ export default function FavoriteButton({ patternId, isFavorited, onToggle }: Fav
       console.error('Error toggling favorite:', error)
       // Revert optimistic update on error
       setOptimisticFavorited(previousState)
+      showError(error, newState ? 'Failed to add favorite' : 'Failed to remove favorite')
     } finally {
       setIsLoading(false)
     }

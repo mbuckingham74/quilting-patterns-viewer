@@ -20,10 +20,13 @@ echo "Packaging image..."
 docker save quilting-patterns:latest | gzip > /tmp/quilting-patterns.tar.gz
 
 echo "Transferring to server..."
-rsync -avz --progress /tmp/quilting-patterns.tar.gz michael@tachyonfuture.com:/tmp/
+# Use Tailscale IP for SSH (bound to Tailscale only)
+SERVER="michael@100.115.127.119"
+
+rsync -avz --progress /tmp/quilting-patterns.tar.gz "$SERVER:/tmp/"
 
 echo "Deploying..."
-ssh michael@tachyonfuture.com "cd ~/quilting-patterns-viewer && gunzip -c /tmp/quilting-patterns.tar.gz | docker load && docker compose down && docker compose up -d"
+ssh "$SERVER" "cd ~/quilting-patterns-viewer && gunzip -c /tmp/quilting-patterns.tar.gz | docker load && docker compose down && docker compose up -d"
 
 echo "Verifying..."
 sleep 3

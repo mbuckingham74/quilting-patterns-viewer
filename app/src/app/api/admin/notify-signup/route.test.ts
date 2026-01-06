@@ -1,10 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { NextRequest } from 'next/server'
-
-// Set env vars BEFORE importing the module
-process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
-process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
-process.env.RESEND_API_KEY = 'test-resend-key'
 
 // Mock fetch for Resend API
 const mockFetch = vi.fn()
@@ -22,20 +17,65 @@ vi.mock('@supabase/supabase-js', () => ({
   })),
 }))
 
-import { POST } from './route'
-
 describe('POST /api/admin/notify-signup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+  // Store the POST function after dynamic import
+  let POST: typeof import('./route').POST
+
+  beforeAll(async () => {
+    // Set env vars BEFORE importing the module
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.RESEND_API_KEY = 'test-resend-key'
+
+    // Dynamically import after env vars are set
+    const module = await import('./route')
+    POST = module.POST
   })
 
-  function createRequest(body: Record<string, unknown>): NextRequest {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Ensure env vars are reset for each test
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
+    process.env.RESEND_API_KEY = 'test-resend-key'
+  })
+
+  function createRequest(body: Record<string, unknown>, includeSecret = true): NextRequest {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (includeSecret) {
+      headers['x-internal-secret'] = 'test-service-role-key'
+    }
     return new NextRequest('http://localhost:3000/api/admin/notify-signup', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(body),
     })
   }
+
+  describe('authentication', () => {
+    it('returns 401 when x-internal-secret header is missing', async () => {
+      const response = await POST(createRequest({ email: 'test@example.com' }, false))
+
+      expect(response.status).toBe(401)
+      const json = await response.json()
+      expect(json.error).toBe('Unauthorized')
+    })
+
+    it('returns 401 when x-internal-secret header is invalid', async () => {
+      const request = new NextRequest('http://localhost:3000/api/admin/notify-signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': 'wrong-secret',
+        },
+        body: JSON.stringify({ email: 'test@example.com' }),
+      })
+
+      const response = await POST(request)
+
+      expect(response.status).toBe(401)
+    })
+  })
 
   describe('input validation', () => {
     it('returns 400 when email is missing', async () => {
@@ -49,7 +89,6 @@ describe('POST /api/admin/notify-signup', () => {
 
   describe('graceful degradation', () => {
     it('succeeds with skipped=true when RESEND_API_KEY is not configured', async () => {
-      const originalKey = process.env.RESEND_API_KEY
       delete process.env.RESEND_API_KEY
 
       const response = await POST(createRequest({ email: 'user@example.com' }))
@@ -58,8 +97,6 @@ describe('POST /api/admin/notify-signup', () => {
       const json = await response.json()
       expect(json.success).toBe(true)
       expect(json.skipped).toBe(true)
-
-      process.env.RESEND_API_KEY = originalKey
     })
   })
 
@@ -110,7 +147,4 @@ describe('POST /api/admin/notify-signup', () => {
       expect(json.emailSent).toBe(false)
     })
   })
-
-  // NOTE: Authentication tests (x-internal-secret header) will be added after
-  // PR #8 is merged. PR #8 adds secret validation to prevent external abuse.
 })

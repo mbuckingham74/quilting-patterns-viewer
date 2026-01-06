@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, badRequest, rateLimited, serviceUnavailable, internalError } from '@/lib/api-response'
 
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY
 const VOYAGE_MODEL = 'voyage-multimodal-3'
@@ -64,56 +65,35 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return unauthorized()
     }
 
     // Check rate limit before any expensive operations
-    const rateLimit = checkRateLimit(user.id)
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Rate limit exceeded. Please try again later.' },
-        {
-          status: 429,
-          headers: { 'Retry-After': String(rateLimit.retryAfter) },
-        }
-      )
+    const rateLimitResult = checkRateLimit(user.id)
+    if (!rateLimitResult.allowed) {
+      return rateLimited(rateLimitResult.retryAfter || 60)
     }
 
     const { query, limit = 50 } = await request.json()
 
     if (!query || typeof query !== 'string') {
-      return NextResponse.json(
-        { error: 'Query is required' },
-        { status: 400 }
-      )
+      return badRequest('Query is required')
     }
 
     // Validate query length
     if (query.length < MIN_QUERY_LENGTH) {
-      return NextResponse.json(
-        { error: `Query must be at least ${MIN_QUERY_LENGTH} characters` },
-        { status: 400 }
-      )
+      return badRequest(`Query must be at least ${MIN_QUERY_LENGTH} characters`)
     }
 
     if (query.length > MAX_QUERY_LENGTH) {
-      return NextResponse.json(
-        { error: `Query must be at most ${MAX_QUERY_LENGTH} characters` },
-        { status: 400 }
-      )
+      return badRequest(`Query must be at most ${MAX_QUERY_LENGTH} characters`)
     }
 
     // Clamp limit to prevent expensive queries
     const safeLimit = Math.min(Math.max(1, Number(limit) || 50), MAX_RESULTS)
 
     if (!VOYAGE_API_KEY) {
-      return NextResponse.json(
-        { error: 'Search service not configured' },
-        { status: 500 }
-      )
+      return serviceUnavailable('Search service not configured')
     }
 
     // Embed the text query using Voyage AI
@@ -133,10 +113,7 @@ export async function POST(request: NextRequest) {
     if (!embeddingResponse.ok) {
       const errorText = await embeddingResponse.text()
       console.error('Voyage API error:', errorText)
-      return NextResponse.json(
-        { error: 'Failed to process search query' },
-        { status: 500 }
-      )
+      return serviceUnavailable('AI search service temporarily unavailable')
     }
 
     const embeddingData = await embeddingResponse.json()
@@ -150,11 +127,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
-      console.error('Search error:', error)
-      return NextResponse.json(
-        { error: 'Search failed' },
-        { status: 500 }
-      )
+      return internalError(error, { action: 'search_patterns', userId: user.id, query })
     }
 
     return NextResponse.json({
@@ -163,10 +136,6 @@ export async function POST(request: NextRequest) {
       count: patterns?.length || 0,
     })
   } catch (error) {
-    console.error('Search error:', error)
-    return NextResponse.json(
-      { error: 'An error occurred while searching' },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'search' })
   }
 }
