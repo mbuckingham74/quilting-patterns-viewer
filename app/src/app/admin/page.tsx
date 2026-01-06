@@ -118,7 +118,7 @@ export default async function AdminDashboardPage() {
         {/* Quick Links */}
         <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-6">
           <h2 className="text-lg font-semibold text-stone-800 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link
               href="/admin/users"
               className="flex items-center gap-3 p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
@@ -166,6 +166,21 @@ export default async function AdminDashboardPage() {
               <div>
                 <p className="font-medium text-stone-800">Browse Patterns</p>
                 <p className="text-sm text-stone-500">View the pattern library</p>
+              </div>
+            </Link>
+
+            <Link
+              href="/admin/duplicates"
+              className="flex items-center gap-3 p-4 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-stone-800">Find Duplicates</p>
+                <p className="text-sm text-stone-500">Review similar patterns</p>
               </div>
             </Link>
           </div>
