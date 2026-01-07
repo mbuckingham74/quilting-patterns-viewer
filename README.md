@@ -44,11 +44,31 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - Powered by Voyage AI multimodal embeddings + pgvector
 - Automatic fallback to text search if AI service is unavailable
 
+### Pattern Sharing
+- **Share with customers** - Select up to 10 patterns and email them to non-member recipients
+- **Drag-to-rank feedback** - Customers rank patterns by preference without needing an account
+- **Email notifications** - Sender receives email when customer submits rankings
+- **Share history** - Track all sent shares and feedback status in account dashboard
+- Links expire after 30 days
+
+### Duplicate Detection
+- **Visual similarity search** - Find patterns that look alike using AI embeddings
+- **Adjustable threshold** - Control how similar patterns need to be (0.90-0.99)
+- **Batch review** - Mark pairs as duplicates or not-duplicates
+- **Admin tool** - Helps clean up redundant patterns in the library
+
 ### Authentication & Security
-- Google OAuth via Supabase
+- Google OAuth + Email/Password via Supabase
+- User approval system - new signups require admin approval
 - Row-level security (RLS) on all database tables
 - Protected pattern downloads
 - Admin panel for user management
+
+### Admin Features
+- **User Management** - Approve/reject new signups, view approved users with last login
+- **Pattern Upload** - Bulk upload patterns from ZIP files
+- **Duplicate Finder** - Identify and manage similar patterns
+- **How-To Guide** - Built-in help documentation for non-technical users
 
 ### Error Handling
 - Comprehensive toast notification system
@@ -155,11 +175,15 @@ sequenceDiagram
 erDiagram
     PROFILES ||--o{ FAVORITES : has
     PROFILES ||--o{ SAVED_SEARCHES : has
+    PROFILES ||--o{ SHARED_COLLECTIONS : creates
     PATTERNS ||--o{ PATTERN_KEYWORDS : has
     PATTERNS ||--o{ FAVORITES : in
+    PATTERNS ||--o{ SHARED_COLLECTION_PATTERNS : in
     KEYWORDS ||--o{ PATTERN_KEYWORDS : has
     KEYWORD_GROUPS ||--o{ KEYWORD_GROUP_KEYWORDS : has
     KEYWORDS ||--o{ KEYWORD_GROUP_KEYWORDS : in
+    SHARED_COLLECTIONS ||--o{ SHARED_COLLECTION_PATTERNS : contains
+    SHARED_COLLECTIONS ||--o| SHARED_COLLECTION_FEEDBACK : receives
 
     PATTERNS {
         int id PK
@@ -180,8 +204,9 @@ erDiagram
         uuid id PK
         text email
         text display_name
-        text role
-        boolean approved
+        boolean is_admin
+        boolean is_approved
+        timestamptz approved_at
     }
 
     FAVORITES {
@@ -193,6 +218,38 @@ erDiagram
         int id PK
         uuid user_id FK
         text query
+    }
+
+    SHARED_COLLECTIONS {
+        uuid id PK
+        text token UK
+        uuid created_by FK
+        text recipient_email
+        text recipient_name
+        text message
+        timestamptz expires_at
+    }
+
+    SHARED_COLLECTION_PATTERNS {
+        uuid collection_id FK
+        int pattern_id FK
+        int position
+    }
+
+    SHARED_COLLECTION_FEEDBACK {
+        uuid collection_id FK
+        jsonb rankings
+        text customer_name
+        text customer_notes
+        timestamptz submitted_at
+    }
+
+    DUPLICATE_REVIEWS {
+        int id PK
+        int pattern_id_1 FK
+        int pattern_id_2 FK
+        text status
+        uuid reviewed_by FK
     }
 ```
 
@@ -304,11 +361,19 @@ patterns/
 
 The app uses Supabase Postgres with the following main tables:
 
-- **patterns** - Pattern metadata, file URLs, and vector embeddings
-- **keywords** - Searchable keyword taxonomy
-- **pattern_keywords** - Many-to-many junction table
-- **profiles** - Extended user profiles
-- **admin_emails** - Admin notification recipients
+| Table | Description |
+|-------|-------------|
+| **patterns** | Pattern metadata, file URLs, and vector embeddings |
+| **keywords** | Searchable keyword taxonomy |
+| **pattern_keywords** | Many-to-many junction table |
+| **profiles** | User profiles with approval status and admin flag |
+| **user_favorites** | User's favorited patterns |
+| **saved_searches** | User's saved AI search queries |
+| **shared_collections** | Pattern shares sent to customers |
+| **shared_collection_patterns** | Patterns included in each share |
+| **shared_collection_feedback** | Customer rankings and notes |
+| **duplicate_reviews** | Admin reviews of similar pattern pairs |
+| **admin_emails** | Admin notification recipients |
 
 See [CLAUDE.md](CLAUDE.md#database-schema-supabase-postgres) for the complete schema.
 
@@ -320,10 +385,15 @@ See [CLAUDE.md](CLAUDE.md#database-schema-supabase-postgres) for the complete sc
 |----------|--------|------|-------------|
 | `/api/search` | POST | Required | AI-powered pattern search |
 | `/api/download/[id]` | GET | Required | Download pattern file |
-| `/api/favorites` | GET/POST | Required | User favorites |
-| `/api/saved-searches` | GET/POST | Required | Saved search queries |
+| `/api/favorites` | GET/POST/DELETE | Required | User favorites |
+| `/api/saved-searches` | GET/POST/DELETE | Required | Saved search queries |
+| `/api/shares` | GET/POST | Required | Create and list pattern shares |
+| `/api/shares/[token]` | GET | Public | Get share details by token |
+| `/api/shares/[token]/feedback` | POST | Public | Submit customer rankings |
 | `/api/admin/upload` | POST | Admin | Upload new patterns |
 | `/api/admin/users` | GET | Admin | User management |
+| `/api/admin/duplicates` | GET | Admin | Find similar patterns |
+| `/api/admin/duplicates/review` | POST | Admin | Mark duplicate status |
 
 ---
 

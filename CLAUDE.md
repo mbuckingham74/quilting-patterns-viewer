@@ -37,8 +37,12 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Users table (managed by Supabase Auth, extended with profile)
 CREATE TABLE profiles (
   id UUID REFERENCES auth.users PRIMARY KEY,
-  email TEXT,
+  email TEXT NOT NULL,
   display_name TEXT,
+  is_approved BOOLEAN DEFAULT FALSE,
+  is_admin BOOLEAN DEFAULT FALSE,
+  approved_by UUID REFERENCES profiles(id),
+  approved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -93,6 +97,71 @@ CREATE INDEX idx_patterns_author ON patterns(author);
 CREATE INDEX idx_keywords_value ON keywords(value);
 CREATE INDEX idx_pattern_keywords_pattern ON pattern_keywords(pattern_id);
 CREATE INDEX idx_pattern_keywords_keyword ON pattern_keywords(keyword_id);
+
+-- User favorites
+CREATE TABLE user_favorites (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  pattern_id INTEGER REFERENCES patterns(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, pattern_id)
+);
+
+-- Saved AI searches
+CREATE TABLE saved_searches (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  query TEXT NOT NULL,
+  name TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Pattern sharing with customers
+CREATE TABLE shared_collections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token TEXT UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(16), 'hex'),
+  created_by UUID REFERENCES profiles(id) NOT NULL,
+  recipient_email TEXT NOT NULL,
+  recipient_name TEXT,
+  message TEXT,
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 days'),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE shared_collection_patterns (
+  id SERIAL PRIMARY KEY,
+  collection_id UUID REFERENCES shared_collections(id) ON DELETE CASCADE,
+  pattern_id INTEGER REFERENCES patterns(id) ON DELETE CASCADE,
+  "position" INTEGER NOT NULL,
+  UNIQUE(collection_id, pattern_id)
+);
+
+CREATE TABLE shared_collection_feedback (
+  id SERIAL PRIMARY KEY,
+  collection_id UUID REFERENCES shared_collections(id) ON DELETE CASCADE UNIQUE,
+  rankings JSONB NOT NULL,  -- [{pattern_id: 123, rank: 1}, ...]
+  customer_name TEXT,
+  customer_notes TEXT,
+  submitted_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Duplicate pattern tracking
+CREATE TABLE duplicate_reviews (
+  id SERIAL PRIMARY KEY,
+  pattern_id_1 INTEGER REFERENCES patterns(id) ON DELETE CASCADE,
+  pattern_id_2 INTEGER REFERENCES patterns(id) ON DELETE CASCADE,
+  similarity FLOAT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',  -- 'pending', 'duplicate', 'not_duplicate'
+  reviewed_by UUID REFERENCES profiles(id),
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(pattern_id_1, pattern_id_2)
+);
+
+-- Admin email notification list
+CREATE TABLE admin_emails (
+  email TEXT PRIMARY KEY
+);
 ```
 
 ## Supabase Storage Buckets
@@ -127,48 +196,62 @@ SUPABASE_SERVICE_KEY=<service_role_key>
 ```
 patterns/
 ├── CLAUDE.md
+├── README.md
 ├── files/
 │   ├── patterns.db.20251212
 │   ├── PVM_Thumbnails/
 │   └── ui/
 │       └── pvm-UI.png          # Reference screenshot of original app
 ├── scripts/
-│   └── migrate.py              # SQLite → Supabase migration
+│   ├── migrate.py              # SQLite → Supabase migration
+│   ├── generate_embeddings.py  # Voyage AI embedding generation
+│   ├── deploy.sh               # Production deployment script
+│   └── *.sql                   # Database migrations (001-014)
+├── docs/
+│   └── ERROR_HANDLING.md       # Error handling documentation
 ├── app/                        # Next.js app
-│   ├── app/
-│   │   ├── layout.tsx
-│   │   ├── page.tsx            # Landing/browse page
-│   │   ├── auth/
-│   │   │   ├── login/page.tsx
-│   │   │   └── callback/route.ts
-│   │   ├── patterns/
-│   │   │   └── [id]/page.tsx   # Pattern detail page
-│   │   └── api/
-│   │       └── download/[id]/route.ts  # Pattern file download
-│   ├── components/
-│   │   ├── PatternGrid.tsx
-│   │   ├── PatternCard.tsx
-│   │   ├── KeywordFilter.tsx
-│   │   ├── SearchBar.tsx
-│   │   ├── AuthButton.tsx
-│   │   ├── Toast.tsx           # Toast notification system
-│   │   └── ErrorBoundary.tsx   # React error boundary
-│   ├── lib/
-│   │   ├── supabase/
-│   │   │   ├── client.ts       # Browser client
-│   │   │   ├── server.ts       # Server client
-│   │   │   └── middleware.ts
-│   │   ├── errors.ts           # Error codes, parsing, Sentry integration
-│   │   ├── api-response.ts     # API route response helpers
-│   │   ├── fetch-with-retry.ts # Fetch wrapper with retry logic
-│   │   └── utils.ts
-│   ├── hooks/
-│   │   └── useFetch.ts         # React hook for fetch with retry
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── layout.tsx
+│   │   │   ├── page.tsx            # Landing page
+│   │   │   ├── browse/page.tsx     # Pattern browser
+│   │   │   ├── account/page.tsx    # User account & shares
+│   │   │   ├── share/[token]/      # Public share view
+│   │   │   ├── auth/               # Login, signup, callback
+│   │   │   ├── admin/
+│   │   │   │   ├── page.tsx        # Admin dashboard
+│   │   │   │   ├── users/          # User management
+│   │   │   │   ├── approved-users/ # Approved users table
+│   │   │   │   ├── upload/         # Pattern upload
+│   │   │   │   ├── duplicates/     # Duplicate finder
+│   │   │   │   └── help/           # How-to guide
+│   │   │   ├── patterns/[id]/      # Pattern detail
+│   │   │   └── api/
+│   │   │       ├── search/         # AI search
+│   │   │       ├── download/[id]/  # File download
+│   │   │       ├── favorites/      # User favorites
+│   │   │       ├── saved-searches/ # Saved searches
+│   │   │       ├── shares/         # Pattern sharing
+│   │   │       └── admin/          # Admin endpoints
+│   │   ├── components/
+│   │   │   ├── PatternGrid.tsx
+│   │   │   ├── PatternCard.tsx
+│   │   │   ├── ShareBasket.tsx     # Pattern selection for sharing
+│   │   │   ├── ShareModal.tsx      # Share creation form
+│   │   │   ├── PatternRanker.tsx   # Drag-to-rank for customers
+│   │   │   ├── Toast.tsx
+│   │   │   └── ErrorBoundary.tsx
+│   │   ├── contexts/
+│   │   │   └── ShareContext.tsx    # Share basket state
+│   │   ├── lib/
+│   │   │   ├── supabase/
+│   │   │   ├── errors.ts
+│   │   │   ├── api-response.ts
+│   │   │   └── fetch-with-retry.ts
+│   │   └── hooks/
+│   │       └── useFetch.ts
 │   ├── public/
-│   ├── package.json
-│   ├── next.config.js
-│   ├── tailwind.config.js
-│   └── tsconfig.json
+│   └── package.json
 ├── Dockerfile
 ├── docker-compose.yml
 └── .env.local.example
@@ -315,14 +398,31 @@ Add a search bar that:
 - Displays results in the same grid format
 - Optionally shows similarity score or "why this matched"
 
-## Phase 2 Features (Future)
+## Implemented Features
 
-- Upload new patterns (accept .zip, extract, add to DB)
-  - Auto-generate embedding for new uploads
-- User favorites/collections
-- Pattern sharing links
-- Admin panel for Pam to manage patterns
+### User Features
+- **Favorites** - Save patterns to personal collection
+- **Saved Searches** - Store and replay AI search queries
+- **Pattern Sharing** - Share up to 10 patterns with customers via email
+  - Customers can view thumbnails without an account
+  - Drag-to-rank interface for customer feedback
+  - Email notification when feedback is submitted
+  - 30-day expiration on share links
+
+### Admin Features
+- **User Approval System** - New signups require admin approval
+- **Pattern Upload** - Accept .zip files, extract, and add to DB with auto-generated embeddings
+- **Duplicate Detection** - Find visually similar patterns using AI embeddings
+  - Adjustable similarity threshold (0.90-0.99)
+  - Batch review interface
+- **Approved Users View** - Table with registration date, approval date, and last login
+- **How-To Guide** - Built-in help documentation at `/admin/help`
+
+## Future Features
+
 - Claude-powered "explain this match" feature
+- Bulk pattern management (delete, merge duplicates)
+- User activity analytics
 
 ## Docker Configuration
 
@@ -446,14 +546,21 @@ The server runs at https://patterns.tachyonfuture.com via Nginx Proxy Manager.
 
 ### Migrations Required
 
-Run these in Supabase SQL Editor before deploying new security features:
+Run these in Supabase SQL Editor in order:
 ```bash
-# Pattern ID sequence (prevents race conditions in uploads)
-scripts/011_pattern_id_sequence.sql
+# Core tables
+scripts/001_schema.sql                      # Initial schema
+scripts/008_user_approval_system.sql        # User approval and RLS
 
-# Profile self-promotion fix
-scripts/009_fix_profile_self_promotion.sql
-scripts/010_fix_security_definer_bypass.sql
+# Security fixes
+scripts/009_fix_profile_self_promotion.sql  # Prevent admin self-promotion
+scripts/010_fix_security_definer_bypass.sql # Fix security definer bypass
+scripts/011_pattern_id_sequence.sql         # Pattern ID sequence
+
+# Feature tables
+scripts/012_duplicate_detection.sql         # Duplicate review tracking
+scripts/013_pattern_sharing.sql             # Pattern sharing tables
+scripts/014_approved_users_with_login.sql   # User last login view
 ```
 
 ## Error Handling
