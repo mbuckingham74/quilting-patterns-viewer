@@ -28,7 +28,6 @@ export default async function AdminDashboardPage() {
     .from('profiles')
     .select('id, is_approved')
 
-  const totalUsers = allProfiles?.length || 0
   const pendingUsers = allProfiles?.filter(p => !p.is_approved).length || 0
   const approvedUsers = allProfiles?.filter(p => p.is_approved).length || 0
 
@@ -71,48 +70,46 @@ export default async function AdminDashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm text-stone-500">Total Users</p>
-                <p className="text-2xl font-bold text-stone-800">{totalUsers}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-amber-100 p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Link
+            href="/admin/users"
+            className="bg-white rounded-xl shadow-sm border border-amber-100 p-6 hover:shadow-md hover:border-amber-200 transition-all"
+          >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-stone-500">Pending Approval</p>
                 <p className="text-2xl font-bold text-amber-600">{pendingUsers}</p>
               </div>
+              <svg className="w-5 h-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </div>
-          </div>
+          </Link>
 
-          <div className="bg-white rounded-xl shadow-sm border border-green-100 p-6">
+          <Link
+            href="/admin/approved-users"
+            className="bg-white rounded-xl shadow-sm border border-green-100 p-6 hover:shadow-md hover:border-green-200 transition-all"
+          >
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <div>
+              <div className="flex-1">
                 <p className="text-sm text-stone-500">Approved Users</p>
                 <p className="text-2xl font-bold text-green-600">{approvedUsers}</p>
               </div>
+              <svg className="w-5 h-5 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* Quick Links */}
