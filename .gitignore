@@ -45,3 +45,6 @@ venv/
 
 # Claude context file (contains deployment secrets)
 .claude-context
+
+# Claude project documentation (internal)
+.claude.md
