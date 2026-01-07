@@ -11,7 +11,7 @@
   [![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
   [![License](https://img.shields.io/badge/License-Private-red)]()
 
-  [Live Demo](https://patterns.tachyonfuture.com) &bull; [Documentation](CLAUDE.md) &bull; [Error Handling](docs/ERROR_HANDLING.md)
+  [Live Demo](https://patterns.tachyonfuture.com) &bull; [Error Handling](docs/ERROR_HANDLING.md)
 </div>
 
 ---
@@ -341,19 +341,9 @@ patterns/
 │   └── package.json
 ├── scripts/                    # Migration & deployment scripts
 ├── docs/                       # Additional documentation
-├── CLAUDE.md                   # Main project documentation
 ├── Dockerfile
 └── docker-compose.yml
 ```
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [CLAUDE.md](CLAUDE.md) | Main project documentation, architecture, and development guide |
-| [docs/ERROR_HANDLING.md](docs/ERROR_HANDLING.md) | Comprehensive error handling system documentation |
 
 ---
 
@@ -374,8 +364,6 @@ The app uses Supabase Postgres with the following main tables:
 | **shared_collection_feedback** | Customer rankings and notes |
 | **duplicate_reviews** | Admin reviews of similar pattern pairs |
 | **admin_emails** | Admin notification recipients |
-
-See [CLAUDE.md](CLAUDE.md#database-schema-supabase-postgres) for the complete schema.
 
 ---
 
