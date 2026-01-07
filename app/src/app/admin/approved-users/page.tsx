@@ -10,6 +10,7 @@ interface ApprovedUser {
   display_name: string | null
   created_at: string
   approved_at: string | null
+  last_sign_in_at: string | null
 }
 
 export default async function ApprovedUsersPage() {
@@ -31,12 +32,9 @@ export default async function ApprovedUsersPage() {
     redirect('/browse')
   }
 
-  // Get all approved users
+  // Get all approved users with last login time
   const { data: users } = await supabase
-    .from('profiles')
-    .select('id, email, display_name, created_at, approved_at')
-    .eq('is_approved', true)
-    .order('approved_at', { ascending: false, nullsFirst: false })
+    .rpc('get_approved_users_with_login')
 
   const approvedUsers = (users || []) as ApprovedUser[]
 
@@ -134,6 +132,9 @@ export default async function ApprovedUsersPage() {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Approved
                     </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
+                      Last Login
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
@@ -159,6 +160,9 @@ export default async function ApprovedUsersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-stone-500">{formatDate(approvedUser.approved_at)}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-stone-500">{formatDate(approvedUser.last_sign_in_at)}</span>
                       </td>
                     </tr>
                   ))}
