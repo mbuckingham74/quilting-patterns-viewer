@@ -4,14 +4,16 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Pattern } from '@/lib/types'
 import FavoriteButton from './FavoriteButton'
+import ShareButton from './ShareButton'
 
 interface PatternCardProps {
   pattern: Pattern
   isFavorited?: boolean
   onToggleFavorite?: (patternId: number, newState: boolean) => void
+  showShareButton?: boolean
 }
 
-export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite }: PatternCardProps) {
+export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false }: PatternCardProps) {
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
 
@@ -58,6 +60,16 @@ export default function PatternCard({ pattern, isFavorited = false, onToggleFavo
               <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-600 uppercase">
                 {extension}
               </span>
+            )}
+            {showShareButton && (
+              <ShareButton
+                pattern={{
+                  id: pattern.id,
+                  file_name: pattern.file_name || `Pattern ${pattern.id}`,
+                  thumbnail_url: pattern.thumbnail_url,
+                  author: pattern.author,
+                }}
+              />
             )}
             {onToggleFavorite && (
               <FavoriteButton

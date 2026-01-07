@@ -19,20 +19,43 @@ interface FavoriteWithPattern {
   }
 }
 
+interface ShareFeedback {
+  id: number
+  customer_name: string | null
+  submitted_at: string
+}
+
+interface Share {
+  id: string
+  token: string
+  recipientEmail: string
+  recipientName: string | null
+  message: string | null
+  expiresAt: string
+  createdAt: string
+  patternCount: number
+  feedback: ShareFeedback | null
+  isExpired: boolean
+}
+
 interface AccountContentProps {
   initialFavorites: FavoriteWithPattern[]
   initialSavedSearches: SavedSearch[]
+  initialShares?: Share[]
 }
 
 export default function AccountContent({
   initialFavorites,
   initialSavedSearches,
+  initialShares = [],
 }: AccountContentProps) {
   const router = useRouter()
   const [favorites, setFavorites] = useState(initialFavorites)
   const [savedSearches, setSavedSearches] = useState(initialSavedSearches)
+  const [shares, setShares] = useState(initialShares)
   const [deletingFavorite, setDeletingFavorite] = useState<number | null>(null)
   const [deletingSearch, setDeletingSearch] = useState<number | null>(null)
+  const [copiedToken, setCopiedToken] = useState<string | null>(null)
 
   const handleRemoveFavorite = async (patternId: number) => {
     setDeletingFavorite(patternId)
@@ -76,6 +99,13 @@ export default function AccountContent({
 
   const handleRunSearch = (query: string) => {
     router.push(`/browse?ai_search=${encodeURIComponent(query)}`)
+  }
+
+  const handleCopyShareLink = async (token: string) => {
+    const url = `https://patterns.tachyonfuture.com/share/${token}`
+    await navigator.clipboard.writeText(url)
+    setCopiedToken(token)
+    setTimeout(() => setCopiedToken(null), 2000)
   }
 
   const formatDate = (dateString: string) => {
@@ -362,6 +392,136 @@ export default function AccountContent({
                       </svg>
                     )}
                   </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* My Shares Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold text-stone-800 flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="w-6 h-6 text-indigo-600"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z"
+              />
+            </svg>
+            My Shares
+          </h2>
+          <span className="text-sm text-stone-500">{shares.length} shares</span>
+        </div>
+
+        {shares.length === 0 ? (
+          <div className="bg-white rounded-xl border border-stone-200 p-8 text-center">
+            <svg
+              className="mx-auto w-12 h-12 text-stone-300"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186 9.566-5.314m-9.566 7.5 9.566 5.314m0 0a2.25 2.25 0 1 0 3.935 2.186 2.25 2.25 0 0 0-3.935-2.186Zm0-12.814a2.25 2.25 0 1 0 3.933-2.185 2.25 2.25 0 0 0-3.933 2.185Z"
+              />
+            </svg>
+            <p className="mt-4 text-stone-500">No shares yet</p>
+            <p className="mt-1 text-sm text-stone-400">
+              Select patterns while browsing and click &quot;Share&quot; to send them to customers
+            </p>
+            <Link
+              href="/browse"
+              className="mt-4 inline-block text-purple-600 hover:text-purple-700 font-medium"
+            >
+              Browse patterns
+            </Link>
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100">
+            {shares.map((share) => (
+              <div
+                key={share.id}
+                className="p-4 hover:bg-stone-50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-stone-800">
+                        {share.recipientName || share.recipientEmail}
+                      </p>
+                      {share.feedback ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Ranked
+                        </span>
+                      ) : share.isExpired ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-stone-100 text-stone-600 text-xs font-medium rounded-full">
+                          Expired
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                    {share.recipientName && (
+                      <p className="text-sm text-stone-500">{share.recipientEmail}</p>
+                    )}
+                    <p className="text-xs text-stone-400 mt-1">
+                      {share.patternCount} pattern{share.patternCount !== 1 ? 's' : ''} • Sent {formatDate(share.createdAt)}
+                    </p>
+                    {share.feedback && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Ranked by {share.feedback.customer_name || 'customer'} on {formatDate(share.feedback.submitted_at)}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {!share.isExpired && (
+                      <button
+                        onClick={() => handleCopyShareLink(share.token)}
+                        className="p-2 text-stone-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="Copy share link"
+                      >
+                        {copiedToken === share.token ? (
+                          <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+                    {!share.isExpired && (
+                      <Link
+                        href={`/share/${share.token}`}
+                        target="_blank"
+                        className="p-2 text-stone-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                        title="View share page"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

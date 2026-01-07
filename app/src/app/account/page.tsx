@@ -53,6 +53,39 @@ async function getSavedSearches(userId: string) {
   return searches || []
 }
 
+async function getShares(userId: string) {
+  const supabase = await createClient()
+  const { data: shares } = await supabase
+    .from('shared_collections')
+    .select(`
+      id,
+      token,
+      recipient_email,
+      recipient_name,
+      message,
+      expires_at,
+      created_at,
+      shared_collection_patterns(count),
+      shared_collection_feedback(id, customer_name, submitted_at)
+    `)
+    .eq('created_by', userId)
+    .order('created_at', { ascending: false })
+
+  // Transform the data
+  return (shares || []).map(share => ({
+    id: share.id,
+    token: share.token,
+    recipientEmail: share.recipient_email,
+    recipientName: share.recipient_name,
+    message: share.message,
+    expiresAt: share.expires_at,
+    createdAt: share.created_at,
+    patternCount: (share.shared_collection_patterns as unknown as { count: number }[])?.[0]?.count || 0,
+    feedback: share.shared_collection_feedback?.[0] || null,
+    isExpired: new Date(share.expires_at) < new Date(),
+  }))
+}
+
 export default async function AccountPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -61,9 +94,10 @@ export default async function AccountPage() {
     redirect('/')
   }
 
-  const [favorites, savedSearches] = await Promise.all([
+  const [favorites, savedSearches, shares] = await Promise.all([
     getFavorites(user.id),
     getSavedSearches(user.id),
+    getShares(user.id),
   ])
 
   return (
@@ -104,6 +138,7 @@ export default async function AccountPage() {
         <AccountContent
           initialFavorites={favorites}
           initialSavedSearches={savedSearches}
+          initialShares={shares}
         />
       </div>
     </div>
