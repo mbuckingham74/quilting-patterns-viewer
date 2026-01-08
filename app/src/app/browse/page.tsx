@@ -10,6 +10,8 @@ import AuthButtonServer from '@/components/AuthButtonServer'
 
 const PAGE_SIZE = 50
 const NO_THUMBNAIL_KEYWORD_ID = 616  // Keyword ID for patterns without thumbnails
+const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY
+const VOYAGE_MODEL = 'voyage-multimodal-3'
 
 interface PageProps {
   searchParams: Promise<{
@@ -18,6 +20,123 @@ interface PageProps {
     page?: string
     ai_search?: string
   }>
+}
+
+interface SemanticSearchResult {
+  patterns: Array<{
+    id: number
+    file_name: string
+    file_extension: string
+    author: string
+    thumbnail_url: string
+    similarity?: number
+  }>
+  count: number
+  page: number
+  totalPages: number
+  error: string | null
+  searchMethod: 'semantic' | 'text'
+  fallbackUsed: boolean
+}
+
+async function getAISearchPatterns(query: string, page: number): Promise<SemanticSearchResult> {
+  const supabase = await createClient()
+  const offset = (page - 1) * PAGE_SIZE
+
+  // Try semantic search if Voyage API is configured
+  if (VOYAGE_API_KEY) {
+    try {
+      // Get embedding from Voyage AI
+      const embeddingResponse = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${VOYAGE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: VOYAGE_MODEL,
+          inputs: [{ content: [{ type: 'text', text: query }] }],
+          input_type: 'query',
+        }),
+      })
+
+      if (embeddingResponse.ok) {
+        const embeddingData = await embeddingResponse.json()
+        const queryEmbedding = embeddingData.data[0].embedding
+
+        // Search with higher threshold for better relevance
+        const { data: patterns, error } = await supabase.rpc('search_patterns_semantic', {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.3, // Higher threshold for better relevance
+          match_count: 200, // Get more results for pagination
+        })
+
+        if (!error && patterns && patterns.length > 0) {
+          // Manual pagination of semantic results
+          const paginatedPatterns = patterns.slice(offset, offset + PAGE_SIZE)
+          return {
+            patterns: paginatedPatterns,
+            count: patterns.length,
+            page,
+            totalPages: Math.ceil(patterns.length / PAGE_SIZE),
+            error: null,
+            searchMethod: 'semantic',
+            fallbackUsed: false,
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Semantic search error:', err)
+    }
+  }
+
+  // Fallback to text search
+  const searchTerms = query.toLowerCase().split(/\s+/).filter(t => t.length >= 2)
+  if (searchTerms.length === 0) {
+    return {
+      patterns: [],
+      count: 0,
+      page,
+      totalPages: 0,
+      error: null,
+      searchMethod: 'text',
+      fallbackUsed: true,
+    }
+  }
+
+  const { data: patterns, count, error } = await supabase
+    .from('patterns')
+    .select('id, file_name, file_extension, author, thumbnail_url', { count: 'exact' })
+    .not('thumbnail_url', 'is', null)
+    .or(
+      searchTerms.map(term =>
+        `file_name.ilike.%${term}%,author.ilike.%${term}%,notes.ilike.%${term}%`
+      ).join(',')
+    )
+    .range(offset, offset + PAGE_SIZE - 1)
+
+  if (error) {
+    console.error('Text search error:', error)
+    return {
+      patterns: [],
+      count: 0,
+      page,
+      totalPages: 0,
+      error: 'unknown',
+      searchMethod: 'text',
+      fallbackUsed: true,
+    }
+  }
+
+  return {
+    patterns: patterns || [],
+    count: count || 0,
+    page,
+    totalPages: Math.ceil((count || 0) / PAGE_SIZE),
+    error: null,
+    searchMethod: 'text',
+    fallbackUsed: true,
+  }
 }
 
 async function getPatterns(searchParams: { search?: string; keywords?: string; page?: string }) {
@@ -126,13 +245,21 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   }
 
   const resolvedParams = await searchParams
-  const [{ patterns, count, page, totalPages, error: patternsError }, keywords, favoriteIds] = await Promise.all([
-    getPatterns(resolvedParams),
+  const isAISearch = !!resolvedParams.ai_search
+  const currentPage = parseInt(resolvedParams.page || '1', 10)
+
+  // Use AI search or regular pattern fetch based on ai_search param
+  const [patternResult, keywords, favoriteIds] = await Promise.all([
+    isAISearch
+      ? getAISearchPatterns(resolvedParams.ai_search!, currentPage)
+      : getPatterns(resolvedParams),
     getKeywords(),
     getUserFavoriteIds(user.id),
   ])
 
-  const isAISearch = !!resolvedParams.ai_search
+  const { patterns, count, page, totalPages, error: patternsError } = patternResult
+  const searchMethod = 'searchMethod' in patternResult ? patternResult.searchMethod : null
+  const fallbackUsed = 'fallbackUsed' in patternResult ? patternResult.fallbackUsed : false
 
   return (
     <div className="min-h-screen">
@@ -183,8 +310,14 @@ export default async function BrowsePage({ searchParams }: PageProps) {
             {isAISearch && (
               <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
                 <p className="text-sm text-purple-700">
-                  Showing AI search results for: <strong>{resolvedParams.ai_search}</strong>
+                  Showing {searchMethod === 'semantic' ? 'AI' : 'text'} search results for: <strong>{resolvedParams.ai_search}</strong>
+                  {count > 0 && <span className="ml-2 text-purple-500">({count} matches)</span>}
                 </p>
+                {fallbackUsed && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    ⚠️ AI search unavailable, using text search fallback
+                  </p>
+                )}
               </div>
             )}
             <BrowseContent
