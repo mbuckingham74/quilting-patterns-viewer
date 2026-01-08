@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // Mock the Supabase client
@@ -16,9 +16,16 @@ vi.mock('@/lib/errors', async (importOriginal) => {
   }
 })
 
-// Mock global fetch for Voyage AI API calls
+// Mock global fetch for Voyage AI API calls using stubGlobal for proper teardown
 const mockFetch = vi.fn()
-vi.stubGlobal('fetch', mockFetch)
+
+beforeAll(() => {
+  vi.stubGlobal('fetch', mockFetch)
+})
+
+afterAll(() => {
+  vi.unstubAllGlobals()
+})
 
 import { createClient } from '@/lib/supabase/server'
 import { rateLimitStore } from './route'
@@ -197,36 +204,87 @@ describe('POST /api/search', () => {
 
   describe('limit parameter', () => {
     it('clamps limit to maximum of 100', async () => {
-      const mockSupabase = createMockSupabase()
+      const mockLimit = vi.fn().mockResolvedValue({ data: [], error: null })
+      const mockSupabase = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-id', email: 'test@example.com' } },
+            error: null,
+          }),
+        },
+        rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: mockLimit,
+            }),
+          }),
+        }),
+      }
       mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
       const { POST } = await import('./route')
       const response = await POST(createRequest({ query: 'butterflies', limit: 500 }))
 
       expect(response.status).toBe(200)
-      // The actual limit used should be clamped to 100
+      // Verify the limit was clamped to 100 (text search is used when VOYAGE_API_KEY is not set)
+      expect(mockLimit).toHaveBeenCalledWith(100)
     })
 
     it('uses default limit of 50 when not specified', async () => {
-      const mockSupabase = createMockSupabase()
+      const mockLimit = vi.fn().mockResolvedValue({ data: [], error: null })
+      const mockSupabase = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-id', email: 'test@example.com' } },
+            error: null,
+          }),
+        },
+        rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: mockLimit,
+            }),
+          }),
+        }),
+      }
       mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
       const { POST } = await import('./route')
       const response = await POST(createRequest({ query: 'butterflies' }))
 
       expect(response.status).toBe(200)
-      const json = await response.json()
-      expect(json.query).toBe('butterflies')
+      // Verify the default limit of 50 is used
+      expect(mockLimit).toHaveBeenCalledWith(50)
     })
 
     it('handles negative limit by clamping to 1', async () => {
-      const mockSupabase = createMockSupabase()
+      const mockLimit = vi.fn().mockResolvedValue({ data: [], error: null })
+      const mockSupabase = {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'test-user-id', email: 'test@example.com' } },
+            error: null,
+          }),
+        },
+        rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: mockLimit,
+            }),
+          }),
+        }),
+      }
       mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
       const { POST } = await import('./route')
       const response = await POST(createRequest({ query: 'butterflies', limit: -5 }))
 
       expect(response.status).toBe(200)
+      // Verify the limit was clamped to 1
+      expect(mockLimit).toHaveBeenCalledWith(1)
     })
   })
 
@@ -260,8 +318,12 @@ describe('POST /api/search', () => {
       expect(json.searchMethod).toBe('text')
       expect(json.fallbackUsed).toBe(true)
 
-      // Restore
-      if (originalKey) process.env.VOYAGE_API_KEY = originalKey
+      // Restore - properly handle undefined to avoid setting to string "undefined"
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
     })
 
     it('returns empty array when query has no valid search terms', async () => {
@@ -315,8 +377,12 @@ describe('POST /api/search', () => {
       expect(json.searchMethod).toBe('semantic')
       expect(json.fallbackUsed).toBe(false)
 
-      // Restore
-      process.env.VOYAGE_API_KEY = originalKey
+      // Restore - properly handle undefined to avoid setting to string "undefined"
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
     })
 
     it('falls back to text search when Voyage API returns error', async () => {
@@ -353,7 +419,12 @@ describe('POST /api/search', () => {
       expect(json.searchMethod).toBe('text')
       expect(json.fallbackUsed).toBe(true)
 
-      process.env.VOYAGE_API_KEY = originalKey
+      // Restore - properly handle undefined to avoid setting to string "undefined"
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
     })
 
     it('falls back to text search when Voyage API throws network error', async () => {
@@ -386,7 +457,12 @@ describe('POST /api/search', () => {
       expect(json.searchMethod).toBe('text')
       expect(json.fallbackUsed).toBe(true)
 
-      process.env.VOYAGE_API_KEY = originalKey
+      // Restore - properly handle undefined to avoid setting to string "undefined"
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
     })
 
     it('falls back to text search when semantic RPC fails', async () => {
@@ -425,7 +501,12 @@ describe('POST /api/search', () => {
       expect(json.searchMethod).toBe('text')
       expect(json.fallbackUsed).toBe(true)
 
-      process.env.VOYAGE_API_KEY = originalKey
+      // Restore - properly handle undefined to avoid setting to string "undefined"
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
     })
   })
 

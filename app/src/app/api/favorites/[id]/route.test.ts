@@ -98,7 +98,22 @@ describe('DELETE /api/favorites/[id]', () => {
   })
 
   it('calls delete with correct user_id and pattern_id', async () => {
-    const mockSupabase = createMockSupabase({})
+    // Create a mock that captures the chained eq calls
+    const secondEq = vi.fn().mockResolvedValue({ error: null })
+    const firstEq = vi.fn().mockReturnValue({ eq: secondEq })
+    const mockDelete = vi.fn().mockReturnValue({ eq: firstEq })
+
+    const mockSupabase = {
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'test-user' } },
+          error: null,
+        }),
+      },
+      from: vi.fn().mockReturnValue({
+        delete: mockDelete,
+      }),
+    }
     mockCreateClient.mockResolvedValue(mockSupabase as any)
 
     await DELETE(createRequest('42'), {
@@ -106,7 +121,8 @@ describe('DELETE /api/favorites/[id]', () => {
     })
 
     expect(mockSupabase.from).toHaveBeenCalledWith('user_favorites')
-    const deleteChain = mockSupabase.from('user_favorites').delete()
-    expect(deleteChain.eq).toHaveBeenCalledWith('user_id', 'test-user')
+    expect(mockDelete).toHaveBeenCalled()
+    expect(firstEq).toHaveBeenCalledWith('user_id', 'test-user')
+    expect(secondEq).toHaveBeenCalledWith('pattern_id', 42)
   })
 })
