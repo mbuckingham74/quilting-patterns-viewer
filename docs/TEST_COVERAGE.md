@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 8, 2026
+Last updated: January 7, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | 44.13%   |
-| Branches   | 40.27%   |
-| Functions  | 35.11%   |
-| Lines      | 44.55%   |
+| Statements | 47.45%   |
+| Branches   | 43.39%   |
+| Functions  | 38.67%   |
+| Lines      | 47.91%   |
 
-**Total Tests:** 387 across 26 test files
+**Total Tests:** 437 across 29 test files
 
 ## Running Tests
 
@@ -101,13 +101,16 @@ cd app && npm test
 Components with coverage:
 - **Toast.tsx** - 22 tests (context, provider, auto-dismiss, error handling)
 - **ErrorBoundary.tsx** - 24 tests (error catching, fallback UI, HOC, retry)
+- **AuthButton.tsx** - 13 tests (loading state, auth states, admin detection, sign out)
+- **PatternCard.tsx** - 20 tests (rendering, favorite/share buttons, edge cases)
+- **SearchBar.tsx** - 17 tests (form submission, clear button, param handling)
 
 Components still at 0% coverage:
 - AISearchBar.tsx
 - AccountContent.tsx
 - AdminUploadForm.tsx
 - AdminUserList.tsx
-- AuthButton.tsx / AuthButtonClient.tsx / AuthButtonServer.tsx
+- AuthButtonClient.tsx / AuthButtonServer.tsx
 - AuthTabs.tsx
 - BrowseContent.tsx
 - DuplicateReview.tsx
@@ -115,8 +118,8 @@ Components still at 0% coverage:
 - KeywordFilter.tsx / KeywordSidebar.tsx
 - LandingPage.tsx
 - Pagination.tsx
-- PatternCard.tsx / PatternGrid.tsx / PatternRanker.tsx
-- SaveSearchButton.tsx / SearchBar.tsx
+- PatternGrid.tsx / PatternRanker.tsx
+- SaveSearchButton.tsx
 - ShareBasket.tsx / ShareButton.tsx / ShareModal.tsx
 
 ### Pages (0%)
@@ -148,16 +151,18 @@ Components still at 0% coverage:
 
 ### High Priority (Critical paths, low coverage)
 
-1. **Core components**
+1. **Core components** ✅ Completed
    - ErrorBoundary.tsx - Error handling UI
    - Toast.tsx - Notification system
    - AuthButton.tsx - Auth state handling
 
 ### Medium Priority (UI components)
 
-2. **Browse/display components**
-   - PatternGrid.tsx, PatternCard.tsx
-   - SearchBar.tsx, KeywordFilter.tsx
+2. **Browse/display components** (Partially done)
+   - PatternGrid.tsx ← Next priority
+   - ~~PatternCard.tsx~~ ✅ Done
+   - ~~SearchBar.tsx~~ ✅ Done
+   - KeywordFilter.tsx
    - Complexity: React Testing Library + visual testing
 
 3. **Share flow components**
@@ -165,6 +170,40 @@ Components still at 0% coverage:
    - Complexity: Complex state management
 
 ## Recent Progress
+
+### January 7, 2026 (Evening)
+
+Added tests for more React components (50 new tests):
+
+- **AuthButton.tsx** (`src/components/AuthButton.test.tsx`) - 13 tests
+  - Loading skeleton state
+  - Unauthenticated state (Sign in link)
+  - Authenticated state (email display, Account link, Sign out button)
+  - Admin role detection and Admin link display
+  - Sign out with redirect
+  - Auth state change subscription/unsubscription
+  - Session and profile error handling
+
+- **PatternCard.tsx** (`src/components/PatternCard.test.tsx`) - 20 tests
+  - Pattern name rendering with fallback for empty names
+  - Thumbnail display with placeholder when missing
+  - Author display (conditional)
+  - File extension badge
+  - Link to pattern detail page
+  - FavoriteButton conditional rendering and toggle
+  - ShareButton conditional rendering
+  - Edge cases (minimal data, long names with truncation)
+
+- **SearchBar.tsx** (`src/components/SearchBar.test.tsx`) - 17 tests
+  - Input rendering with search param initialization
+  - Value changes on typing (no navigation)
+  - Form submission with search param
+  - Empty search clears param
+  - Page param reset on new search
+  - Other params preserved
+  - Clear button visibility
+  - Clear button functionality (clears input, navigates, resets page)
+  - Accessibility (input type, button type)
 
 ### January 8, 2026
 
