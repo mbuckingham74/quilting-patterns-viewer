@@ -3,7 +3,10 @@ import path from 'path'
 
 export default defineConfig({
   test: {
+    // Default to node, but hooks tests use jsdom via inline config
     environment: 'node',
+    // Required for React Testing Library
+    globals: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html'],

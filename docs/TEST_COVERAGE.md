@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 6, 2026
+Last updated: January 7, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | 25.98%   |
-| Branches   | 26.84%   |
-| Functions  | 17.43%   |
-| Lines      | 26.54%   |
+| Statements | 40.71%   |
+| Branches   | 37.74%   |
+| Functions  | 28.46%   |
+| Lines      | 41.26%   |
 
-**Total Tests:** 248 across 20 test files
+**Total Tests:** 341 across 24 test files
 
 ## Running Tests
 
@@ -39,9 +39,15 @@ cd app && npm test
 
 **Test files:**
 - `src/lib/filename.test.ts` - 32 tests
-- `src/lib/errors.test.ts` - 32 tests (originally existed)
+- `src/lib/errors.test.ts` - 32 tests
 - `src/lib/api-response.test.ts` - 35 tests
 - `src/lib/fetch-with-retry.test.ts` - 19 tests
+- `src/app/api/search/route.test.ts` - 20 tests
+- `src/app/api/search/rateLimit.test.ts` - 8 tests
+- `src/app/auth/callback/route.test.ts` - 18 tests
+- `src/app/auth/signin/route.test.ts` - 14 tests
+- `src/app/api/admin/upload/route.test.ts` - 18 tests
+- `src/hooks/useFetch.test.ts` - 25 tests
 
 ### API Routes - Variable coverage
 
@@ -71,17 +77,22 @@ cd app && npm test
 
 | Route                          | Statements | Notes                    |
 |--------------------------------|------------|--------------------------|
-| /api/search                    | 41.37%     | Voyage AI integration    |
 | /api/download/[id]             | covered    | 9 tests                  |
-| /api/admin/notify-signup       | covered    | 2 tests                  |
+| /api/admin/notify-signup       | covered    | 7 tests                  |
 
-#### Not Covered (0%)
+#### Auth Routes (NEW - fully covered)
 
-| Route                     | Reason                           |
-|---------------------------|----------------------------------|
-| /auth/callback            | OAuth flow, complex mocking      |
-| /auth/signin              | OAuth flow                       |
-| /api/admin/upload         | File upload, storage operations  |
+| Route                          | Tests | Notes                         |
+|--------------------------------|-------|-------------------------------|
+| /auth/callback                 | 18    | OAuth callback, profile creation, redirect validation |
+| /auth/signin                   | 14    | OAuth initiation, cookie handling |
+| /api/search                    | 20    | Auth, rate limiting, semantic/text search paths |
+
+#### Admin Upload (NEW - fully covered)
+
+| Route                          | Tests | Notes                         |
+|--------------------------------|-------|-------------------------------|
+| /api/admin/upload              | 18    | File upload, ZIP processing, storage, auth |
 
 ## What's NOT Covered
 
@@ -117,10 +128,17 @@ All components in `src/components/` have 0% coverage:
 - /pending-approval/page.tsx
 - /share/[token]/page.tsx
 
+### React Hooks (src/hooks/) - 100% statements
+
+| File        | Statements | Branches | Functions | Lines |
+|-------------|------------|----------|-----------|-------|
+| useFetch.ts | 100%       | 89.65%   | 100%      | 100%  |
+
+**Test file:** `src/hooks/useFetch.test.ts` - 25 tests
+
 ### Other (0%)
 
 - src/contexts/ShareContext.tsx
-- src/hooks/useFetch.ts
 - src/lib/supabase/client.ts
 - src/lib/supabase/server.ts
 - src/lib/supabase/middleware.ts
@@ -129,40 +147,78 @@ All components in `src/components/` have 0% coverage:
 
 ### High Priority (Critical paths, low coverage)
 
-1. **Search API (`/api/search/route.ts`)** - 41.37% coverage
-   - Missing: Voyage AI semantic search path, fallback text search
-   - Complexity: Needs mocking of Voyage AI client
-
-2. **Auth routes** - 0% coverage
-   - `/auth/callback/route.ts` - OAuth callback handling
-   - `/auth/signin/route.ts` - Sign-in flow
-   - Complexity: OAuth mocking, cookie handling
-
-3. **Admin upload** - 0% coverage
-   - `/api/admin/upload/route.ts` - File upload and storage
-   - Complexity: Supabase storage mocking, multipart form data
-
-### Medium Priority (Important but complex)
-
-4. **React hooks**
-   - `useFetch.ts` - Fetch with retry hook
-   - Complexity: React Testing Library setup needed
-
-5. **Core components**
+1. **Core components**
    - ErrorBoundary.tsx - Error handling UI
    - Toast.tsx - Notification system
    - AuthButton.tsx - Auth state handling
 
-### Lower Priority (UI components)
+### Medium Priority (UI components)
 
-6. **Browse/display components**
+2. **Browse/display components**
    - PatternGrid.tsx, PatternCard.tsx
    - SearchBar.tsx, KeywordFilter.tsx
    - Complexity: React Testing Library + visual testing
 
-7. **Share flow components**
+3. **Share flow components**
    - ShareModal.tsx, ShareBasket.tsx, PatternRanker.tsx
    - Complexity: Complex state management
+
+## Recent Progress
+
+### January 7, 2026
+
+Added React hook testing infrastructure and tests for:
+
+- **useFetch Hook** (`src/hooks/useFetch.ts`) - 25 tests
+  - Initial state verification
+  - Successful fetch with data transformation
+  - Loading and retrying state management
+  - Error handling with toast notifications
+  - onSuccess/onError callbacks
+  - Abort behavior for concurrent requests
+  - Reset functionality
+  - Transform error handling
+  - usePost convenience hook
+  - useMutation hook for mutations
+
+Added comprehensive tests for:
+
+- **Search API** (`/api/search`) - 20 tests
+  - Authentication requirements (401 for unauthenticated)
+  - Query validation (length limits 2-500 chars)
+  - Rate limiting (429 with Retry-After header)
+  - Limit parameter clamping (max 100)
+  - Text search fallback when Voyage API unavailable
+  - Semantic search with Voyage AI mocking
+  - Graceful fallback on API errors, network errors, RPC failures
+
+- **Auth Callback** (`/auth/callback`) - 18 tests
+  - Code parameter validation
+  - Origin validation (prevent open redirects)
+  - Next parameter validation (relative paths only)
+  - Code exchange error handling
+  - Existing user flow (approved vs unapproved)
+  - New user flow (profile creation, admin notification)
+  - Cookie handling (PKCE verifier)
+
+- **Auth Signin** (`/auth/signin`) - 14 tests
+  - OAuth initiation with Google
+  - Correct redirect callback URL
+  - Query parameters (offline access, consent prompt)
+  - Origin detection from headers
+  - Error handling for OAuth failures
+  - Cookie handling for PKCE flow
+
+- **Admin Upload** (`/api/admin/upload`) - 18 tests
+  - Authentication (401 unauthenticated)
+  - Authorization (403 non-admin)
+  - File validation (ZIP required, must contain .qli files)
+  - Duplicate detection and skipping
+  - Successful upload with pattern processing
+  - Nested folder structure in ZIP files
+  - Storage upload error handling with cleanup
+  - Database error handling with cleanup
+  - Summary reporting with mixed results
 
 ## Test Patterns Used
 
@@ -221,6 +277,49 @@ function createRequest(body: Record<string, unknown>): Request {
 it('returns 400 for invalid input', async () => {
   const response = await POST(createRequest({ invalid: 'data' }))
   expect(response.status).toBe(400)
+})
+```
+
+### Testing React Hooks with jsdom
+
+Use inline environment config and React Testing Library:
+
+```typescript
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, it, expect, vi } from 'vitest'
+import { renderHook, act, waitFor } from '@testing-library/react'
+
+// Mock dependencies
+vi.mock('@/lib/fetch-with-retry', () => ({
+  fetchWithRetry: vi.fn(),
+}))
+
+vi.mock('@/components/Toast', () => ({
+  useToast: vi.fn(() => ({
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+  })),
+}))
+
+import { useFetch } from './useFetch'
+import { fetchWithRetry } from '@/lib/fetch-with-retry'
+
+it('fetches data successfully', async () => {
+  vi.mocked(fetchWithRetry).mockResolvedValueOnce({
+    data: { id: 1 },
+    error: null,
+    attempts: 1,
+  })
+
+  const { result } = renderHook(() => useFetch('/api/test'))
+
+  await act(async () => {
+    await result.current.execute()
+  })
+
+  expect(result.current.data).toEqual({ id: 1 })
 })
 ```
 
