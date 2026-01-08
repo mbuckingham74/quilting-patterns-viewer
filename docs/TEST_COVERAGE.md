@@ -6,12 +6,12 @@ Last updated: January 7, 2026
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | 49.13%   |
-| Branches   | 44.77%   |
-| Functions  | 41.47%   |
-| Lines      | 49.62%   |
+| Statements | 55.09%   |
+| Branches   | 50.24%   |
+| Functions  | 48.34%   |
+| Lines      | 55.70%   |
 
-**Total Tests:** 479 across 31 test files
+**Total Tests:** 575 across 36 test files
 
 ## Running Tests
 
@@ -106,6 +106,11 @@ Components with coverage:
 - **SearchBar.tsx** - 17 tests (form submission, clear button, param handling)
 - **PatternGrid.tsx** - 17 tests (loading, error states, favorites integration)
 - **KeywordFilter.tsx** - 25 tests (dropdown, selection, clear all, URL params)
+- **ShareButton.tsx** - 13 tests (add/remove from basket, styling, event handling)
+- **ShareBasket.tsx** - 19 tests (expand/collapse, pattern list, modal integration)
+- **ShareModal.tsx** - 24 tests (form, submission, success state, error handling)
+- **FavoriteButton.tsx** - 18 tests (API calls, optimistic updates, error handling)
+- **Pagination.tsx** - 22 tests (page numbers, navigation, button states)
 
 Components still at 0% coverage:
 - AISearchBar.tsx
@@ -116,13 +121,10 @@ Components still at 0% coverage:
 - AuthTabs.tsx
 - BrowseContent.tsx
 - DuplicateReview.tsx
-- FavoriteButton.tsx
 - KeywordSidebar.tsx
 - LandingPage.tsx
-- Pagination.tsx
 - PatternRanker.tsx
 - SaveSearchButton.tsx
-- ShareBasket.tsx / ShareButton.tsx / ShareModal.tsx
 
 ### Pages (0%)
 
@@ -166,11 +168,59 @@ Components still at 0% coverage:
    - ~~SearchBar.tsx~~ ✅ Done
    - ~~KeywordFilter.tsx~~ ✅ Done
 
-3. **Share flow components**
-   - ShareModal.tsx, ShareBasket.tsx, PatternRanker.tsx
-   - Complexity: Complex state management
+3. **Share flow components** ✅ Completed
+   - ~~ShareModal.tsx~~ ✅ Done
+   - ~~ShareBasket.tsx~~ ✅ Done
+   - ~~ShareButton.tsx~~ ✅ Done
+   - ~~FavoriteButton.tsx~~ ✅ Done
+   - ~~Pagination.tsx~~ ✅ Done
 
 ## Recent Progress
+
+### January 7, 2026 (Night)
+
+Added tests for share flow and interaction components (96 new tests):
+
+- **ShareButton.tsx** (`src/components/ShareButton.test.tsx`) - 13 tests
+  - Rendering states (plus icon, checkmark, full basket)
+  - Adding to basket (calls addPattern)
+  - Removing from basket (calls removePattern)
+  - Event handling (preventDefault, stopPropagation)
+  - Styling (selected, unselected, disabled states)
+
+- **ShareBasket.tsx** (`src/components/ShareBasket.test.tsx`) - 19 tests
+  - Rendering (hidden when empty, floating button with count)
+  - Expand/collapse toggle
+  - Pattern list display with thumbnails
+  - Remove pattern functionality
+  - Clear all functionality
+  - Share modal integration
+  - Success callback handling
+
+- **ShareModal.tsx** (`src/components/ShareModal.test.tsx`) - 24 tests
+  - Rendering (pattern preview, form fields)
+  - Form interaction (input changes)
+  - Form submission (API call, loading state)
+  - Success state (share URL, copy to clipboard)
+  - Error handling (API failure, network error)
+  - Close behavior
+
+- **FavoriteButton.tsx** (`src/components/FavoriteButton.test.tsx`) - 18 tests
+  - Rendering (star icons, aria labels)
+  - Adding favorites (POST API call)
+  - Removing favorites (DELETE API call)
+  - Optimistic updates (immediate UI change, revert on error)
+  - Error handling (toast notifications)
+  - Loading state (disabled button, ignore clicks)
+  - Event handling (stopPropagation)
+
+- **Pagination.tsx** (`src/components/Pagination.test.tsx`) - 22 tests
+  - Rendering (hide for single page, show page numbers)
+  - Page number display (ellipsis logic, current page highlight)
+  - Navigation (page click, prev/next buttons)
+  - URL param preservation
+  - Button states (disabled at boundaries)
+  - Edge cases (2 pages, 3 pages, many pages)
 
 ### January 7, 2026 (Late Evening)
 
