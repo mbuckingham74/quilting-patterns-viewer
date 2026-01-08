@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 7, 2026
+Last updated: January 8, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | 55.09%   |
-| Branches   | 50.24%   |
-| Functions  | 48.34%   |
-| Lines      | 55.70%   |
+| Statements | 60%      |
+| Branches   | 54.6%    |
+| Functions  | 53.43%   |
+| Lines      | 60.47%   |
 
-**Total Tests:** 575 across 36 test files
+**Total Tests:** 632 across 39 test files
 
 ## Running Tests
 
@@ -48,6 +48,15 @@ cd app && npm test
 - `src/app/auth/signin/route.test.ts` - 14 tests
 - `src/app/api/admin/upload/route.test.ts` - 18 tests
 - `src/hooks/useFetch.test.ts` - 25 tests
+
+### Contexts (src/contexts/) - 100% statements
+
+| File               | Statements | Branches | Functions | Lines   |
+|--------------------|------------|----------|-----------|---------|
+| ShareContext.tsx   | 100%       | 100%     | 100%      | 100%    |
+
+**Test files:**
+- `src/contexts/ShareContext.test.tsx` - 14 tests
 
 ### API Routes - Variable coverage
 
@@ -96,24 +105,25 @@ cd app && npm test
 
 ## What's NOT Covered
 
-### React Components (mostly 0%)
+### React Components (src/components/) - 47.98% statements
 
 Components with coverage:
-- **Toast.tsx** - 22 tests (context, provider, auto-dismiss, error handling)
-- **ErrorBoundary.tsx** - 24 tests (error catching, fallback UI, HOC, retry)
-- **AuthButton.tsx** - 13 tests (loading state, auth states, admin detection, sign out)
-- **PatternCard.tsx** - 20 tests (rendering, favorite/share buttons, edge cases)
-- **SearchBar.tsx** - 17 tests (form submission, clear button, param handling)
-- **PatternGrid.tsx** - 17 tests (loading, error states, favorites integration)
-- **KeywordFilter.tsx** - 25 tests (dropdown, selection, clear all, URL params)
-- **ShareButton.tsx** - 13 tests (add/remove from basket, styling, event handling)
-- **ShareBasket.tsx** - 19 tests (expand/collapse, pattern list, modal integration)
-- **ShareModal.tsx** - 24 tests (form, submission, success state, error handling)
-- **FavoriteButton.tsx** - 18 tests (API calls, optimistic updates, error handling)
-- **Pagination.tsx** - 22 tests (page numbers, navigation, button states)
+- **AISearchBar.tsx** - 25 tests (100% coverage)
+- **Toast.tsx** - 22 tests (95.52% coverage)
+- **ErrorBoundary.tsx** - 24 tests (100% coverage)
+- **AuthButton.tsx** - 13 tests (95.55% coverage)
+- **PatternCard.tsx** - 20 tests (100% coverage)
+- **SearchBar.tsx** - 17 tests (100% coverage)
+- **PatternGrid.tsx** - 17 tests (100% coverage)
+- **KeywordFilter.tsx** - 25 tests (100% coverage)
+- **ShareButton.tsx** - 13 tests (100% coverage)
+- **ShareBasket.tsx** - 19 tests (100% coverage)
+- **ShareModal.tsx** - 24 tests (97.67% coverage)
+- **FavoriteButton.tsx** - 18 tests (96.42% coverage)
+- **Pagination.tsx** - 22 tests (100% coverage)
+- **SaveSearchButton.tsx** - 18 tests (94.11% coverage)
 
 Components still at 0% coverage:
-- AISearchBar.tsx
 - AccountContent.tsx
 - AdminUploadForm.tsx
 - AdminUserList.tsx
@@ -124,7 +134,6 @@ Components still at 0% coverage:
 - KeywordSidebar.tsx
 - LandingPage.tsx
 - PatternRanker.tsx
-- SaveSearchButton.tsx
 
 ### Pages (0%)
 
@@ -146,7 +155,6 @@ Components still at 0% coverage:
 
 ### Other (0%)
 
-- src/contexts/ShareContext.tsx
 - src/lib/supabase/client.ts
 - src/lib/supabase/server.ts
 - src/lib/supabase/middleware.ts
@@ -175,7 +183,72 @@ Components still at 0% coverage:
    - ~~FavoriteButton.tsx~~ ✅ Done
    - ~~Pagination.tsx~~ ✅ Done
 
+4. **Search and save components** ✅ Completed
+   - ~~AISearchBar.tsx~~ ✅ Done
+   - ~~SaveSearchButton.tsx~~ ✅ Done
+   - ~~ShareContext.tsx~~ ✅ Done
+
+### Lower Priority (Admin and edge features)
+
+5. **Admin components** (0% coverage)
+   - AdminUploadForm.tsx
+   - AdminUserList.tsx
+   - DuplicateReview.tsx
+
+6. **Auth UI components** (0% coverage)
+   - AuthTabs.tsx
+   - AuthButtonClient.tsx / AuthButtonServer.tsx
+
 ## Recent Progress
+
+### January 8, 2026
+
+Added tests for search/save components and context (57 new tests):
+
+- **ShareContext.tsx** (`src/contexts/ShareContext.test.tsx`) - 14 tests
+  - Provider initialization and empty state
+  - Loading patterns from localStorage on mount
+  - Invalid JSON handling in localStorage
+  - addPattern (success, duplicate rejection, max capacity)
+  - removePattern functionality
+  - clearSelection functionality
+  - isSelected state checking
+  - canAddMore computed value
+  - localStorage error handling (setItem failures)
+
+- **AISearchBar.tsx** (`src/components/AISearchBar.test.tsx`) - 25 tests
+  - Input rendering and placeholder text
+  - AI Search button state (enabled/disabled)
+  - Query initialization from URL params
+  - Input value updates on typing
+  - Clear button visibility and functionality
+  - Form submission with API call
+  - Query trimming before submission
+  - Empty/whitespace query prevention
+  - Loading state during search
+  - onSearch callback with results
+  - URL update with search query
+  - Fallback indicator for text search
+  - Error handling with toast
+  - SaveSearchButton integration
+
+- **SaveSearchButton.tsx** (`src/components/SaveSearchButton.test.tsx`) - 18 tests
+  - Button rendering with save text
+  - Bookmark icon when not saved
+  - Disabled state for empty/whitespace query
+  - API call with trimmed query
+  - Loading state during save
+  - Saved state after successful save
+  - onSaved callback execution
+  - setTimeout for reset after 3 seconds
+  - Ignore clicks while saved
+  - Ignore clicks while loading
+  - Error logging on API failure
+  - No saved state on error
+  - No onSaved callback on error
+  - Network error handling
+  - Purple styling when not saved
+  - Green styling when saved
 
 ### January 7, 2026 (Night)
 
@@ -393,6 +466,30 @@ function createMockSupabase(options: {
     }),
   }
 }
+```
+
+### Mocking localStorage
+
+```typescript
+class MockStorage implements Storage {
+  private store: Record<string, string> = {}
+
+  get length() { return Object.keys(this.store).length }
+  clear() { this.store = {} }
+  getItem(key: string) { return this.store[key] || null }
+  key(index: number) { return Object.keys(this.store)[index] || null }
+  removeItem(key: string) { delete this.store[key] }
+  setItem(key: string, value: string) { this.store[key] = value }
+}
+
+beforeEach(() => {
+  mockStorage = new MockStorage()
+  vi.stubGlobal('localStorage', mockStorage)
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 ```
 
 ### Dynamic Import for Env Vars
