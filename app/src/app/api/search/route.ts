@@ -143,6 +143,7 @@ async function semanticSearch(
     addErrorBreadcrumb('Calling Voyage AI API', 'search', { query })
 
     // Embed the text query using Voyage AI
+    // Note: Voyage multimodal API expects inputs as array of objects with "content" key
     const embeddingResponse = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
       method: 'POST',
       headers: {
@@ -151,7 +152,7 @@ async function semanticSearch(
       },
       body: JSON.stringify({
         model: VOYAGE_MODEL,
-        inputs: [[{ type: 'text', text: query }]],
+        inputs: [{ content: [{ type: 'text', text: query }] }],
         input_type: 'query',
       }),
     })
