@@ -1,0 +1,41 @@
+# Dependencies
+app/node_modules
+node_modules
+
+# Build outputs
+app/.next
+app/coverage
+
+# Development files
+app/.env.local
+.env.local
+*.log
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Test files
+app/**/*.test.ts
+app/**/*.test.tsx
+app/**/*.spec.ts
+app/**/*.spec.tsx
+
+# Documentation
+docs
+*.md
+!app/README.md
+
+# Scripts (not needed in container)
+scripts
+files
+
+# OS files
+.DS_Store
+Thumbs.db

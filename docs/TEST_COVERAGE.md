@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 7, 2026
+Last updated: January 8, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | 40.71%   |
-| Branches   | 37.74%   |
-| Functions  | 28.46%   |
-| Lines      | 41.26%   |
+| Statements | 44.13%   |
+| Branches   | 40.27%   |
+| Functions  | 35.11%   |
+| Lines      | 44.55%   |
 
-**Total Tests:** 341 across 24 test files
+**Total Tests:** 387 across 26 test files
 
 ## Running Tests
 
@@ -96,10 +96,13 @@ cd app && npm test
 
 ## What's NOT Covered
 
-### React Components (0%)
+### React Components (mostly 0%)
 
-All components in `src/components/` have 0% coverage:
+Components with coverage:
+- **Toast.tsx** - 22 tests (context, provider, auto-dismiss, error handling)
+- **ErrorBoundary.tsx** - 24 tests (error catching, fallback UI, HOC, retry)
 
+Components still at 0% coverage:
 - AISearchBar.tsx
 - AccountContent.tsx
 - AdminUploadForm.tsx
@@ -108,7 +111,6 @@ All components in `src/components/` have 0% coverage:
 - AuthTabs.tsx
 - BrowseContent.tsx
 - DuplicateReview.tsx
-- ErrorBoundary.tsx
 - FavoriteButton.tsx
 - KeywordFilter.tsx / KeywordSidebar.tsx
 - LandingPage.tsx
@@ -116,7 +118,6 @@ All components in `src/components/` have 0% coverage:
 - PatternCard.tsx / PatternGrid.tsx / PatternRanker.tsx
 - SaveSearchButton.tsx / SearchBar.tsx
 - ShareBasket.tsx / ShareButton.tsx / ShareModal.tsx
-- Toast.tsx
 
 ### Pages (0%)
 
@@ -164,6 +165,37 @@ All components in `src/components/` have 0% coverage:
    - Complexity: Complex state management
 
 ## Recent Progress
+
+### January 8, 2026
+
+Added React component testing infrastructure:
+- Installed `@testing-library/jest-dom` for DOM matchers
+- Added `src/test/setup.ts` for vitest setup
+- Configured `vitest.config.ts` with setupFiles
+
+Added tests for core UI components:
+
+- **Toast.tsx** (`src/components/Toast.test.tsx`) - 22 tests
+  - useToast hook context validation
+  - showToast with unique IDs and auto-dismiss
+  - Duration handling (default 5s, error 7s, persistent with 0)
+  - Max toasts limit (5)
+  - dismissToast with timer cleanup
+  - showSuccess with correct styling
+  - showError with error parsing, context, auth actions, rate limit display
+  - ToastItem dismiss button and action buttons
+  - ToastContainer accessibility (aria-live)
+
+- **ErrorBoundary.tsx** (`src/components/ErrorBoundary.test.tsx`) - 24 tests
+  - Normal render without errors
+  - Error catching with default fallback
+  - Custom fallback support
+  - logError with component context
+  - onError callback
+  - Retry functionality
+  - Development error details visibility
+  - PageErrorFallback component
+  - withErrorBoundary HOC (displayName, props passthrough, options)
 
 ### January 7, 2026
 

@@ -7,6 +7,8 @@ export default defineConfig({
     environment: 'node',
     // Required for React Testing Library
     globals: true,
+    // Setup file for jest-dom matchers
+    setupFiles: ['./src/test/setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary', 'html'],
