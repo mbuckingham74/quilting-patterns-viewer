@@ -6,12 +6,12 @@ Last updated: January 7, 2026
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | 47.45%   |
-| Branches   | 43.39%   |
-| Functions  | 38.67%   |
-| Lines      | 47.91%   |
+| Statements | 49.13%   |
+| Branches   | 44.77%   |
+| Functions  | 41.47%   |
+| Lines      | 49.62%   |
 
-**Total Tests:** 437 across 29 test files
+**Total Tests:** 479 across 31 test files
 
 ## Running Tests
 
@@ -104,6 +104,8 @@ Components with coverage:
 - **AuthButton.tsx** - 13 tests (loading state, auth states, admin detection, sign out)
 - **PatternCard.tsx** - 20 tests (rendering, favorite/share buttons, edge cases)
 - **SearchBar.tsx** - 17 tests (form submission, clear button, param handling)
+- **PatternGrid.tsx** - 17 tests (loading, error states, favorites integration)
+- **KeywordFilter.tsx** - 25 tests (dropdown, selection, clear all, URL params)
 
 Components still at 0% coverage:
 - AISearchBar.tsx
@@ -115,10 +117,10 @@ Components still at 0% coverage:
 - BrowseContent.tsx
 - DuplicateReview.tsx
 - FavoriteButton.tsx
-- KeywordFilter.tsx / KeywordSidebar.tsx
+- KeywordSidebar.tsx
 - LandingPage.tsx
 - Pagination.tsx
-- PatternGrid.tsx / PatternRanker.tsx
+- PatternRanker.tsx
 - SaveSearchButton.tsx
 - ShareBasket.tsx / ShareButton.tsx / ShareModal.tsx
 
@@ -158,18 +160,43 @@ Components still at 0% coverage:
 
 ### Medium Priority (UI components)
 
-2. **Browse/display components** (Partially done)
-   - PatternGrid.tsx ← Next priority
+2. **Browse/display components** ✅ Completed
+   - ~~PatternGrid.tsx~~ ✅ Done
    - ~~PatternCard.tsx~~ ✅ Done
    - ~~SearchBar.tsx~~ ✅ Done
-   - KeywordFilter.tsx
-   - Complexity: React Testing Library + visual testing
+   - ~~KeywordFilter.tsx~~ ✅ Done
 
 3. **Share flow components**
    - ShareModal.tsx, ShareBasket.tsx, PatternRanker.tsx
    - Complexity: Complex state management
 
 ## Recent Progress
+
+### January 7, 2026 (Late Evening)
+
+Added tests for browse/display components (42 new tests):
+
+- **PatternGrid.tsx** (`src/components/PatternGrid.test.tsx`) - 17 tests
+  - Loading state with skeleton placeholders
+  - Auth error state with session expired message
+  - Empty state message
+  - Pattern card rendering and grid layout
+  - Favorites integration (isFavorited state, toggle callbacks)
+  - State priority (loading > error > empty)
+  - Large data set handling
+
+- **KeywordFilter.tsx** (`src/components/KeywordFilter.test.tsx`) - 25 tests
+  - Filter button rendering with badge count
+  - Dropdown open/close toggle
+  - All keywords displayed with checkboxes
+  - Checkbox states based on URL params
+  - Keyword selection updates URL
+  - Multiple keyword selection
+  - Keyword deselection
+  - Clear all button visibility and functionality
+  - Page param reset on selection/clear
+  - Other params preserved
+  - Edge cases (empty keywords, invalid IDs in URL)
 
 ### January 7, 2026 (Evening)
 
