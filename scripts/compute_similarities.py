@@ -82,8 +82,17 @@ def get_all_embeddings() -> Tuple[List[int], np.ndarray]:
         return [], np.array([])
 
     # Extract IDs and embeddings
+    # Handle embeddings that may come as strings from REST API
     pattern_ids = [p['id'] for p in all_patterns]
-    embeddings = np.array([p['embedding'] for p in all_patterns], dtype=np.float32)
+
+    def parse_embedding(emb):
+        if isinstance(emb, str):
+            # Parse string representation of array
+            import json
+            return json.loads(emb)
+        return emb
+
+    embeddings = np.array([parse_embedding(p['embedding']) for p in all_patterns], dtype=np.float32)
 
     return pattern_ids, embeddings
 
