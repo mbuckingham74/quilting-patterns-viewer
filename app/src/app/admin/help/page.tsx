@@ -98,6 +98,9 @@ export default async function AdminHelpPage() {
             <a href="#edit-pattern" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">7.</span> Edit Pattern Details
             </a>
+            <a href="#analytics" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">8.</span> View Analytics
+            </a>
           </div>
         </div>
 
@@ -512,6 +515,23 @@ export default async function AdminHelpPage() {
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
                 <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">4</div>
                 <div>
+                  <p className="font-medium text-stone-800">Rotate or flip the thumbnail (if needed)</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    If the pattern thumbnail is oriented incorrectly, use the transform controls below the image:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Rotate buttons</strong> — turn the image 90° left, 90° right, or 180°</li>
+                    <li>&bull; <strong>Flip buttons</strong> — mirror the image horizontally or vertically</li>
+                  </ul>
+                  <p className="text-stone-500 text-xs mt-2">
+                    Note: After rotating/flipping, the AI search data will be regenerated automatically.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">5</div>
+                <div>
                   <p className="font-medium text-stone-800">Add or remove keywords</p>
                   <p className="text-stone-600 text-sm mt-1">
                     Scroll down to the Keywords section. Click the <span className="text-rose-600 font-medium">×</span> on any keyword to remove it.
@@ -521,7 +541,7 @@ export default async function AdminHelpPage() {
               </div>
 
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
-                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">5</div>
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">6</div>
                 <div>
                   <p className="font-medium text-stone-800">Click &quot;Save Changes&quot;</p>
                   <p className="text-stone-600 text-sm mt-1">
@@ -534,8 +554,79 @@ export default async function AdminHelpPage() {
             <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-lg">
               <p className="font-medium text-rose-800">When should I edit a pattern?</p>
               <p className="text-rose-700 text-sm mt-1">
-                Use this feature to fix typos, add missing author information, update notes, or organize patterns with better keywords.
-                The thumbnail and pattern file cannot be changed — to replace those, delete the pattern and re-upload it.
+                Use this feature to fix typos, add missing author information, update notes, organize patterns with better keywords, or fix incorrectly oriented thumbnails.
+                The pattern file itself cannot be changed — to replace that, delete the pattern and re-upload it.
+              </p>
+            </div>
+          </section>
+
+          {/* View Analytics */}
+          <section id="analytics" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">View Analytics</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              See how people are using the site — track downloads, searches, and user activity.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-indigo-50 rounded-lg">
+                <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-indigo-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to Analytics</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    From the <Link href="/admin" className="text-indigo-700 underline">Admin Panel</Link>, click &quot;Analytics&quot;
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-indigo-50 rounded-lg">
+                <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-indigo-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">View the overview stats</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    At the top you&apos;ll see:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Total Users</strong> — how many people have accounts</li>
+                    <li>&bull; <strong>Downloads</strong> — how many patterns have been downloaded</li>
+                    <li>&bull; <strong>Searches</strong> — how many searches have been performed</li>
+                    <li>&bull; <strong>Shares</strong> — how many pattern collections have been shared</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-indigo-50 rounded-lg">
+                <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-indigo-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Check the activity chart</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    The bar chart shows activity over the last 30 days, including downloads, searches, and new signups.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-indigo-50 rounded-lg">
+                <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-indigo-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">See what&apos;s popular</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    At the bottom, you&apos;ll find the top downloaded patterns and most popular search queries.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
+              <p className="font-medium text-indigo-800">Note about historical data</p>
+              <p className="text-indigo-700 text-sm mt-1">
+                Analytics tracking starts from when this feature was added. Downloads and searches from before that time aren&apos;t counted.
               </p>
             </div>
           </section>
