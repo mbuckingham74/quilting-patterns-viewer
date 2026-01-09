@@ -9,9 +9,10 @@ interface PatternGridProps {
   error?: string | null
   favoritePatternIds?: Set<number>
   onToggleFavorite?: (patternId: number, newState: boolean) => void
+  isAdmin?: boolean
 }
 
-export default function PatternGrid({ patterns, loading, error, favoritePatternIds, onToggleFavorite }: PatternGridProps) {
+export default function PatternGrid({ patterns, loading, error, favoritePatternIds, onToggleFavorite, isAdmin = false }: PatternGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -60,6 +61,7 @@ export default function PatternGrid({ patterns, loading, error, favoritePatternI
           pattern={pattern}
           isFavorited={favoritePatternIds?.has(pattern.id) ?? false}
           onToggleFavorite={onToggleFavorite}
+          showEditButton={isAdmin}
         />
       ))}
     </div>

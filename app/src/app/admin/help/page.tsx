@@ -95,6 +95,9 @@ export default async function AdminHelpPage() {
             <a href="#users" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">6.</span> Manage Users
             </a>
+            <a href="#edit-pattern" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">7.</span> Edit Pattern Details
+            </a>
           </div>
         </div>
 
@@ -445,6 +448,94 @@ export default async function AdminHelpPage() {
               <p className="font-medium text-purple-800">You&apos;ll get an email!</p>
               <p className="text-purple-700 text-sm mt-1">
                 Whenever someone new signs up, you&apos;ll receive an email notification so you can approve them quickly.
+              </p>
+            </div>
+          </section>
+
+          {/* Edit Pattern Details */}
+          <section id="edit-pattern" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">Edit Pattern Details</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              Fix mistakes or update information on any pattern — change the name, author, notes, or keywords.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Find the pattern you want to edit</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    <Link href="/browse" className="text-rose-700 underline">Browse patterns</Link> or use search to find it
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">Click the Edit button</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Look for the pencil icon <span className="inline-flex items-center justify-center w-5 h-5 bg-stone-100 text-stone-600 rounded text-xs">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </span> on the pattern card, or click &quot;Edit Pattern&quot; on the pattern detail page.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Update the information</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    You can change:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>File Name</strong> — the display name of the pattern</li>
+                    <li>&bull; <strong>Author</strong> — who designed the pattern</li>
+                    <li>&bull; <strong>Author Website</strong> — link to the designer&apos;s site</li>
+                    <li>&bull; <strong>Author Notes</strong> — notes from the designer</li>
+                    <li>&bull; <strong>Notes</strong> — your own notes about the pattern</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Add or remove keywords</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Scroll down to the Keywords section. Click the <span className="text-rose-600 font-medium">×</span> on any keyword to remove it.
+                    Use the search box to find and add new keywords.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Click &quot;Save Changes&quot;</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Your changes will be saved and you&apos;ll return to the pattern detail page.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-rose-50 border border-rose-200 rounded-lg">
+              <p className="font-medium text-rose-800">When should I edit a pattern?</p>
+              <p className="text-rose-700 text-sm mt-1">
+                Use this feature to fix typos, add missing author information, update notes, or organize patterns with better keywords.
+                The thumbnail and pattern file cannot be changed — to replace those, delete the pattern and re-upload it.
               </p>
             </div>
           </section>

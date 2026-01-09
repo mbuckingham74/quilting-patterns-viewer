@@ -12,6 +12,7 @@ interface BrowseContentProps {
   totalPages: number
   totalCount: number
   initialFavoriteIds: number[]
+  isAdmin?: boolean
 }
 
 export default function BrowseContent({
@@ -21,6 +22,7 @@ export default function BrowseContent({
   totalPages,
   totalCount,
   initialFavoriteIds,
+  isAdmin = false,
 }: BrowseContentProps) {
   const [favoritePatternIds, setFavoritePatternIds] = useState<Set<number>>(
     new Set(initialFavoriteIds)
@@ -50,6 +52,7 @@ export default function BrowseContent({
         error={error}
         favoritePatternIds={favoritePatternIds}
         onToggleFavorite={handleToggleFavorite}
+        isAdmin={isAdmin}
       />
       <Pagination
         currentPage={currentPage}

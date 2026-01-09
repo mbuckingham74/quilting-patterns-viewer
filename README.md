@@ -68,6 +68,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - **User Management** - Approve/reject new signups, view approved users with last login
 - **Pattern Upload** - Bulk upload patterns from ZIP files
 - **Duplicate Finder** - Identify and manage similar patterns
+- **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
 - **How-To Guide** - Built-in help documentation for non-technical users
 
 ### Error Handling
@@ -382,6 +383,9 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/users` | GET | Admin | User management |
 | `/api/admin/duplicates` | GET | Admin | Find similar patterns |
 | `/api/admin/duplicates/review` | POST | Admin | Mark duplicate status |
+| `/api/admin/patterns/[id]` | GET/PATCH | Admin | Get/update pattern metadata |
+| `/api/admin/patterns/[id]/keywords` | GET/POST/DELETE | Admin | Manage pattern keywords |
+| `/api/keywords` | GET | Required | List all keywords |
 
 ---
 

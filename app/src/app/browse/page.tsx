@@ -244,6 +244,15 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     redirect('/')
   }
 
+  // Check if user is admin (for edit buttons)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = profile?.is_admin ?? false
+
   const resolvedParams = await searchParams
   const isAISearch = !!resolvedParams.ai_search
   const currentPage = parseInt(resolvedParams.page || '1', 10)
@@ -327,6 +336,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
               totalPages={totalPages}
               totalCount={count}
               initialFavoriteIds={favoriteIds}
+              isAdmin={isAdmin}
             />
           </main>
         </div>

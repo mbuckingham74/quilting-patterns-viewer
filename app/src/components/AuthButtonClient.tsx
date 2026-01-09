@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
@@ -9,10 +10,38 @@ interface AuthButtonClientProps {
 }
 
 export default function AuthButtonClient({ email, isAdmin }: AuthButtonClientProps) {
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  console.log('AuthButtonClient: rendered with', { email, isAdmin, isSigningOut })
+
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = '/'
+    if (isSigningOut) {
+      console.log('AuthButtonClient: already signing out, ignoring')
+      return
+    }
+    setIsSigningOut(true)
+    console.log('AuthButtonClient: handleSignOut called')
+    try {
+      const supabase = createClient()
+      console.log('AuthButtonClient: calling signOut')
+
+      // Add timeout to detect hanging requests
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SignOut timed out after 5s')), 5000)
+      )
+
+      // Use scope: 'local' to sign out without server call (faster, more reliable)
+      const signOutPromise = supabase.auth.signOut({ scope: 'local' })
+
+      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as { error: Error | null }
+      console.log('AuthButtonClient: signOut result', { error: error?.message })
+
+      // Even if signOut fails, clear local state and redirect
+      window.location.href = '/'
+    } catch (err) {
+      console.error('AuthButtonClient: signOut exception', err)
+      // Force redirect even on error - clear the session anyway
+      window.location.href = '/'
+    }
   }
 
   return (
@@ -35,8 +64,9 @@ export default function AuthButtonClient({ email, isAdmin }: AuthButtonClientPro
         Account
       </Link>
       <button
+        type="button"
         onClick={handleSignOut}
-        className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors"
+        className="px-3 py-1.5 text-sm text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
       >
         Sign out
       </button>

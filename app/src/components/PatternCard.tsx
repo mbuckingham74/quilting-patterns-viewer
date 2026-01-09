@@ -11,9 +11,10 @@ interface PatternCardProps {
   isFavorited?: boolean
   onToggleFavorite?: (patternId: number, newState: boolean) => void
   showShareButton?: boolean
+  showEditButton?: boolean
 }
 
-export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false }: PatternCardProps) {
+export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false }: PatternCardProps) {
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
 
@@ -60,6 +61,18 @@ export default function PatternCard({ pattern, isFavorited = false, onToggleFavo
               <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-600 uppercase">
                 {extension}
               </span>
+            )}
+            {showEditButton && (
+              <Link
+                href={`/admin/patterns/${pattern.id}/edit`}
+                onClick={(e) => e.stopPropagation()}
+                className="p-1 rounded hover:bg-stone-200 transition-colors text-stone-500 hover:text-rose-600"
+                title="Edit pattern"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </Link>
             )}
             {showShareButton && (
               <ShareButton

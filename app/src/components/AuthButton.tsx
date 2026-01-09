@@ -80,9 +80,20 @@ export default function AuthButton() {
   }, [mounted])
 
   const handleSignOut = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    window.location.href = '/'
+    console.log('AuthButton: handleSignOut called')
+    try {
+      const supabase = createClient()
+      console.log('AuthButton: calling signOut')
+      const { error } = await supabase.auth.signOut()
+      console.log('AuthButton: signOut result', { error: error?.message })
+      if (error) {
+        console.error('AuthButton: signOut error', error)
+      }
+      console.log('AuthButton: redirecting to /')
+      window.location.href = '/'
+    } catch (err) {
+      console.error('AuthButton: signOut exception', err)
+    }
   }
 
   // Always render skeleton on server and during initial client mount

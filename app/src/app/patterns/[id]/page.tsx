@@ -63,6 +63,15 @@ export default async function PatternPage({ params }: PageProps) {
     notFound()
   }
 
+  // Check if user is admin (for edit button)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = profile?.is_admin ?? false
+
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
 
   return (
@@ -202,8 +211,8 @@ export default async function PatternPage({ params }: PageProps) {
                 )}
               </dl>
 
-              {/* Download button */}
-              <div className="mt-8">
+              {/* Action buttons */}
+              <div className="mt-8 flex flex-wrap items-center gap-3">
                 <a
                   href={`/api/download/${pattern.id}`}
                   className="inline-flex items-center gap-2 bg-rose-500 text-white px-6 py-3 rounded-lg hover:bg-rose-600 transition-colors font-medium"
@@ -213,10 +222,22 @@ export default async function PatternPage({ params }: PageProps) {
                   </svg>
                   Download Pattern
                 </a>
-                <p className="mt-2 text-sm text-stone-500">
-                  Sign in required to download
-                </p>
+
+                {isAdmin && (
+                  <Link
+                    href={`/admin/patterns/${pattern.id}/edit`}
+                    className="inline-flex items-center gap-2 bg-stone-100 text-stone-700 px-6 py-3 rounded-lg hover:bg-stone-200 transition-colors font-medium"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Pattern
+                  </Link>
+                )}
               </div>
+              <p className="mt-2 text-sm text-stone-500">
+                Sign in required to download
+              </p>
             </div>
           </div>
         </div>
