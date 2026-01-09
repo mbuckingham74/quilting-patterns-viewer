@@ -52,6 +52,8 @@ export default function PatternEditForm({
   // Loading states
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(true)
+  const [isTransforming, setIsTransforming] = useState(false)
+  const [thumbnailUrl, setThumbnailUrl] = useState(initialPattern.thumbnail_url)
 
   // Fetch all available keywords
   useEffect(() => {
@@ -152,21 +154,67 @@ export default function PatternEditForm({
     }
   }, [patternId, showSuccess, showError])
 
+  // Transform thumbnail (rotate/flip)
+  const handleTransform = useCallback(async (operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v') => {
+    if (!thumbnailUrl) {
+      showError(new Error('No thumbnail to transform'))
+      return
+    }
+
+    setIsTransforming(true)
+    try {
+      const response = await fetch(`/api/admin/patterns/${patternId}/transform`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to transform thumbnail')
+      }
+
+      const data = await response.json()
+      setThumbnailUrl(data.thumbnail_url)
+
+      const operationLabels: Record<string, string> = {
+        rotate_cw: 'Rotated 90° clockwise',
+        rotate_ccw: 'Rotated 90° counter-clockwise',
+        rotate_180: 'Rotated 180°',
+        flip_h: 'Flipped horizontally',
+        flip_v: 'Flipped vertically',
+      }
+      showSuccess(`${operationLabels[operation]}. Embedding cleared - will regenerate on next search.`)
+    } catch (error) {
+      showError(error instanceof Error ? error : new Error('Failed to transform thumbnail'))
+    } finally {
+      setIsTransforming(false)
+    }
+  }, [patternId, thumbnailUrl, showSuccess, showError])
+
   return (
     <div className="space-y-6">
       {/* Pattern Info Header */}
       <div className="flex flex-col sm:flex-row gap-6">
         {/* Thumbnail */}
         <div className="flex-shrink-0">
-          <div className="w-48 h-48 bg-white rounded-lg border border-stone-200 overflow-hidden">
-            {initialPattern.thumbnail_url ? (
-              <Image
-                src={initialPattern.thumbnail_url}
-                alt={initialPattern.file_name || 'Pattern thumbnail'}
-                width={192}
-                height={192}
-                className="w-full h-full object-contain"
-              />
+          <div className="w-48 h-48 bg-white rounded-lg border border-stone-200 overflow-hidden relative">
+            {thumbnailUrl ? (
+              <>
+                <Image
+                  src={thumbnailUrl}
+                  alt={initialPattern.file_name || 'Pattern thumbnail'}
+                  width={192}
+                  height={192}
+                  className="w-full h-full object-contain"
+                  unoptimized
+                />
+                {isTransforming && (
+                  <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </>
             ) : (
               <div className="w-full h-full flex items-center justify-center text-stone-400">
                 <svg className="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -175,6 +223,66 @@ export default function PatternEditForm({
               </div>
             )}
           </div>
+
+          {/* Transform Controls */}
+          {thumbnailUrl && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-stone-500 text-center font-medium">Transform Thumbnail</p>
+              <div className="flex justify-center gap-1">
+                <button
+                  onClick={() => handleTransform('rotate_ccw')}
+                  disabled={isTransforming}
+                  className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Rotate 90° counter-clockwise"
+                >
+                  <svg className="w-4 h-4 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleTransform('rotate_cw')}
+                  disabled={isTransforming}
+                  className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Rotate 90° clockwise"
+                >
+                  <svg className="w-4 h-4 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleTransform('rotate_180')}
+                  disabled={isTransforming}
+                  className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Rotate 180°"
+                >
+                  <svg className="w-4 h-4 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleTransform('flip_h')}
+                  disabled={isTransforming}
+                  className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Flip horizontally"
+                >
+                  <svg className="w-4 h-4 text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12M8 12h12M8 17h12M4 7v10" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleTransform('flip_v')}
+                  disabled={isTransforming}
+                  className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Flip vertically"
+                >
+                  <svg className="w-4 h-4 text-stone-600 rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12M8 12h12M8 17h12M4 7v10" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+
           <p className="text-sm text-stone-500 mt-2 text-center">
             Pattern #{patternId}
             {initialPattern.file_extension && (
