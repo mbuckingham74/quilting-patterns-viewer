@@ -212,6 +212,21 @@ export default async function AdminDashboardPage() {
             </Link>
 
             <Link
+              href="/admin/rotate-review"
+              className="flex items-center gap-3 p-4 bg-cyan-50 hover:bg-cyan-100 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-cyan-200 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-cyan-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-stone-800">Quick Rotate Review</p>
+                <p className="text-sm text-stone-500">Fix pattern orientations</p>
+              </div>
+            </Link>
+
+            <Link
               href="/admin/help"
               className="flex items-center gap-3 p-4 bg-rose-50 hover:bg-rose-100 rounded-lg transition-colors"
             >
