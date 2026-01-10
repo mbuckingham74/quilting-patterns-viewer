@@ -10,6 +10,46 @@ interface Pattern {
   thumbnail_url: string
 }
 
+// Generate array of page numbers to display
+function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
+  const pages: (number | 'ellipsis')[] = []
+
+  if (totalPages <= 7) {
+    // Show all pages if 7 or fewer
+    for (let i = 1; i <= totalPages; i++) {
+      pages.push(i)
+    }
+  } else {
+    // Always show first page
+    pages.push(1)
+
+    if (currentPage <= 4) {
+      // Near the start: show 1-5, ..., last
+      for (let i = 2; i <= 5; i++) {
+        pages.push(i)
+      }
+      pages.push('ellipsis')
+      pages.push(totalPages)
+    } else if (currentPage >= totalPages - 3) {
+      // Near the end: show 1, ..., last-4 to last
+      pages.push('ellipsis')
+      for (let i = totalPages - 4; i <= totalPages; i++) {
+        pages.push(i)
+      }
+    } else {
+      // In the middle: show 1, ..., current-1, current, current+1, ..., last
+      pages.push('ellipsis')
+      pages.push(currentPage - 1)
+      pages.push(currentPage)
+      pages.push(currentPage + 1)
+      pages.push('ellipsis')
+      pages.push(totalPages)
+    }
+  }
+
+  return pages
+}
+
 export default function RotateReviewPage() {
   const [patterns, setPatterns] = useState<Pattern[]>([])
   const [loading, setLoading] = useState(true)
@@ -100,17 +140,30 @@ export default function RotateReviewPage() {
           </div>
         </div>
 
+        {/* Stats Banner */}
+        <div className="bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl p-6 mb-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-cyan-100 text-sm font-medium">Patterns to Review</p>
+              <p className="text-4xl font-bold">{total.toLocaleString()}</p>
+              <p className="text-cyan-100 text-sm mt-1">
+                {totalPages} pages × {PATTERNS_PER_PAGE} per page
+              </p>
+            </div>
+            <div className="text-right">
+              <svg className="w-16 h-16 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
           <p className="text-sm text-blue-800">
             <strong>Tip:</strong> Click the rotate buttons below each thumbnail to quickly fix orientation.
             Changes are saved immediately. The AI search data will be regenerated automatically.
           </p>
-        </div>
-
-        {/* Stats */}
-        <div className="mb-4 text-sm text-stone-600">
-          Showing {patterns.length} of {total} patterns (page {page} of {totalPages})
         </div>
 
         {/* Content */}
@@ -209,21 +262,78 @@ export default function RotateReviewPage() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="mt-8 flex items-center justify-between">
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
                 <p className="text-sm text-stone-600">
                   Page {page} of {totalPages}
                 </p>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-1">
+                  {/* Previous button */}
+                  <button
+                    onClick={() => setPage(1)}
+                    disabled={page === 1}
+                    className="px-3 py-2 bg-white border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="First page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                    </svg>
+                  </button>
                   <button
                     onClick={() => setPage(p => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-4 py-2 bg-white border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-2 bg-white border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Previous page"
                   >
-                    Previous
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
                   </button>
 
-                  {/* Page number input */}
-                  <div className="flex items-center gap-2">
+                  {/* Page numbers */}
+                  {getPageNumbers(page, totalPages).map((p, idx) =>
+                    p === 'ellipsis' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 py-2 text-stone-400">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`min-w-[40px] px-3 py-2 rounded-lg font-medium transition-colors ${
+                          p === page
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-white border border-stone-300 text-stone-700 hover:bg-stone-50'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  {/* Next button */}
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    className="px-3 py-2 bg-white border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Next page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setPage(totalPages)}
+                    disabled={page === totalPages}
+                    className="px-3 py-2 bg-white border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Last page"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  {/* Go to page input */}
+                  <div className="flex items-center gap-2 ml-4">
                     <span className="text-sm text-stone-600">Go to:</span>
                     <input
                       type="number"
@@ -239,14 +349,6 @@ export default function RotateReviewPage() {
                       className="w-20 px-3 py-2 border border-stone-300 rounded-lg text-center"
                     />
                   </div>
-
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    className="px-4 py-2 bg-white border border-stone-300 rounded-lg text-stone-700 hover:bg-stone-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
                 </div>
               </div>
             )}
