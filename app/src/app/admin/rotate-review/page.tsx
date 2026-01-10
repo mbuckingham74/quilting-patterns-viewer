@@ -10,34 +10,48 @@ interface Pattern {
   thumbnail_url: string
 }
 
+interface OrientationResult {
+  id: number
+  pattern_id: number
+  orientation: string
+  confidence: string
+  reason: string
+  reviewed: boolean
+  pattern: Pattern
+}
+
+interface Stats {
+  total: number
+  correct: number
+  needs_rotation: number
+  high_confidence: number
+  medium_confidence: number
+  low_confidence: number
+}
+
 // Generate array of page numbers to display
 function getPageNumbers(currentPage: number, totalPages: number): (number | 'ellipsis')[] {
   const pages: (number | 'ellipsis')[] = []
 
   if (totalPages <= 7) {
-    // Show all pages if 7 or fewer
     for (let i = 1; i <= totalPages; i++) {
       pages.push(i)
     }
   } else {
-    // Always show first page
     pages.push(1)
 
     if (currentPage <= 4) {
-      // Near the start: show 1-5, ..., last
       for (let i = 2; i <= 5; i++) {
         pages.push(i)
       }
       pages.push('ellipsis')
       pages.push(totalPages)
     } else if (currentPage >= totalPages - 3) {
-      // Near the end: show 1, ..., last-4 to last
       pages.push('ellipsis')
       for (let i = totalPages - 4; i <= totalPages; i++) {
         pages.push(i)
       }
     } else {
-      // In the middle: show 1, ..., current-1, current, current+1, ..., last
       pages.push('ellipsis')
       pages.push(currentPage - 1)
       pages.push(currentPage)
@@ -51,7 +65,8 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | 'ell
 }
 
 export default function RotateReviewPage() {
-  const [patterns, setPatterns] = useState<Pattern[]>([])
+  const [results, setResults] = useState<OrientationResult[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
@@ -59,40 +74,44 @@ export default function RotateReviewPage() {
   const [total, setTotal] = useState(0)
   const [transforming, setTransforming] = useState<Record<number, boolean>>({})
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({})
+  const [filter, setFilter] = useState<'needs_rotation' | 'all'>('needs_rotation')
   const PATTERNS_PER_PAGE = 24
 
-  const fetchPatterns = useCallback(async () => {
+  const fetchResults = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const response = await fetch(
-        `/api/admin/patterns?page=${page}&limit=${PATTERNS_PER_PAGE}&hasThumb=true`
+        `/api/admin/orientation?page=${page}&limit=${PATTERNS_PER_PAGE}&filter=${filter}`
       )
       if (!response.ok) {
         const data = await response.json()
         throw new Error(data.error || 'Failed to fetch')
       }
       const data = await response.json()
-      setPatterns(data.patterns)
+      setResults(data.results)
       setTotalPages(data.totalPages)
       setTotal(data.total)
+      setStats(data.stats)
 
       // Initialize thumbnail URLs
       const urls: Record<number, string> = {}
-      data.patterns.forEach((p: Pattern) => {
-        urls[p.id] = p.thumbnail_url
+      data.results.forEach((r: OrientationResult) => {
+        if (r.pattern) {
+          urls[r.pattern_id] = r.pattern.thumbnail_url
+        }
       })
       setThumbnailUrls(urls)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch patterns')
+      setError(err instanceof Error ? err.message : 'Failed to fetch')
     } finally {
       setLoading(false)
     }
-  }, [page])
+  }, [page, filter])
 
   useEffect(() => {
-    fetchPatterns()
-  }, [fetchPatterns])
+    fetchResults()
+  }, [fetchResults])
 
   const handleTransform = async (
     patternId: number,
@@ -112,14 +131,50 @@ export default function RotateReviewPage() {
       }
 
       const data = await response.json()
-      // Update the thumbnail URL with cache buster
       setThumbnailUrls(prev => ({ ...prev, [patternId]: data.thumbnail_url }))
+
+      // Mark as reviewed
+      await fetch('/api/admin/orientation', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
+      })
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to transform')
     } finally {
       setTransforming(prev => ({ ...prev, [patternId]: false }))
     }
   }
+
+  const handleMarkCorrect = async (patternId: number) => {
+    try {
+      await fetch('/api/admin/orientation', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
+      })
+      // Remove from list
+      setResults(prev => prev.filter(r => r.pattern_id !== patternId))
+      setTotal(prev => prev - 1)
+    } catch (err) {
+      alert('Failed to mark as correct')
+    }
+  }
+
+  const getRecommendedAction = (orientation: string) => {
+    switch (orientation) {
+      case 'rotate_90_cw':
+        return { label: 'Rotate 90° Right', action: 'rotate_cw' as const }
+      case 'rotate_90_ccw':
+        return { label: 'Rotate 90° Left', action: 'rotate_ccw' as const }
+      case 'rotate_180':
+        return { label: 'Rotate 180°', action: 'rotate_180' as const }
+      default:
+        return null
+    }
+  }
+
+  const analysisInProgress = stats && stats.total < 15000 // Rough check if analysis is still running
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50 to-white">
@@ -136,20 +191,36 @@ export default function RotateReviewPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-stone-800">Quick Rotate Review</h1>
-            <p className="text-stone-600">Click rotate buttons to fix incorrectly oriented patterns</p>
+            <p className="text-stone-600">AI-detected patterns that may need rotation</p>
           </div>
         </div>
 
         {/* Stats Banner */}
         <div className="bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl p-6 mb-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <p className="text-cyan-100 text-sm font-medium">Patterns to Review</p>
-              <p className="text-4xl font-bold">{total.toLocaleString()}</p>
+              <p className="text-cyan-100 text-sm font-medium">Patterns Needing Review</p>
+              <p className="text-4xl font-bold">{stats?.needs_rotation.toLocaleString() || '—'}</p>
               <p className="text-cyan-100 text-sm mt-1">
-                {totalPages} pages × {PATTERNS_PER_PAGE} per page
+                {stats ? `${stats.total.toLocaleString()} analyzed • ${stats.correct.toLocaleString()} correct` : 'Loading...'}
               </p>
             </div>
+            {stats && stats.needs_rotation > 0 && (
+              <div className="flex gap-4 text-sm">
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{stats.high_confidence}</p>
+                  <p className="text-cyan-100">High conf.</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{stats.medium_confidence}</p>
+                  <p className="text-cyan-100">Medium</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{stats.low_confidence}</p>
+                  <p className="text-cyan-100">Low</p>
+                </div>
+              </div>
+            )}
             <div className="text-right">
               <svg className="w-16 h-16 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -158,11 +229,24 @@ export default function RotateReviewPage() {
           </div>
         </div>
 
+        {/* Analysis in progress notice */}
+        {analysisInProgress && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+              <p className="text-sm text-yellow-800">
+                <strong>AI analysis in progress...</strong> {stats?.total.toLocaleString()} of ~15,351 patterns analyzed.
+                New results will appear as they&apos;re processed.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Instructions */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
           <p className="text-sm text-blue-800">
-            <strong>Tip:</strong> Click the rotate buttons below each thumbnail to quickly fix orientation.
-            Changes are saved immediately. The AI search data will be regenerated automatically.
+            <strong>How it works:</strong> AI analyzed each pattern and flagged ones that may be incorrectly oriented.
+            Click the recommended action to fix, or &quot;Looks Correct&quot; if the AI was wrong.
           </p>
         </div>
 
@@ -176,88 +260,116 @@ export default function RotateReviewPage() {
           <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8 text-center">
             <p className="text-red-600">{error}</p>
             <button
-              onClick={fetchPatterns}
+              onClick={fetchResults}
               className="mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
             >
               Try Again
             </button>
           </div>
+        ) : results.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-green-200 p-12 text-center">
+            <svg className="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-lg font-medium text-stone-800">All done!</p>
+            <p className="text-stone-600 mt-2">
+              {analysisInProgress
+                ? 'No patterns flagged yet. Check back as analysis continues.'
+                : 'All flagged patterns have been reviewed.'}
+            </p>
+          </div>
         ) : (
           <>
             {/* Pattern Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {patterns.map(pattern => (
-                <div
-                  key={pattern.id}
-                  className="bg-white rounded-xl shadow-sm border border-stone-200 p-3 hover:shadow-md transition-shadow"
-                >
-                  {/* Thumbnail */}
-                  <div className="aspect-square bg-stone-50 rounded-lg overflow-hidden mb-2 relative">
-                    <Image
-                      src={thumbnailUrls[pattern.id] || pattern.thumbnail_url}
-                      alt={pattern.file_name}
-                      width={200}
-                      height={200}
-                      className="w-full h-full object-contain"
-                      unoptimized
-                    />
-                    {transforming[pattern.id] && (
-                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                        <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
-                      </div>
+              {results.map(result => {
+                const recommended = getRecommendedAction(result.orientation)
+                return (
+                  <div
+                    key={result.id}
+                    className="bg-white rounded-xl shadow-sm border border-stone-200 p-3 hover:shadow-md transition-shadow"
+                  >
+                    {/* Confidence badge */}
+                    <div className="flex justify-between items-center mb-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        result.confidence === 'high'
+                          ? 'bg-red-100 text-red-700'
+                          : result.confidence === 'medium'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-stone-100 text-stone-600'
+                      }`}>
+                        {result.confidence}
+                      </span>
+                      <span className="text-xs text-stone-400">#{result.pattern_id}</span>
+                    </div>
+
+                    {/* Thumbnail */}
+                    <div className="aspect-square bg-stone-50 rounded-lg overflow-hidden mb-2 relative">
+                      <Image
+                        src={thumbnailUrls[result.pattern_id] || result.pattern?.thumbnail_url || ''}
+                        alt={result.pattern?.file_name || ''}
+                        width={200}
+                        height={200}
+                        className="w-full h-full object-contain"
+                        unoptimized
+                      />
+                      {transforming[result.pattern_id] && (
+                        <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                          <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI reason */}
+                    {result.reason && (
+                      <p className="text-xs text-stone-500 mb-2 line-clamp-2" title={result.reason}>
+                        {result.reason}
+                      </p>
                     )}
-                  </div>
 
-                  {/* Pattern ID */}
-                  <p className="text-xs text-stone-500 text-center mb-2 truncate" title={pattern.file_name}>
-                    #{pattern.id}
-                  </p>
+                    {/* Recommended action button */}
+                    {recommended && (
+                      <button
+                        onClick={() => handleTransform(result.pattern_id, recommended.action)}
+                        disabled={transforming[result.pattern_id]}
+                        className="w-full mb-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {recommended.label}
+                      </button>
+                    )}
 
-                  {/* Transform Buttons */}
-                  <div className="flex justify-center gap-1">
-                    <button
-                      onClick={() => handleTransform(pattern.id, 'rotate_ccw')}
-                      disabled={transforming[pattern.id]}
-                      className="p-1.5 bg-stone-100 hover:bg-purple-100 hover:text-purple-700 rounded transition-colors disabled:opacity-50"
-                      title="Rotate 90° left"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleTransform(pattern.id, 'rotate_cw')}
-                      disabled={transforming[pattern.id]}
-                      className="p-1.5 bg-stone-100 hover:bg-purple-100 hover:text-purple-700 rounded transition-colors disabled:opacity-50"
-                      title="Rotate 90° right"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleTransform(pattern.id, 'rotate_180')}
-                      disabled={transforming[pattern.id]}
-                      className="p-1.5 bg-stone-100 hover:bg-purple-100 hover:text-purple-700 rounded transition-colors disabled:opacity-50"
-                      title="Rotate 180°"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => handleTransform(pattern.id, 'flip_h')}
-                      disabled={transforming[pattern.id]}
-                      className="p-1.5 bg-stone-100 hover:bg-purple-100 hover:text-purple-700 rounded transition-colors disabled:opacity-50"
-                      title="Flip horizontal"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12M8 12h12M8 17h12M4 7v10" />
-                      </svg>
-                    </button>
+                    {/* Secondary actions */}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleMarkCorrect(result.pattern_id)}
+                        className="flex-1 px-2 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded transition-colors"
+                      >
+                        Looks Correct
+                      </button>
+                      <button
+                        onClick={() => handleTransform(result.pattern_id, 'rotate_ccw')}
+                        disabled={transforming[result.pattern_id]}
+                        className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded transition-colors disabled:opacity-50"
+                        title="Rotate 90° left"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleTransform(result.pattern_id, 'rotate_cw')}
+                        disabled={transforming[result.pattern_id]}
+                        className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded transition-colors disabled:opacity-50"
+                        title="Rotate 90° right"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Pagination */}
@@ -267,7 +379,6 @@ export default function RotateReviewPage() {
                   Page {page} of {totalPages}
                 </p>
                 <div className="flex items-center gap-1">
-                  {/* Previous button */}
                   <button
                     onClick={() => setPage(1)}
                     disabled={page === 1}
@@ -289,7 +400,6 @@ export default function RotateReviewPage() {
                     </svg>
                   </button>
 
-                  {/* Page numbers */}
                   {getPageNumbers(page, totalPages).map((p, idx) =>
                     p === 'ellipsis' ? (
                       <span key={`ellipsis-${idx}`} className="px-2 py-2 text-stone-400">
@@ -310,7 +420,6 @@ export default function RotateReviewPage() {
                     )
                   )}
 
-                  {/* Next button */}
                   <button
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                     disabled={page === totalPages}
@@ -332,7 +441,6 @@ export default function RotateReviewPage() {
                     </svg>
                   </button>
 
-                  {/* Go to page input */}
                   <div className="flex items-center gap-2 ml-4">
                     <span className="text-sm text-stone-600">Go to:</span>
                     <input
