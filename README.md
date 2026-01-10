@@ -64,11 +64,20 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - Protected pattern downloads
 - Admin panel for user management
 
+### AI-Powered Thumbnail Orientation Detection
+- **Automatic detection** - Claude Vision analyzes all thumbnails to identify incorrectly oriented patterns
+- **Confidence scoring** - Each detection includes high/medium/low confidence rating
+- **Smart review queue** - Only AI-flagged patterns shown for human review (not all 15,000+)
+- **One-click fixes** - Recommended rotation action displayed with single-click application
+- **Batch processing** - Background script processes entire library automatically
+
 ### Admin Features
 - **User Management** - Approve/reject new signups, view approved users with last login
 - **Pattern Upload** - Bulk upload patterns from ZIP files
 - **Duplicate Finder** - Identify and manage similar patterns
+- **Quick Rotate Review** - AI-assisted thumbnail orientation fixes
 - **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
+- **Pattern Analytics** - Dashboard showing downloads, searches, user activity, top patterns, and popular search queries
 - **How-To Guide** - Built-in help documentation for non-technical users
 
 ### Error Handling
@@ -88,6 +97,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 | **Styling** | Tailwind CSS |
 | **Backend** | Supabase (Postgres + Auth + Storage) |
 | **AI Search** | Voyage AI multimodal embeddings, pgvector |
+| **AI Vision** | Claude (Anthropic) for thumbnail orientation detection |
 | **Error Monitoring** | Sentry |
 | **Deployment** | Docker, Nginx Proxy Manager |
 
@@ -117,6 +127,7 @@ flowchart TB
 
     subgraph External["🌐 External Services"]
         Voyage[Voyage AI]
+        Claude[Claude Vision]
         Google[Google OAuth]
         Resend[Resend Email]
         SentryCloud[Sentry.io]
@@ -293,6 +304,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 VOYAGE_API_KEY=your-voyage-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key  # For AI orientation detection
 
 # Optional (Production)
 NEXT_PUBLIC_SENTRY_DSN=your-sentry-dsn
@@ -364,7 +376,10 @@ The app uses Supabase Postgres with the following main tables:
 | **shared_collection_patterns** | Patterns included in each share |
 | **shared_collection_feedback** | Customer rankings and notes |
 | **duplicate_reviews** | Admin reviews of similar pattern pairs |
+| **orientation_analysis** | AI-detected thumbnail orientation issues |
 | **admin_emails** | Admin notification recipients |
+| **download_logs** | Pattern download tracking for analytics |
+| **search_logs** | Search query tracking for analytics |
 
 ---
 
@@ -383,8 +398,15 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/users` | GET | Admin | User management |
 | `/api/admin/duplicates` | GET | Admin | Find similar patterns |
 | `/api/admin/duplicates/review` | POST | Admin | Mark duplicate status |
+| `/api/admin/patterns` | GET | Admin | List patterns (paginated) |
 | `/api/admin/patterns/[id]` | GET/PATCH | Admin | Get/update pattern metadata |
 | `/api/admin/patterns/[id]/keywords` | GET/POST/DELETE | Admin | Manage pattern keywords |
+| `/api/admin/patterns/[id]/transform` | POST | Admin | Rotate/flip thumbnail |
+| `/api/admin/orientation` | GET/PATCH | Admin | AI orientation detection results |
+| `/api/admin/analytics` | GET | Admin | Overview stats (users, downloads, searches, shares) |
+| `/api/admin/analytics/activity` | GET | Admin | 30-day activity chart data |
+| `/api/admin/analytics/top-patterns` | GET | Admin | Most downloaded patterns |
+| `/api/admin/analytics/top-searches` | GET | Admin | Most popular search queries |
 | `/api/keywords` | GET | Required | List all keywords |
 
 ---
