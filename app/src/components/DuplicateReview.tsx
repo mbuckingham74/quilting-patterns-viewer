@@ -17,6 +17,17 @@ interface DuplicatePair {
   similarity: number
 }
 
+interface AIVerification {
+  are_duplicates: boolean
+  confidence: 'high' | 'medium' | 'low'
+  recommendation: 'keep_first' | 'keep_second' | 'keep_both' | 'needs_human_review'
+  reasoning: string
+  quality_comparison: {
+    pattern_1: string
+    pattern_2: string
+  }
+}
+
 type ReviewDecision = 'keep_both' | 'deleted_first' | 'deleted_second'
 
 export default function DuplicateReview() {
@@ -24,6 +35,9 @@ export default function DuplicateReview() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiVerification, setAiVerification] = useState<AIVerification | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [threshold, setThreshold] = useState(0.95)
 
@@ -50,6 +64,62 @@ export default function DuplicateReview() {
   useEffect(() => {
     fetchDuplicates()
   }, [threshold])
+
+  // Clear AI verification when moving to a different pair
+  useEffect(() => {
+    setAiVerification(null)
+    setAiError(null)
+  }, [currentIndex])
+
+  const requestAiVerification = async () => {
+    const currentPair = duplicates[currentIndex]
+    if (!currentPair) return
+
+    setAiLoading(true)
+    setAiError(null)
+    setAiVerification(null)
+
+    try {
+      const response = await fetch('/api/admin/duplicates/ai-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pattern_id_1: currentPair.pattern1.id,
+          pattern_id_2: currentPair.pattern2.id,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'AI verification failed')
+      }
+
+      setAiVerification(data.verification)
+    } catch (err) {
+      console.error('AI verification error:', err)
+      setAiError(err instanceof Error ? err.message : 'AI verification failed')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleAiRecommendation = () => {
+    if (!aiVerification) return
+
+    switch (aiVerification.recommendation) {
+      case 'keep_first':
+        handleDelete('second')
+        break
+      case 'keep_second':
+        handleDelete('first')
+        break
+      case 'keep_both':
+        handleReview('keep_both')
+        break
+      // needs_human_review - do nothing, let user decide
+    }
+  }
 
   const handleReview = async (decision: ReviewDecision) => {
     const currentPair = duplicates[currentIndex]
@@ -191,6 +261,153 @@ export default function DuplicateReview() {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* AI Verification Section */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl shadow-sm border border-indigo-200 p-4">
+        {!aiVerification && !aiLoading && !aiError && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-indigo-900">AI Verification Available</p>
+                <p className="text-sm text-indigo-600">Let Claude analyze these patterns and recommend which to keep</p>
+              </div>
+            </div>
+            <button
+              onClick={requestAiVerification}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Analyze with AI
+            </button>
+          </div>
+        )}
+
+        {aiLoading && (
+          <div className="flex items-center justify-center gap-3 py-4">
+            <div className="animate-spin rounded-full h-5 w-5 border-2 border-indigo-500 border-t-transparent"></div>
+            <span className="text-indigo-700">Claude is analyzing both patterns...</span>
+          </div>
+        )}
+
+        {aiError && (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3 text-red-600">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span>{aiError}</span>
+            </div>
+            <button
+              onClick={requestAiVerification}
+              className="px-3 py-1.5 text-sm bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {aiVerification && (
+          <div className="space-y-4">
+            {/* Verification Result Header */}
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  aiVerification.are_duplicates ? 'bg-amber-100' : 'bg-green-100'
+                }`}>
+                  {aiVerification.are_duplicates ? (
+                    <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium text-stone-800">
+                    {aiVerification.are_duplicates ? 'These are duplicates' : 'Not duplicates'}
+                  </p>
+                  <p className={`text-xs px-2 py-0.5 rounded-full inline-block mt-1 ${
+                    aiVerification.confidence === 'high' ? 'bg-green-100 text-green-700' :
+                    aiVerification.confidence === 'medium' ? 'bg-amber-100 text-amber-700' :
+                    'bg-stone-100 text-stone-600'
+                  }`}>
+                    {aiVerification.confidence} confidence
+                  </p>
+                </div>
+              </div>
+
+              {/* Recommendation Badge */}
+              {aiVerification.recommendation !== 'needs_human_review' && (
+                <div className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                  aiVerification.recommendation === 'keep_both' ? 'bg-green-100 text-green-700 border border-green-200' :
+                  aiVerification.recommendation === 'keep_first' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                  'bg-blue-100 text-blue-700 border border-blue-200'
+                }`}>
+                  Recommend: {
+                    aiVerification.recommendation === 'keep_both' ? 'Keep Both' :
+                    aiVerification.recommendation === 'keep_first' ? 'Keep Pattern 1' :
+                    'Keep Pattern 2'
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* AI Reasoning */}
+            <div className="bg-white/60 rounded-lg p-3 border border-indigo-100">
+              <p className="text-sm text-stone-700">{aiVerification.reasoning}</p>
+            </div>
+
+            {/* Quality Comparison */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/60 rounded-lg p-3 border border-indigo-100">
+                <p className="text-xs font-medium text-stone-500 mb-1">Pattern 1 Quality</p>
+                <p className="text-sm text-stone-700">{aiVerification.quality_comparison.pattern_1}</p>
+              </div>
+              <div className="bg-white/60 rounded-lg p-3 border border-indigo-100">
+                <p className="text-xs font-medium text-stone-500 mb-1">Pattern 2 Quality</p>
+                <p className="text-sm text-stone-700">{aiVerification.quality_comparison.pattern_2}</p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            {aiVerification.recommendation !== 'needs_human_review' && (
+              <button
+                onClick={handleAiRecommendation}
+                disabled={actionLoading}
+                className={`w-full px-4 py-3 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                  aiVerification.recommendation === 'keep_both'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                {actionLoading ? 'Processing...' : `Apply AI Recommendation: ${
+                  aiVerification.recommendation === 'keep_both' ? 'Keep Both' :
+                  aiVerification.recommendation === 'keep_first' ? 'Delete Pattern 2' :
+                  'Delete Pattern 1'
+                }`}
+              </button>
+            )}
+
+            {aiVerification.recommendation === 'needs_human_review' && (
+              <div className="text-center py-2 text-sm text-amber-700 bg-amber-50 rounded-lg border border-amber-200">
+                AI couldn&apos;t make a clear recommendation - please review manually
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Comparison */}
