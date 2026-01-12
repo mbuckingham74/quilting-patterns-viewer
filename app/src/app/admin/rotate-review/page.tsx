@@ -118,6 +118,11 @@ export default function RotateReviewPage() {
     patternId: number,
     operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
   ) => {
+    // Confirm before saving
+    if (!confirm('Save rotated image?')) {
+      return
+    }
+
     setTransforming(prev => ({ ...prev, [patternId]: true }))
     try {
       const response = await fetch(`/api/admin/patterns/${patternId}/transform`, {
@@ -131,15 +136,16 @@ export default function RotateReviewPage() {
         throw new Error(data.error || 'Failed to transform')
       }
 
-      const data = await response.json()
-      setThumbnailUrls(prev => ({ ...prev, [patternId]: data.thumbnail_url }))
-
       // Mark as reviewed
       await fetch('/api/admin/orientation', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
       })
+
+      // Remove from list after successful transform
+      setResults(prev => prev.filter(r => r.pattern_id !== patternId))
+      setTotal(prev => prev - 1)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to transform')
     } finally {
