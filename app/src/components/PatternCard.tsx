@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Pattern } from '@/lib/types'
 import FavoriteButton from './FavoriteButton'
 import ShareButton from './ShareButton'
+import FlipButton from './FlipButton'
 
 interface PatternCardProps {
   pattern: Pattern
@@ -12,9 +14,11 @@ interface PatternCardProps {
   onToggleFavorite?: (patternId: number, newState: boolean) => void
   showShareButton?: boolean
   showEditButton?: boolean
+  showFlipButton?: boolean
 }
 
-export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false }: PatternCardProps) {
+export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false }: PatternCardProps) {
+  const [thumbnailUrl, setThumbnailUrl] = useState(pattern.thumbnail_url)
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
 
@@ -24,15 +28,19 @@ export default function PatternCard({ pattern, isFavorited = false, onToggleFavo
     }
   }
 
+  const handleFlipped = (_patternId: number, newThumbnailUrl: string) => {
+    setThumbnailUrl(newThumbnailUrl)
+  }
+
   return (
     <Link
       href={`/patterns/${pattern.id}`}
       className="group block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border border-stone-200 overflow-hidden"
     >
       <div className="aspect-square relative bg-white p-2">
-        {pattern.thumbnail_url ? (
+        {thumbnailUrl ? (
           <Image
-            src={pattern.thumbnail_url}
+            src={thumbnailUrl}
             alt={displayName}
             fill
             className="object-contain"
@@ -61,6 +69,12 @@ export default function PatternCard({ pattern, isFavorited = false, onToggleFavo
               <span className="bg-stone-100 px-1.5 py-0.5 rounded text-stone-600 uppercase">
                 {extension}
               </span>
+            )}
+            {showFlipButton && (
+              <FlipButton
+                patternId={pattern.id}
+                onFlipped={handleFlipped}
+              />
             )}
             {showEditButton && (
               <Link

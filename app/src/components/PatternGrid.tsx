@@ -62,6 +62,7 @@ export default function PatternGrid({ patterns, loading, error, favoritePatternI
           isFavorited={favoritePatternIds?.has(pattern.id) ?? false}
           onToggleFavorite={onToggleFavorite}
           showEditButton={isAdmin}
+          showFlipButton={isAdmin}
         />
       ))}
     </div>
