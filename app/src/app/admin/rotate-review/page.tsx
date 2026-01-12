@@ -68,30 +68,29 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | 'ell
 interface RotationPreview {
   patternId: number
   thumbnailUrl: string
-  operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
+  rotation: number // cumulative degrees (0, 90, 180, 270)
   fileName: string
 }
 
-// Get CSS rotation for preview
-function getRotationStyle(operation: string): string {
-  switch (operation) {
-    case 'rotate_cw': return 'rotate(90deg)'
-    case 'rotate_ccw': return 'rotate(-90deg)'
-    case 'rotate_180': return 'rotate(180deg)'
-    case 'flip_h': return 'scaleX(-1)'
-    case 'flip_v': return 'scaleY(-1)'
-    default: return ''
+// Convert rotation degrees to API operation
+function getOperationFromRotation(degrees: number): 'rotate_cw' | 'rotate_180' | 'rotate_ccw' | null {
+  const normalized = ((degrees % 360) + 360) % 360
+  switch (normalized) {
+    case 90: return 'rotate_cw'
+    case 180: return 'rotate_180'
+    case 270: return 'rotate_ccw'
+    default: return null // 0 degrees = no change
   }
 }
 
-function getOperationLabel(operation: string): string {
-  switch (operation) {
-    case 'rotate_cw': return 'Rotate 90° Right'
-    case 'rotate_ccw': return 'Rotate 90° Left'
-    case 'rotate_180': return 'Rotate 180°'
-    case 'flip_h': return 'Flip Horizontal'
-    case 'flip_v': return 'Flip Vertical'
-    default: return operation
+function getRotationLabel(degrees: number): string {
+  const normalized = ((degrees % 360) + 360) % 360
+  switch (normalized) {
+    case 0: return 'No rotation'
+    case 90: return 'Rotated 90° right'
+    case 180: return 'Rotated 180°'
+    case 270: return 'Rotated 90° left'
+    default: return `Rotated ${normalized}°`
   }
 }
 
@@ -146,28 +145,62 @@ export default function RotateReviewPage() {
     fetchResults()
   }, [fetchResults])
 
-  // Show rotation preview modal
+  // Show rotation preview modal with initial rotation
   const showRotationPreview = (
     patternId: number,
-    operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
+    initialOperation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
   ) => {
     const result = results.find(r => r.pattern_id === patternId)
     if (!result?.pattern) return
 
+    // Convert initial operation to degrees
+    let initialRotation = 0
+    switch (initialOperation) {
+      case 'rotate_cw': initialRotation = 90; break
+      case 'rotate_ccw': initialRotation = 270; break
+      case 'rotate_180': initialRotation = 180; break
+    }
+
     setRotationPreview({
       patternId,
       thumbnailUrl: thumbnailUrls[patternId] || result.pattern.thumbnail_url,
-      operation,
+      rotation: initialRotation,
       fileName: result.pattern.file_name,
     })
+  }
+
+  // Rotate further in the modal
+  const rotateInModal = (direction: 'cw' | 'ccw') => {
+    if (!rotationPreview) return
+    setRotationPreview(prev => prev ? {
+      ...prev,
+      rotation: prev.rotation + (direction === 'cw' ? 90 : -90)
+    } : null)
   }
 
   // Actually perform the transform (called from modal)
   const confirmTransform = async () => {
     if (!rotationPreview) return
 
-    const { patternId, operation } = rotationPreview
+    const operation = getOperationFromRotation(rotationPreview.rotation)
+    const { patternId } = rotationPreview
     setRotationPreview(null)
+
+    // If no rotation needed (0 degrees), just mark as reviewed and remove
+    if (!operation) {
+      try {
+        await fetch('/api/admin/orientation', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
+        })
+        setResults(prev => prev.filter(r => r.pattern_id !== patternId))
+        setTotal(prev => prev - 1)
+      } catch (err) {
+        alert('Failed to mark as reviewed')
+      }
+      return
+    }
 
     setTransforming(prev => ({ ...prev, [patternId]: true }))
     try {
@@ -566,66 +599,74 @@ export default function RotateReviewPage() {
 
       {/* Rotation Preview Modal */}
       {rotationPreview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-stone-200">
-              <h3 className="text-lg font-semibold text-stone-800">
-                Preview: {getOperationLabel(rotationPreview.operation)}
+              <h3 className="text-lg font-semibold text-stone-800 truncate">
+                {rotationPreview.fileName}
               </h3>
-              <p className="text-sm text-stone-500 truncate">{rotationPreview.fileName}</p>
+              <p className="text-sm text-purple-600 font-medium">
+                {getRotationLabel(rotationPreview.rotation)}
+              </p>
             </div>
 
-            {/* Before/After preview */}
-            <div className="p-6">
-              <div className="grid grid-cols-2 gap-6">
-                {/* Before */}
-                <div>
-                  <p className="text-xs font-medium text-stone-500 mb-2 text-center">Before</p>
-                  <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden">
-                    <Image
-                      src={rotationPreview.thumbnailUrl}
-                      alt="Before"
-                      width={300}
-                      height={300}
-                      className="w-full h-full object-contain"
-                      unoptimized
-                    />
-                  </div>
-                </div>
-
-                {/* After */}
-                <div>
-                  <p className="text-xs font-medium text-stone-500 mb-2 text-center">After</p>
-                  <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden flex items-center justify-center">
-                    <Image
-                      src={rotationPreview.thumbnailUrl}
-                      alt="After"
-                      width={300}
-                      height={300}
-                      className="w-full h-full object-contain"
-                      style={{ transform: getRotationStyle(rotationPreview.operation) }}
-                      unoptimized
-                    />
-                  </div>
-                </div>
+            {/* Rotated image preview */}
+            <div className="p-6 bg-stone-50">
+              <div className="aspect-square bg-white rounded-xl shadow-inner overflow-hidden flex items-center justify-center">
+                <Image
+                  src={rotationPreview.thumbnailUrl}
+                  alt="Preview"
+                  width={350}
+                  height={350}
+                  className="w-full h-full object-contain transition-transform duration-200"
+                  style={{ transform: `rotate(${rotationPreview.rotation}deg)` }}
+                  unoptimized
+                />
               </div>
             </div>
 
-            {/* Modal actions */}
-            <div className="px-6 py-4 bg-stone-50 border-t border-stone-200 flex gap-3 justify-end">
-              <button
-                onClick={() => setRotationPreview(null)}
-                className="px-4 py-2 text-stone-700 hover:bg-stone-200 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmTransform}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Save Rotation
-              </button>
+            {/* Rotation controls */}
+            <div className="px-6 py-4 border-t border-stone-200">
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <button
+                  onClick={() => rotateInModal('ccw')}
+                  className="p-3 bg-stone-100 hover:bg-stone-200 rounded-full transition-colors"
+                  title="Rotate 90° left"
+                >
+                  <svg className="w-6 h-6 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </button>
+                <span className="text-sm text-stone-500 min-w-[80px] text-center">
+                  {((rotationPreview.rotation % 360) + 360) % 360}°
+                </span>
+                <button
+                  onClick={() => rotateInModal('cw')}
+                  className="p-3 bg-stone-100 hover:bg-stone-200 rounded-full transition-colors"
+                  title="Rotate 90° right"
+                >
+                  <svg className="w-6 h-6 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setRotationPreview(null)}
+                  className="flex-1 px-4 py-2.5 text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmTransform}
+                  className="flex-1 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  {getOperationFromRotation(rotationPreview.rotation) ? 'Save' : 'Mark Correct'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
