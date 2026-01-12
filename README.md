@@ -64,18 +64,21 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - Protected pattern downloads
 - Admin panel for user management
 
-### AI-Powered Thumbnail Orientation Detection
-- **Automatic detection** - Claude Vision analyzes all thumbnails to identify incorrectly oriented patterns
+### AI-Powered Thumbnail Orientation & Mirror Detection
+- **Automatic orientation detection** - Claude Vision analyzes all thumbnails to identify incorrectly rotated patterns
+- **Mirror detection** - Identifies horizontally mirrored images (like backwards text on military patches)
 - **Confidence scoring** - Each detection includes high/medium/low confidence rating
 - **Smart review queue** - Only AI-flagged patterns shown for human review (not all 15,000+)
-- **One-click fixes** - Recommended rotation action displayed with single-click application
-- **Batch processing** - Background script processes entire library automatically
+- **Filter tabs** - Switch between rotation issues, mirrored issues, or view all analyzed patterns
+- **One-click fixes** - Recommended rotation or flip action displayed with single-click application
+- **Flip controls** - Horizontal flip (Flip H) for mirrored text, Vertical flip (Flip V) for upside-down + mirrored
+- **Batch processing** - Background scripts process entire library automatically
 
 ### Admin Features
 - **User Management** - Approve/reject new signups, view approved users with last login
 - **Pattern Upload** - Bulk upload patterns from ZIP files
 - **Duplicate Finder** - Identify and manage similar patterns
-- **Quick Rotate Review** - AI-assisted thumbnail orientation fixes
+- **Quick Rotate Review** - AI-assisted thumbnail orientation and mirror fixes with filter tabs
 - **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
 - **Pattern Analytics** - Dashboard showing downloads, searches, user activity, top patterns, and popular search queries
 - **How-To Guide** - Built-in help documentation for non-technical users
@@ -263,6 +266,26 @@ erDiagram
         text status
         uuid reviewed_by FK
     }
+
+    ORIENTATION_ANALYSIS {
+        int id PK
+        int pattern_id FK
+        text orientation
+        text confidence
+        text reason
+        boolean reviewed
+        timestamptz analyzed_at
+    }
+
+    MIRROR_ANALYSIS {
+        int id PK
+        int pattern_id FK
+        boolean is_mirrored
+        text confidence
+        text reason
+        boolean reviewed
+        timestamptz analyzed_at
+    }
 ```
 
 ---
@@ -376,7 +399,8 @@ The app uses Supabase Postgres with the following main tables:
 | **shared_collection_patterns** | Patterns included in each share |
 | **shared_collection_feedback** | Customer rankings and notes |
 | **duplicate_reviews** | Admin reviews of similar pattern pairs |
-| **orientation_analysis** | AI-detected thumbnail orientation issues |
+| **orientation_analysis** | AI-detected thumbnail rotation issues |
+| **mirror_analysis** | AI-detected horizontally mirrored thumbnails |
 | **admin_emails** | Admin notification recipients |
 | **download_logs** | Pattern download tracking for analytics |
 | **search_logs** | Search query tracking for analytics |

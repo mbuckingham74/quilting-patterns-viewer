@@ -133,7 +133,11 @@ patterns/
 │   └── ui/
 │       └── pvm-UI.png          # Reference screenshot of original app
 ├── scripts/
-│   └── migrate.py              # SQLite → Supabase migration
+│   ├── migrate.py              # SQLite → Supabase migration
+│   ├── generate_embeddings.py  # Voyage AI embeddings for search
+│   ├── detect_orientation.py   # AI orientation detection
+│   ├── detect_mirrored.py      # AI mirror detection
+│   └── compute_similarities.py # Duplicate detection
 ├── app/                        # Next.js app
 │   ├── app/
 │   │   ├── layout.tsx
@@ -152,7 +156,9 @@ patterns/
 │   │   ├── SearchBar.tsx
 │   │   ├── AuthButton.tsx
 │   │   ├── Toast.tsx           # Toast notification system
-│   │   └── ErrorBoundary.tsx   # React error boundary
+│   │   ├── ErrorBoundary.tsx   # React error boundary
+│   │   ├── FlipButton.tsx      # Horizontal flip button for mirrored thumbnails
+│   │   └── PatternDetailThumbnail.tsx  # Client-side thumbnail with flip support
 │   ├── lib/
 │   │   ├── supabase/
 │   │   │   ├── client.ts       # Browser client
@@ -367,6 +373,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://base.tachyonfuture.com
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon_key>
 SUPABASE_SERVICE_ROLE_KEY=<service_role_key>
 VOYAGE_API_KEY=<voyage_api_key>              # For AI semantic search
+ANTHROPIC_API_KEY=<anthropic_api_key>        # For AI orientation/mirror detection
 
 # Production only (optional)
 NEXT_PUBLIC_SENTRY_DSN=<sentry_dsn>          # Error monitoring
@@ -507,6 +514,76 @@ const { showError, showSuccess } = useToast()
 showSuccess('Pattern downloaded!')
 showError(error, 'Download failed')  // Auto-parses error for user-friendly message
 ```
+
+## AI Thumbnail Analysis
+
+The app uses Claude Vision to detect thumbnail issues that need correction.
+
+### Database Tables
+
+```sql
+-- Orientation analysis (rotation issues)
+CREATE TABLE orientation_analysis (
+  id SERIAL PRIMARY KEY,
+  pattern_id INTEGER REFERENCES patterns(id) ON DELETE CASCADE UNIQUE,
+  orientation TEXT NOT NULL,  -- 'correct', 'rotate_90_cw', 'rotate_90_ccw', 'rotate_180'
+  confidence TEXT NOT NULL,   -- 'high', 'medium', 'low'
+  reason TEXT,
+  reviewed BOOLEAN DEFAULT FALSE,
+  reviewed_at TIMESTAMPTZ,
+  analyzed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Mirror analysis (horizontally flipped images)
+CREATE TABLE mirror_analysis (
+  id SERIAL PRIMARY KEY,
+  pattern_id INTEGER REFERENCES patterns(id) ON DELETE CASCADE UNIQUE,
+  is_mirrored BOOLEAN NOT NULL,
+  confidence TEXT NOT NULL,   -- 'high', 'medium', 'low'
+  reason TEXT,
+  reviewed BOOLEAN DEFAULT FALSE,
+  reviewed_at TIMESTAMPTZ,
+  analyzed_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Scripts
+
+**Orientation Detection** (`scripts/detect_orientation.py`):
+- Analyzes thumbnails for rotation issues using Claude Vision
+- Stores results in `orientation_analysis` table
+- Run: `python scripts/detect_orientation.py [--limit N] [--batch-size N]`
+
+**Mirror Detection** (`scripts/detect_mirrored.py`):
+- Detects horizontally mirrored images (backwards text like "YMRA" instead of "ARMY")
+- Stores results in `mirror_analysis` table
+- Run: `python scripts/detect_mirrored.py [--limit N] [--batch-size N]`
+
+### API Endpoints
+
+**GET `/api/admin/orientation`**
+- Query params: `page`, `limit`, `filter` ('needs_rotation' | 'mirrored' | 'all' | 'reviewed')
+- Returns patterns flagged for issues with stats
+- When `filter=mirrored`, queries `mirror_analysis` table instead
+
+**PATCH `/api/admin/orientation`**
+- Body: `{ pattern_ids: number[], reviewed: boolean, source?: 'orientation_analysis' | 'mirror_analysis' }`
+- Marks patterns as reviewed in the appropriate table
+
+**POST `/api/admin/patterns/[id]/transform`**
+- Body: `{ operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v' }`
+- Applies transformation to thumbnail using Sharp
+- `flip_h`: Horizontal flip for mirrored images
+- `flip_v`: Vertical flip for upside-down + mirrored images
+
+### Review Page
+
+The rotate-review page (`/admin/rotate-review`) provides:
+- **Filter tabs**: Switch between "Rotation Issues", "Mirrored", and "All Analyzed"
+- **Confidence badges**: High (red), Medium (yellow), Low (gray)
+- **One-click fixes**: Recommended action button (purple for rotation, blue for flip)
+- **Manual controls**: Rotate left/right, Flip H (blue), Flip V (orange)
+- **Refresh button**: Reload data from server
 
 ## Notes
 
