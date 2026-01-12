@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import sharp from 'sharp'
 
 type TransformOperation = 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
@@ -100,10 +100,11 @@ export async function POST(
     const transformedBuffer = await transformer.png().toBuffer()
 
     // Upload the transformed image back to Supabase Storage
-    // Extract the storage path from the URL
+    // Use service client to bypass RLS for storage operations
+    const serviceClient = createServiceClient()
     const storagePath = `${patternId}.png`
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await serviceClient.storage
       .from('thumbnails')
       .upload(storagePath, transformedBuffer, {
         contentType: 'image/png',
@@ -116,7 +117,7 @@ export async function POST(
     }
 
     // Get the new public URL (with cache buster)
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = serviceClient.storage
       .from('thumbnails')
       .getPublicUrl(storagePath)
 
