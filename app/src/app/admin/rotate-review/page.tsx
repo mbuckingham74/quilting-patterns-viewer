@@ -558,8 +558,8 @@ export default function RotateReviewPage() {
                       <button
                         onClick={() => handleFlip(result.pattern_id, 'flip_v')}
                         disabled={transforming[result.pattern_id]}
-                        className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50"
-                        title="Flip vertically (mirror top-bottom)"
+                        className="p-1.5 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors disabled:opacity-50"
+                        title="Flip vertically (fix upside-down + mirrored)"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
