@@ -81,11 +81,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
   }
 
-  // Debug: log first result to see data structure
-  if (results && results.length > 0) {
-    console.log('First orientation result:', JSON.stringify(results[0], null, 2))
-  }
-
   // Get stats
   const { data: stats } = await supabase
     .from('orientation_analysis')
