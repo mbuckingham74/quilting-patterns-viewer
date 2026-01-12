@@ -120,81 +120,100 @@ async def fetch_patterns_to_analyze(session, limit=None):
     return patterns
 
 
-async def download_image(session, url):
-    """Download image and return base64 encoded data."""
-    try:
-        async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
-            response.raise_for_status()
-            data = await response.read()
-            return base64.b64encode(data).decode('utf-8')
-    except Exception as e:
-        print(f"  Error downloading image: {e}")
-        return None
+async def download_image(session, url, max_retries=3):
+    """Download image and return base64 encoded data with retry logic."""
+    for attempt in range(max_retries):
+        try:
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                response.raise_for_status()
+                data = await response.read()
+                return base64.b64encode(data).decode('utf-8')
+        except asyncio.TimeoutError:
+            print(f"  Timeout downloading image (attempt {attempt + 1})")
+        except Exception as e:
+            print(f"  Error downloading image (attempt {attempt + 1}): {e}")
+
+        if attempt < max_retries - 1:
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff
+
+    return None
 
 
-async def analyze_image(session, image_base64):
-    """Send image to Claude for orientation analysis."""
-    try:
-        payload = {
-            "model": "claude-sonnet-4-20250514",
-            "max_tokens": 200,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": image_base64
-                            }
-                        },
-                        {
-                            "type": "text",
-                            "text": ORIENTATION_PROMPT
+async def analyze_image(session, image_base64, max_retries=3):
+    """Send image to Claude for orientation analysis with retry logic."""
+    payload = {
+        "model": "claude-sonnet-4-20250514",
+        "max_tokens": 200,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": image_base64
                         }
-                    ]
-                }
-            ]
-        }
+                    },
+                    {
+                        "type": "text",
+                        "text": ORIENTATION_PROMPT
+                    }
+                ]
+            }
+        ]
+    }
 
-        async with session.post(
-            "https://api.anthropic.com/v1/messages",
-            headers=CLAUDE_HEADERS,
-            json=payload,
-            timeout=aiohttp.ClientTimeout(total=60)
-        ) as response:
-            if response.status != 200:
-                error_text = await response.text()
-                print(f"  Claude API error: {response.status} - {error_text}")
-                return None
+    for attempt in range(max_retries):
+        try:
+            async with session.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=CLAUDE_HEADERS,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                if response.status == 429:
+                    # Rate limited - wait and retry
+                    print(f"  Rate limited, waiting 30s (attempt {attempt + 1})")
+                    await asyncio.sleep(30)
+                    continue
 
-            result = await response.json()
-            text = result['content'][0]['text']
+                if response.status != 200:
+                    error_text = await response.text()
+                    print(f"  Claude API error: {response.status} - {error_text} (attempt {attempt + 1})")
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2 ** attempt)
+                    continue
 
-            # Parse JSON response
-            try:
-                # Handle potential markdown code blocks
-                if text.startswith('```'):
-                    text = text.split('```')[1]
-                    if text.startswith('json'):
-                        text = text[4:]
-                return json.loads(text.strip())
-            except json.JSONDecodeError:
-                print(f"  Failed to parse Claude response: {text}")
-                return None
+                result = await response.json()
+                text = result['content'][0]['text']
 
-    except asyncio.TimeoutError:
-        print("  Claude API timeout")
-        return None
-    except Exception as e:
-        print(f"  Claude API error: {e}")
-        return None
+                # Parse JSON response
+                try:
+                    # Handle potential markdown code blocks
+                    if text.startswith('```'):
+                        text = text.split('```')[1]
+                        if text.startswith('json'):
+                            text = text[4:]
+                    return json.loads(text.strip())
+                except json.JSONDecodeError:
+                    print(f"  Failed to parse Claude response: {text}")
+                    return None
+
+        except asyncio.TimeoutError:
+            print(f"  Claude API timeout (attempt {attempt + 1})")
+        except Exception as e:
+            print(f"  Claude API error: {e} (attempt {attempt + 1})")
+
+        if attempt < max_retries - 1:
+            await asyncio.sleep(2 ** attempt)
+
+    return None
 
 
-async def store_result(session, pattern_id, result):
-    """Store analysis result in the database."""
+async def store_result(session, pattern_id, result, max_retries=3):
+    """Store analysis result in the database using UPSERT to handle duplicates."""
     url = f"{SUPABASE_URL}/rest/v1/orientation_analysis"
     payload = {
         "pattern_id": pattern_id,
@@ -204,12 +223,33 @@ async def store_result(session, pattern_id, result):
         "analyzed_at": datetime.utcnow().isoformat()
     }
 
-    async with session.post(url, headers=HEADERS, json=payload) as response:
-        if response.status not in (200, 201):
-            error = await response.text()
-            print(f"  Failed to store result: {error}")
-            return False
-        return True
+    # Use UPSERT: on conflict with pattern_id, update the existing record
+    upsert_headers = {
+        **HEADERS,
+        'Prefer': 'resolution=merge-duplicates,return=representation'
+    }
+
+    for attempt in range(max_retries):
+        try:
+            async with session.post(
+                url,
+                headers=upsert_headers,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+                if response.status in (200, 201):
+                    return True
+                error = await response.text()
+                print(f"  Failed to store result (attempt {attempt + 1}): {error}")
+        except asyncio.TimeoutError:
+            print(f"  Timeout storing result (attempt {attempt + 1})")
+        except Exception as e:
+            print(f"  Error storing result (attempt {attempt + 1}): {e}")
+
+        if attempt < max_retries - 1:
+            await asyncio.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+
+    return False
 
 
 async def process_batch(session, patterns, dry_run=False):
@@ -269,26 +309,37 @@ async def main():
 
         for i in range(0, len(patterns), args.batch_size):
             batch = patterns[i:i + args.batch_size]
-            print(f"\nProcessing batch {i // args.batch_size + 1} ({i + 1}-{min(i + len(batch), len(patterns))} of {len(patterns)})...")
+            batch_num = i // args.batch_size + 1
+            print(f"\nProcessing batch {batch_num} ({i + 1}-{min(i + len(batch), len(patterns))} of {len(patterns)})...")
 
-            results = await process_batch(session, batch, args.dry_run)
+            try:
+                results = await process_batch(session, batch, args.dry_run)
 
-            for pattern_id, analysis, status in results:
-                if status != "success" or not analysis:
+                for pattern_id, analysis, status in results:
+                    if status != "success" or not analysis:
+                        total_failed += 1
+                        print(f"  Pattern {pattern_id}: FAILED ({status})")
+                    elif analysis['orientation'] == 'correct':
+                        total_correct += 1
+                        print(f"  Pattern {pattern_id}: correct ({analysis['confidence']})")
+                    else:
+                        total_needs_rotation += 1
+                        rotation_needed.append({
+                            'id': pattern_id,
+                            'action': analysis['orientation'],
+                            'confidence': analysis['confidence'],
+                            'reason': analysis.get('reason', '')
+                        })
+                        print(f"  Pattern {pattern_id}: {analysis['orientation']} ({analysis['confidence']}) - {analysis.get('reason', '')}")
+
+            except Exception as e:
+                print(f"  BATCH {batch_num} FAILED: {e}")
+                print(f"  Waiting 10s before continuing...")
+                await asyncio.sleep(10)
+                # Mark all patterns in failed batch as failed
+                for p in batch:
                     total_failed += 1
-                    print(f"  Pattern {pattern_id}: FAILED ({status})")
-                elif analysis['orientation'] == 'correct':
-                    total_correct += 1
-                    print(f"  Pattern {pattern_id}: correct ({analysis['confidence']})")
-                else:
-                    total_needs_rotation += 1
-                    rotation_needed.append({
-                        'id': pattern_id,
-                        'action': analysis['orientation'],
-                        'confidence': analysis['confidence'],
-                        'reason': analysis.get('reason', '')
-                    })
-                    print(f"  Pattern {pattern_id}: {analysis['orientation']} ({analysis['confidence']}) - {analysis.get('reason', '')}")
+                    print(f"  Pattern {p['id']}: FAILED (batch_error)")
 
         # Summary
         print(f"\n{'='*50}")
