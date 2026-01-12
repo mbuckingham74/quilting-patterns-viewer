@@ -248,6 +248,33 @@ export default function RotateReviewPage() {
     }
   }
 
+  const handleFlipHorizontal = async (patternId: number) => {
+    setTransforming(prev => ({ ...prev, [patternId]: true }))
+    try {
+      const response = await fetch(`/api/admin/patterns/${patternId}/transform`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operation: 'flip_h' }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to flip')
+      }
+
+      const data = await response.json()
+
+      // Update the thumbnail URL with cache buster
+      if (data.thumbnail_url) {
+        setThumbnailUrls(prev => ({ ...prev, [patternId]: data.thumbnail_url }))
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to flip thumbnail')
+    } finally {
+      setTransforming(prev => ({ ...prev, [patternId]: false }))
+    }
+  }
+
   const handleDelete = async (patternId: number, fileName: string) => {
     if (!confirm(`Are you sure you want to delete "${fileName}"? This cannot be undone.`)) {
       return
@@ -516,6 +543,16 @@ export default function RotateReviewPage() {
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleFlipHorizontal(result.pattern_id)}
+                        disabled={transforming[result.pattern_id]}
+                        className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50"
+                        title="Flip horizontally (mirror)"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
                         </svg>
                       </button>
                     </div>
