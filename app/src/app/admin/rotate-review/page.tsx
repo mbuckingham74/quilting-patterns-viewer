@@ -64,6 +64,37 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | 'ell
   return pages
 }
 
+// Rotation preview modal state
+interface RotationPreview {
+  patternId: number
+  thumbnailUrl: string
+  operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
+  fileName: string
+}
+
+// Get CSS rotation for preview
+function getRotationStyle(operation: string): string {
+  switch (operation) {
+    case 'rotate_cw': return 'rotate(90deg)'
+    case 'rotate_ccw': return 'rotate(-90deg)'
+    case 'rotate_180': return 'rotate(180deg)'
+    case 'flip_h': return 'scaleX(-1)'
+    case 'flip_v': return 'scaleY(-1)'
+    default: return ''
+  }
+}
+
+function getOperationLabel(operation: string): string {
+  switch (operation) {
+    case 'rotate_cw': return 'Rotate 90° Right'
+    case 'rotate_ccw': return 'Rotate 90° Left'
+    case 'rotate_180': return 'Rotate 180°'
+    case 'flip_h': return 'Flip Horizontal'
+    case 'flip_v': return 'Flip Vertical'
+    default: return operation
+  }
+}
+
 export default function RotateReviewPage() {
   const [results, setResults] = useState<OrientationResult[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
@@ -76,6 +107,7 @@ export default function RotateReviewPage() {
   const [deleting, setDeleting] = useState<Record<number, boolean>>({})
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({})
   const [filter, setFilter] = useState<'needs_rotation' | 'all'>('needs_rotation')
+  const [rotationPreview, setRotationPreview] = useState<RotationPreview | null>(null)
   const PATTERNS_PER_PAGE = 24
 
   const fetchResults = useCallback(async () => {
@@ -114,14 +146,28 @@ export default function RotateReviewPage() {
     fetchResults()
   }, [fetchResults])
 
-  const handleTransform = async (
+  // Show rotation preview modal
+  const showRotationPreview = (
     patternId: number,
     operation: 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
   ) => {
-    // Confirm before saving
-    if (!confirm('Save rotated image?')) {
-      return
-    }
+    const result = results.find(r => r.pattern_id === patternId)
+    if (!result?.pattern) return
+
+    setRotationPreview({
+      patternId,
+      thumbnailUrl: thumbnailUrls[patternId] || result.pattern.thumbnail_url,
+      operation,
+      fileName: result.pattern.file_name,
+    })
+  }
+
+  // Actually perform the transform (called from modal)
+  const confirmTransform = async () => {
+    if (!rotationPreview) return
+
+    const { patternId, operation } = rotationPreview
+    setRotationPreview(null)
 
     setTransforming(prev => ({ ...prev, [patternId]: true }))
     try {
@@ -363,7 +409,7 @@ export default function RotateReviewPage() {
                     {/* Recommended action button */}
                     {recommended && (
                       <button
-                        onClick={() => handleTransform(result.pattern_id, recommended.action)}
+                        onClick={() => showRotationPreview(result.pattern_id, recommended.action)}
                         disabled={transforming[result.pattern_id]}
                         className="w-full mb-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                       >
@@ -380,7 +426,7 @@ export default function RotateReviewPage() {
                         Looks Correct
                       </button>
                       <button
-                        onClick={() => handleTransform(result.pattern_id, 'rotate_ccw')}
+                        onClick={() => showRotationPreview(result.pattern_id, 'rotate_ccw')}
                         disabled={transforming[result.pattern_id]}
                         className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded transition-colors disabled:opacity-50"
                         title="Rotate 90° left"
@@ -390,7 +436,7 @@ export default function RotateReviewPage() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleTransform(result.pattern_id, 'rotate_cw')}
+                        onClick={() => showRotationPreview(result.pattern_id, 'rotate_cw')}
                         disabled={transforming[result.pattern_id]}
                         className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded transition-colors disabled:opacity-50"
                         title="Rotate 90° right"
@@ -517,6 +563,73 @@ export default function RotateReviewPage() {
           </>
         )}
       </div>
+
+      {/* Rotation Preview Modal */}
+      {rotationPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden">
+            {/* Modal header */}
+            <div className="px-6 py-4 border-b border-stone-200">
+              <h3 className="text-lg font-semibold text-stone-800">
+                Preview: {getOperationLabel(rotationPreview.operation)}
+              </h3>
+              <p className="text-sm text-stone-500 truncate">{rotationPreview.fileName}</p>
+            </div>
+
+            {/* Before/After preview */}
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Before */}
+                <div>
+                  <p className="text-xs font-medium text-stone-500 mb-2 text-center">Before</p>
+                  <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden">
+                    <Image
+                      src={rotationPreview.thumbnailUrl}
+                      alt="Before"
+                      width={300}
+                      height={300}
+                      className="w-full h-full object-contain"
+                      unoptimized
+                    />
+                  </div>
+                </div>
+
+                {/* After */}
+                <div>
+                  <p className="text-xs font-medium text-stone-500 mb-2 text-center">After</p>
+                  <div className="aspect-square bg-stone-100 rounded-lg overflow-hidden flex items-center justify-center">
+                    <Image
+                      src={rotationPreview.thumbnailUrl}
+                      alt="After"
+                      width={300}
+                      height={300}
+                      className="w-full h-full object-contain"
+                      style={{ transform: getRotationStyle(rotationPreview.operation) }}
+                      unoptimized
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal actions */}
+            <div className="px-6 py-4 bg-stone-50 border-t border-stone-200 flex gap-3 justify-end">
+              <button
+                onClick={() => setRotationPreview(null)}
+                className="px-4 py-2 text-stone-700 hover:bg-stone-200 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmTransform}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Save Rotation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

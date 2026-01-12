@@ -55,6 +55,14 @@ export async function GET(
   const rawFilename = pattern.file_name || `pattern-${pattern.id}.${pattern.file_extension || 'bin'}`
   const { contentDisposition } = sanitizeFilenameForHeader(rawFilename)
 
+  // Log the download (non-blocking)
+  supabase
+    .from('download_logs')
+    .insert({ user_id: user.id, pattern_id: patternId })
+    .then(({ error }) => {
+      if (error) console.error('Failed to log download:', error)
+    })
+
   // Return file with appropriate headers
   return new NextResponse(fileData, {
     headers: {

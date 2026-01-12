@@ -254,6 +254,19 @@ export async function POST(request: NextRequest) {
       fallbackUsed,
     }
 
+    // Log the search (non-blocking)
+    supabase
+      .from('search_logs')
+      .insert({
+        user_id: user.id,
+        query,
+        search_method: fallbackUsed ? 'text' : 'semantic',
+        result_count: patterns.length,
+      })
+      .then(({ error }) => {
+        if (error) console.error('Failed to log search:', error)
+      })
+
     return NextResponse.json(result)
 
   } catch (error) {

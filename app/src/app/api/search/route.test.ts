@@ -56,12 +56,25 @@ describe('POST /api/search', () => {
       fromResult = { data: [], error: null },
     } = options
 
-    const mockFrom = vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnValue({
-        or: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue(fromResult),
+    const mockFrom = vi.fn().mockImplementation((table: string) => {
+      if (table === 'search_logs') {
+        return {
+          insert: vi.fn().mockReturnValue({
+            then: vi.fn().mockImplementation((cb: (result: { error: null }) => void) => {
+              cb({ error: null })
+              return Promise.resolve()
+            }),
+          }),
+        }
+      }
+      // Default: patterns table
+      return {
+        select: vi.fn().mockReturnValue({
+          or: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(fromResult),
+          }),
         }),
-      }),
+      }
     })
 
     return {
@@ -203,6 +216,29 @@ describe('POST /api/search', () => {
   })
 
   describe('limit parameter', () => {
+    // Helper to create mock that handles both patterns and search_logs tables
+    function createMockFromWithLimit(mockLimit: ReturnType<typeof vi.fn>) {
+      return vi.fn().mockImplementation((table: string) => {
+        if (table === 'search_logs') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((cb: (result: { error: null }) => void) => {
+                cb({ error: null })
+                return Promise.resolve()
+              }),
+            }),
+          }
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            or: vi.fn().mockReturnValue({
+              limit: mockLimit,
+            }),
+          }),
+        }
+      })
+    }
+
     it('clamps limit to maximum of 100', async () => {
       const mockLimit = vi.fn().mockResolvedValue({ data: [], error: null })
       const mockSupabase = {
@@ -213,13 +249,7 @@ describe('POST /api/search', () => {
           }),
         },
         rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              limit: mockLimit,
-            }),
-          }),
-        }),
+        from: createMockFromWithLimit(mockLimit),
       }
       mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
@@ -241,13 +271,7 @@ describe('POST /api/search', () => {
           }),
         },
         rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              limit: mockLimit,
-            }),
-          }),
-        }),
+        from: createMockFromWithLimit(mockLimit),
       }
       mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 
@@ -269,13 +293,7 @@ describe('POST /api/search', () => {
           }),
         },
         rpc: vi.fn().mockResolvedValue({ data: [], error: null }),
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({
-            or: vi.fn().mockReturnValue({
-              limit: mockLimit,
-            }),
-          }),
-        }),
+        from: createMockFromWithLimit(mockLimit),
       }
       mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
 

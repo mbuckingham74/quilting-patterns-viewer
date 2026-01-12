@@ -29,12 +29,27 @@ describe('GET /api/download/[id]', () => {
       auth: {
         getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
       },
-      from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            single: vi.fn().mockResolvedValue({ data: pattern, error: patternError }),
-          }),
-        }),
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === 'patterns') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({ data: pattern, error: patternError }),
+              }),
+            }),
+          }
+        }
+        if (table === 'download_logs') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              then: vi.fn().mockImplementation((cb: (result: { error: null }) => void) => {
+                cb({ error: null })
+                return Promise.resolve()
+              }),
+            }),
+          }
+        }
+        return {}
       }),
       storage: {
         from: vi.fn().mockReturnValue({
