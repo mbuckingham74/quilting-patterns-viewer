@@ -248,13 +248,13 @@ export default function RotateReviewPage() {
     }
   }
 
-  const handleFlipHorizontal = async (patternId: number) => {
+  const handleFlip = async (patternId: number, operation: 'flip_h' | 'flip_v') => {
     setTransforming(prev => ({ ...prev, [patternId]: true }))
     try {
       const response = await fetch(`/api/admin/patterns/${patternId}/transform`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: 'flip_h' }),
+        body: JSON.stringify({ operation }),
       })
 
       if (!response.ok) {
@@ -546,13 +546,23 @@ export default function RotateReviewPage() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleFlipHorizontal(result.pattern_id)}
+                        onClick={() => handleFlip(result.pattern_id, 'flip_h')}
                         disabled={transforming[result.pattern_id]}
                         className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50"
-                        title="Flip horizontally (mirror)"
+                        title="Flip horizontally (mirror left-right)"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleFlip(result.pattern_id, 'flip_v')}
+                        disabled={transforming[result.pattern_id]}
+                        className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50"
+                        title="Flip vertically (mirror top-bottom)"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
                         </svg>
                       </button>
                     </div>
