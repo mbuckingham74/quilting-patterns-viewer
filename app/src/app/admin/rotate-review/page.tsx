@@ -451,17 +451,17 @@ export default function RotateReviewPage() {
           </div>
         ) : (
           <>
-            {/* Pattern Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {/* Pattern Grid - larger cards with 4 columns max */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
               {results.map(result => {
                 const recommended = getRecommendedAction(result.orientation)
                 return (
                   <div
                     key={result.id}
-                    className="bg-white rounded-xl shadow-sm border border-stone-200 p-3 hover:shadow-md transition-shadow"
+                    className="bg-white rounded-xl shadow-sm border border-stone-200 p-4 hover:shadow-md transition-shadow"
                   >
                     {/* Confidence badge */}
-                    <div className="flex justify-between items-center mb-2">
+                    <div className="flex justify-between items-center mb-3">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         result.confidence === 'high'
                           ? 'bg-red-100 text-red-700'
@@ -474,34 +474,34 @@ export default function RotateReviewPage() {
                       <span className="text-xs text-stone-400">#{result.pattern_id}</span>
                     </div>
 
-                    {/* Thumbnail */}
-                    <div className="aspect-square bg-stone-50 rounded-lg overflow-hidden mb-2 relative">
+                    {/* Thumbnail - larger */}
+                    <div className="aspect-square bg-stone-50 rounded-lg overflow-hidden mb-3 relative">
                       {(thumbnailUrls[result.pattern_id] || result.pattern?.thumbnail_url) ? (
                         <Image
                           src={thumbnailUrls[result.pattern_id] || result.pattern?.thumbnail_url || ''}
                           alt={result.pattern?.file_name || ''}
-                          width={200}
-                          height={200}
+                          width={300}
+                          height={300}
                           className="w-full h-full object-contain"
                           unoptimized
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-stone-400">
-                          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                           </svg>
                         </div>
                       )}
                       {transforming[result.pattern_id] && (
                         <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                          <div className="w-6 h-6 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                          <div className="w-8 h-8 border-3 border-purple-500 border-t-transparent rounded-full animate-spin" />
                         </div>
                       )}
                     </div>
 
                     {/* AI reason */}
                     {result.reason && (
-                      <p className="text-xs text-stone-500 mb-2 line-clamp-2" title={result.reason}>
+                      <p className="text-xs text-stone-500 mb-3 line-clamp-2" title={result.reason}>
                         {result.reason}
                       </p>
                     )}
@@ -511,67 +511,76 @@ export default function RotateReviewPage() {
                       <button
                         onClick={() => showRotationPreview(result.pattern_id, recommended.action)}
                         disabled={transforming[result.pattern_id]}
-                        className="w-full mb-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        className="w-full mb-3 px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
                       >
                         {recommended.label}
                       </button>
                     )}
 
-                    {/* Secondary actions */}
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleMarkCorrect(result.pattern_id)}
-                        className="flex-1 px-2 py-1.5 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded transition-colors"
-                      >
-                        Looks Correct
-                      </button>
-                      <button
-                        onClick={() => showRotationPreview(result.pattern_id, 'rotate_ccw')}
-                        disabled={transforming[result.pattern_id]}
-                        className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded transition-colors disabled:opacity-50"
-                        title="Rotate 90° left"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => showRotationPreview(result.pattern_id, 'rotate_cw')}
-                        disabled={transforming[result.pattern_id]}
-                        className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded transition-colors disabled:opacity-50"
-                        title="Rotate 90° right"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleFlip(result.pattern_id, 'flip_h')}
-                        disabled={transforming[result.pattern_id]}
-                        className="p-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors disabled:opacity-50"
-                        title="Flip horizontally (mirror left-right)"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleFlip(result.pattern_id, 'flip_v')}
-                        disabled={transforming[result.pattern_id]}
-                        className="p-1.5 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded transition-colors disabled:opacity-50"
-                        title="Flip vertically (fix upside-down + mirrored)"
-                      >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
-                        </svg>
-                      </button>
+                    {/* Transform controls - two rows */}
+                    <div className="space-y-2">
+                      {/* Row 1: Looks Correct + Rotate */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleMarkCorrect(result.pattern_id)}
+                          className="flex-1 px-3 py-2 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-lg transition-colors"
+                        >
+                          Looks Correct
+                        </button>
+                        <button
+                          onClick={() => showRotationPreview(result.pattern_id, 'rotate_ccw')}
+                          disabled={transforming[result.pattern_id]}
+                          className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50"
+                          title="Rotate 90° left"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => showRotationPreview(result.pattern_id, 'rotate_cw')}
+                          disabled={transforming[result.pattern_id]}
+                          className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50"
+                          title="Rotate 90° right"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+                          </svg>
+                        </button>
+                      </div>
+
+                      {/* Row 2: Flip controls */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleFlip(result.pattern_id, 'flip_h')}
+                          disabled={transforming[result.pattern_id]}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                          title="Flip horizontally (mirror left-right)"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                          </svg>
+                          Flip H
+                        </button>
+                        <button
+                          onClick={() => handleFlip(result.pattern_id, 'flip_v')}
+                          disabled={transforming[result.pattern_id]}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+                          title="Flip vertically (fix upside-down + mirrored)"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5 0L16.5 21m0 0L12 16.5m4.5 4.5V7.5" />
+                          </svg>
+                          Flip V
+                        </button>
+                      </div>
                     </div>
 
                     {/* Delete duplicate button */}
                     <button
                       onClick={() => handleDelete(result.pattern_id, result.pattern?.file_name || `Pattern ${result.pattern_id}`)}
                       disabled={deleting[result.pattern_id] || transforming[result.pattern_id]}
-                      className="w-full mt-2 px-2 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                      className="w-full mt-3 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
                     >
                       {deleting[result.pattern_id] ? (
                         <>
