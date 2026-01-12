@@ -73,6 +73,7 @@ export default function RotateReviewPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
   const [transforming, setTransforming] = useState<Record<number, boolean>>({})
+  const [deleting, setDeleting] = useState<Record<number, boolean>>({})
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({})
   const [filter, setFilter] = useState<'needs_rotation' | 'all'>('needs_rotation')
   const PATTERNS_PER_PAGE = 24
@@ -158,6 +159,32 @@ export default function RotateReviewPage() {
       setTotal(prev => prev - 1)
     } catch (err) {
       alert('Failed to mark as correct')
+    }
+  }
+
+  const handleDelete = async (patternId: number, fileName: string) => {
+    if (!confirm(`Are you sure you want to delete "${fileName}"? This cannot be undone.`)) {
+      return
+    }
+
+    setDeleting(prev => ({ ...prev, [patternId]: true }))
+    try {
+      const response = await fetch(`/api/admin/patterns/${patternId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete')
+      }
+
+      // Remove from list
+      setResults(prev => prev.filter(r => r.pattern_id !== patternId))
+      setTotal(prev => prev - 1)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete pattern')
+    } finally {
+      setDeleting(prev => ({ ...prev, [patternId]: false }))
     }
   }
 
@@ -367,6 +394,27 @@ export default function RotateReviewPage() {
                         </svg>
                       </button>
                     </div>
+
+                    {/* Delete duplicate button */}
+                    <button
+                      onClick={() => handleDelete(result.pattern_id, result.pattern?.file_name || `Pattern ${result.pattern_id}`)}
+                      disabled={deleting[result.pattern_id] || transforming[result.pattern_id]}
+                      className="w-full mt-2 px-2 py-1.5 bg-red-100 hover:bg-red-200 text-red-700 text-xs font-medium rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
+                    >
+                      {deleting[result.pattern_id] ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete Duplicate
+                        </>
+                      )}
+                    </button>
                   </div>
                 )
               })}

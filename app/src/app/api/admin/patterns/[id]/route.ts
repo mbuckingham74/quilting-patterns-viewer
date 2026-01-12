@@ -64,6 +64,67 @@ export async function GET(
   })
 }
 
+// DELETE /api/admin/patterns/[id] - Delete a pattern
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
+  const patternId = parseInt(id, 10)
+
+  if (isNaN(patternId)) {
+    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+  }
+
+  const supabase = await createClient()
+
+  // Check if current user is admin
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  }
+
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  if (!adminProfile?.is_admin) {
+    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  }
+
+  // Check if pattern exists
+  const { data: existingPattern } = await supabase
+    .from('patterns')
+    .select('id, file_name')
+    .eq('id', patternId)
+    .single()
+
+  if (!existingPattern) {
+    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+  }
+
+  // Delete the pattern (storage files are kept for potential recovery)
+  const { error: deleteError } = await supabase
+    .from('patterns')
+    .delete()
+    .eq('id', patternId)
+
+  if (deleteError) {
+    console.error('Error deleting pattern:', deleteError)
+    return NextResponse.json(
+      { error: 'Failed to delete pattern', details: deleteError.message },
+      { status: 500 }
+    )
+  }
+
+  return NextResponse.json({
+    success: true,
+    deleted_pattern_id: patternId,
+  })
+}
+
 // PATCH /api/admin/patterns/[id] - Update pattern metadata
 export async function PATCH(
   request: Request,
