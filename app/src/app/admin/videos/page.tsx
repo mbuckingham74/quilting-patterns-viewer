@@ -108,32 +108,52 @@ export default async function EducationalVideosPage() {
               </div>
 
               <div className="space-y-4 flex flex-col items-center">
-                {videos.map((video, index) => (
-                  <div key={video.id} className="border border-stone-200 rounded-lg overflow-hidden w-full max-w-xl">
-                    <div className="bg-stone-50 px-3 py-2 border-b border-stone-200">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-xs font-bold text-purple-700">
-                          {index + 1}
-                        </span>
-                        <h3 className="font-medium text-stone-800 text-sm">{video.title}</h3>
+                {videos.map((video, index) => {
+                  const videoUrl = `${VIDEO_BASE_URL}/${encodeURIComponent(month)}/${encodeURIComponent(video.filename)}`
+                  const posterUrl = `${VIDEO_BASE_URL}/${encodeURIComponent(month)}/${encodeURIComponent(video.filename.replace('.mp4', '.jpg'))}`
+
+                  return (
+                    <div key={video.id} className="border border-stone-200 rounded-lg overflow-hidden w-full max-w-xl">
+                      <div className="bg-stone-50 px-3 py-2 border-b border-stone-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 bg-purple-200 rounded-full flex items-center justify-center text-xs font-bold text-purple-700">
+                              {index + 1}
+                            </span>
+                            <h3 className="font-medium text-stone-800 text-sm">{video.title}</h3>
+                          </div>
+                          <a
+                            href={videoUrl}
+                            download={video.filename}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-sm font-medium transition-colors"
+                            title="Download for offline viewing"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                      <div className="aspect-video bg-black">
+                        <video
+                          controls
+                          preload="metadata"
+                          className="w-full h-full"
+                          poster={posterUrl}
+                        >
+                          <source src={videoUrl} type="video/mp4" />
+                          Your browser does not support the video tag.
+                        </video>
+                      </div>
+                      <div className="bg-stone-50 px-3 py-2 border-t border-stone-200">
+                        <p className="text-xs text-stone-500 text-center">
+                          Use the fullscreen button (bottom-right of video) for a larger view
+                        </p>
                       </div>
                     </div>
-                    <div className="aspect-video bg-black">
-                      <video
-                        controls
-                        preload="metadata"
-                        className="w-full h-full"
-                        poster=""
-                      >
-                        <source
-                          src={`${VIDEO_BASE_URL}/${encodeURIComponent(month)}/${encodeURIComponent(video.filename)}`}
-                          type="video/mp4"
-                        />
-                        Your browser does not support the video tag.
-                      </video>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
           ))}
@@ -142,9 +162,11 @@ export default async function EducationalVideosPage() {
         {/* Help Note */}
         <div className="mt-8 bg-white rounded-xl shadow-sm border border-purple-100 p-6 text-center">
           <p className="text-stone-600">
-            Having trouble viewing a video? Make sure you have a stable internet connection.
+            <strong>Traveling?</strong> Click the Download button to save videos for offline viewing.
             <br />
-            Contact Michael if videos aren&apos;t loading properly.
+            <span className="text-stone-500 text-sm">
+              Having trouble? Make sure you have a stable internet connection or contact Michael.
+            </span>
           </p>
         </div>
       </div>
