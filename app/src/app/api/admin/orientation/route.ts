@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     .select('*', { count: 'exact', head: true })
 
   if (filter === 'needs_rotation') {
-    countQuery = countQuery.neq('orientation', 'correct')
+    countQuery = countQuery.neq('orientation', 'correct').eq('reviewed', false)
   } else if (filter === 'reviewed') {
     countQuery = countQuery.eq('reviewed', true)
   }
@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     .range(offset, offset + limit - 1)
 
   if (filter === 'needs_rotation') {
-    dataQuery = dataQuery.neq('orientation', 'correct')
+    dataQuery = dataQuery.neq('orientation', 'correct').eq('reviewed', false)
   } else if (filter === 'reviewed') {
     dataQuery = dataQuery.eq('reviewed', true)
   }
