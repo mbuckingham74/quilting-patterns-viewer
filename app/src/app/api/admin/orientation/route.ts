@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-// GET /api/admin/orientation - Get patterns flagged for rotation
+// GET /api/admin/orientation - Get patterns flagged for rotation or mirroring
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1', 10)
   const limit = Math.min(parseInt(searchParams.get('limit') || '24', 10), 100)
-  const filter = searchParams.get('filter') || 'needs_rotation' // 'needs_rotation', 'all', 'reviewed'
+  const filter = searchParams.get('filter') || 'needs_rotation' // 'needs_rotation', 'mirrored', 'all', 'reviewed'
   const confidence = searchParams.get('confidence') // 'high', 'medium', 'low' or null for all
 
   const supabase = await createClient()
@@ -27,6 +27,81 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
+  const offset = (page - 1) * limit
+
+  // Handle mirrored filter separately - queries mirror_analysis table
+  if (filter === 'mirrored') {
+    // Count mirrored patterns
+    const { count: mirrorCount } = await supabase
+      .from('mirror_analysis')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_mirrored', true)
+      .eq('reviewed', false)
+
+    // Get mirrored pattern data
+    const { data: mirrorResults, error: mirrorError } = await supabase
+      .from('mirror_analysis')
+      .select(`
+        id,
+        pattern_id,
+        is_mirrored,
+        confidence,
+        reason,
+        reviewed,
+        patterns!inner (
+          id,
+          file_name,
+          thumbnail_url
+        )
+      `)
+      .eq('is_mirrored', true)
+      .eq('reviewed', false)
+      .order('pattern_id', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    if (mirrorError) {
+      console.error('Error fetching mirror analysis:', mirrorError)
+      return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
+    }
+
+    // Get mirror stats
+    const { data: mirrorStats } = await supabase
+      .from('mirror_analysis')
+      .select('is_mirrored, confidence, reviewed')
+
+    const mirrorStatsBreakdown = {
+      total: mirrorStats?.length || 0,
+      correct: mirrorStats?.filter(s => !s.is_mirrored).length || 0,
+      needs_rotation: 0, // Not applicable for mirror
+      mirrored: mirrorStats?.filter(s => s.is_mirrored && !s.reviewed).length || 0,
+      high_confidence: mirrorStats?.filter(s => s.is_mirrored && !s.reviewed && s.confidence === 'high').length || 0,
+      medium_confidence: mirrorStats?.filter(s => s.is_mirrored && !s.reviewed && s.confidence === 'medium').length || 0,
+      low_confidence: mirrorStats?.filter(s => s.is_mirrored && !s.reviewed && s.confidence === 'low').length || 0,
+    }
+
+    const total = mirrorCount || 0
+    const totalPages = Math.ceil(total / limit)
+
+    return NextResponse.json({
+      results: mirrorResults?.map(r => ({
+        id: r.id,
+        pattern_id: r.pattern_id,
+        orientation: r.is_mirrored ? 'mirrored' : 'correct',
+        confidence: r.confidence,
+        reason: r.reason,
+        reviewed: r.reviewed,
+        pattern: r.patterns
+      })) || [],
+      page,
+      limit,
+      total,
+      totalPages,
+      stats: mirrorStatsBreakdown,
+      source: 'mirror_analysis'
+    })
+  }
+
+  // Standard orientation_analysis queries
   // Build query for counting
   let countQuery = supabase
     .from('orientation_analysis')
@@ -45,7 +120,6 @@ export async function GET(request: Request) {
   const { count } = await countQuery
 
   // Build query for data
-  const offset = (page - 1) * limit
   let dataQuery = supabase
     .from('orientation_analysis')
     .select(`
@@ -81,15 +155,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
   }
 
-  // Get stats
+  // Get rotation stats
   const { data: stats } = await supabase
     .from('orientation_analysis')
     .select('orientation, confidence')
+
+  // Get mirror stats for combined display
+  const { data: mirrorStats } = await supabase
+    .from('mirror_analysis')
+    .select('is_mirrored, reviewed')
 
   const statsBreakdown = {
     total: stats?.length || 0,
     correct: stats?.filter(s => s.orientation === 'correct').length || 0,
     needs_rotation: stats?.filter(s => s.orientation !== 'correct').length || 0,
+    mirrored: mirrorStats?.filter(s => s.is_mirrored && !s.reviewed).length || 0,
     high_confidence: stats?.filter(s => s.orientation !== 'correct' && s.confidence === 'high').length || 0,
     medium_confidence: stats?.filter(s => s.orientation !== 'correct' && s.confidence === 'medium').length || 0,
     low_confidence: stats?.filter(s => s.orientation !== 'correct' && s.confidence === 'low').length || 0,
@@ -112,7 +192,8 @@ export async function GET(request: Request) {
     limit,
     total,
     totalPages,
-    stats: statsBreakdown
+    stats: statsBreakdown,
+    source: 'orientation_analysis'
   })
 }
 
@@ -135,19 +216,22 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
-  const { pattern_ids, reviewed } = await request.json()
+  const { pattern_ids, reviewed, source } = await request.json()
 
   if (!Array.isArray(pattern_ids)) {
     return NextResponse.json({ error: 'pattern_ids must be an array' }, { status: 400 })
   }
 
+  // Determine which table to update based on source
+  const tableName = source === 'mirror_analysis' ? 'mirror_analysis' : 'orientation_analysis'
+
   const { error } = await supabase
-    .from('orientation_analysis')
+    .from(tableName)
     .update({ reviewed: reviewed ?? true, reviewed_at: new Date().toISOString() })
     .in('pattern_id', pattern_ids)
 
   if (error) {
-    console.error('Error updating orientation analysis:', error)
+    console.error(`Error updating ${tableName}:`, error)
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
   }
 

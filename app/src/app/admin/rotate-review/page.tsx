@@ -25,6 +25,7 @@ interface Stats {
   total: number
   correct: number
   needs_rotation: number
+  mirrored?: number
   high_confidence: number
   medium_confidence: number
   low_confidence: number
@@ -106,8 +107,9 @@ export default function RotateReviewPage() {
   const [transforming, setTransforming] = useState<Record<number, boolean>>({})
   const [deleting, setDeleting] = useState<Record<number, boolean>>({})
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({})
-  const [filter, setFilter] = useState<'needs_rotation' | 'all'>('needs_rotation')
+  const [filter, setFilter] = useState<'needs_rotation' | 'mirrored' | 'all'>('needs_rotation')
   const [rotationPreview, setRotationPreview] = useState<RotationPreview | null>(null)
+  const [dataSource, setDataSource] = useState<'orientation_analysis' | 'mirror_analysis'>('orientation_analysis')
   const PATTERNS_PER_PAGE = 24
 
   const fetchResults = useCallback(async () => {
@@ -126,6 +128,7 @@ export default function RotateReviewPage() {
       setTotalPages(data.totalPages)
       setTotal(data.total)
       setStats(data.stats)
+      setDataSource(data.source || 'orientation_analysis')
 
       // Initialize thumbnail URLs
       const urls: Record<number, string> = {}
@@ -193,7 +196,7 @@ export default function RotateReviewPage() {
         await fetch('/api/admin/orientation', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
+          body: JSON.stringify({ pattern_ids: [patternId], reviewed: true, source: dataSource }),
         })
         setResults(prev => prev.filter(r => r.pattern_id !== patternId))
         setTotal(prev => prev - 1)
@@ -220,7 +223,7 @@ export default function RotateReviewPage() {
       await fetch('/api/admin/orientation', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
+        body: JSON.stringify({ pattern_ids: [patternId], reviewed: true, source: dataSource }),
       })
 
       // Remove from list after successful transform
@@ -238,7 +241,7 @@ export default function RotateReviewPage() {
       await fetch('/api/admin/orientation', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pattern_ids: [patternId], reviewed: true }),
+        body: JSON.stringify({ pattern_ids: [patternId], reviewed: true, source: dataSource }),
       })
       // Remove from list
       setResults(prev => prev.filter(r => r.pattern_id !== patternId))
@@ -304,17 +307,25 @@ export default function RotateReviewPage() {
   const getRecommendedAction = (orientation: string) => {
     switch (orientation) {
       case 'rotate_90_cw':
-        return { label: 'Rotate 90° Right', action: 'rotate_cw' as const }
+        return { label: 'Rotate 90° Right', action: 'rotate_cw' as const, type: 'rotate' as const }
       case 'rotate_90_ccw':
-        return { label: 'Rotate 90° Left', action: 'rotate_ccw' as const }
+        return { label: 'Rotate 90° Left', action: 'rotate_ccw' as const, type: 'rotate' as const }
       case 'rotate_180':
-        return { label: 'Rotate 180°', action: 'rotate_180' as const }
+        return { label: 'Rotate 180°', action: 'rotate_180' as const, type: 'rotate' as const }
+      case 'mirrored':
+        return { label: 'Flip Horizontal', action: 'flip_h' as const, type: 'flip' as const }
       default:
         return null
     }
   }
 
   const analysisInProgress = stats && stats.total < 15000 // Rough check if analysis is still running
+
+  // Handle filter change - reset to page 1
+  const handleFilterChange = (newFilter: 'needs_rotation' | 'mirrored' | 'all') => {
+    setFilter(newFilter)
+    setPage(1)
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -392,12 +403,65 @@ export default function RotateReviewPage() {
                 </div>
               </div>
             )}
-            <div className="text-right">
-              <svg className="w-16 h-16 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <button
+              onClick={() => fetchResults()}
+              disabled={loading}
+              className="p-3 rounded-full bg-white/20 hover:bg-white/30 transition-colors disabled:opacity-50"
+              title="Refresh data"
+            >
+              <svg className={`w-8 h-8 text-white ${loading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-            </div>
+            </button>
           </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => handleFilterChange('needs_rotation')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filter === 'needs_rotation'
+                ? 'bg-purple-600 text-white'
+                : 'bg-white text-stone-700 hover:bg-purple-50 border border-stone-200'
+            }`}
+          >
+            Rotation Issues
+            {stats?.needs_rotation !== undefined && (
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                filter === 'needs_rotation' ? 'bg-purple-500' : 'bg-stone-100'
+              }`}>
+                {stats.needs_rotation}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleFilterChange('mirrored')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filter === 'mirrored'
+                ? 'bg-blue-600 text-white'
+                : 'bg-white text-stone-700 hover:bg-blue-50 border border-stone-200'
+            }`}
+          >
+            Mirrored
+            {stats?.mirrored !== undefined && (
+              <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                filter === 'mirrored' ? 'bg-blue-500' : 'bg-stone-100'
+              }`}>
+                {stats.mirrored}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => handleFilterChange('all')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              filter === 'all'
+                ? 'bg-stone-700 text-white'
+                : 'bg-white text-stone-700 hover:bg-stone-50 border border-stone-200'
+            }`}
+          >
+            All Analyzed
+          </button>
         </div>
 
         {/* Analysis in progress notice */}
@@ -417,7 +481,11 @@ export default function RotateReviewPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
           <p className="text-sm text-blue-800">
             <strong>How it works:</strong> AI analyzed each pattern and flagged ones that may be incorrectly oriented.
-            Click the recommended action to fix, or &quot;Looks Correct&quot; if the AI was wrong.
+            {filter === 'mirrored' ? (
+              <> Use &quot;Flip H&quot; to fix horizontally mirrored images (like backwards text), or &quot;Looks Correct&quot; if the AI was wrong.</>
+            ) : (
+              <> Click the recommended action to fix, or &quot;Looks Correct&quot; if the AI was wrong.</>
+            )}
           </p>
         </div>
 
@@ -509,9 +577,19 @@ export default function RotateReviewPage() {
                     {/* Recommended action button */}
                     {recommended && (
                       <button
-                        onClick={() => showRotationPreview(result.pattern_id, recommended.action)}
+                        onClick={() => {
+                          if (recommended.type === 'flip') {
+                            handleFlip(result.pattern_id, recommended.action as 'flip_h' | 'flip_v')
+                          } else {
+                            showRotationPreview(result.pattern_id, recommended.action)
+                          }
+                        }}
                         disabled={transforming[result.pattern_id]}
-                        className="w-full mb-3 px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                        className={`w-full mb-3 px-3 py-2.5 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                          recommended.type === 'flip'
+                            ? 'bg-blue-600 hover:bg-blue-700'
+                            : 'bg-purple-600 hover:bg-purple-700'
+                        }`}
                       >
                         {recommended.label}
                       </button>
