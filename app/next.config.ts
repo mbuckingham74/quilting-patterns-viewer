@@ -16,6 +16,7 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '100mb', // Allow large ZIP uploads
     },
+    middlewareClientMaxBodySize: '100mb', // Allow large uploads through middleware
   },
 };
 
