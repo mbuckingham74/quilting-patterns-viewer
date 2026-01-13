@@ -346,9 +346,6 @@ async function renderPdfToThumbnail(pdfData: Uint8Array): Promise<Uint8Array | n
   return null
 }
 
-// Configure for larger uploads
-export const config = {
-  api: {
-    bodyParser: false, // We handle form data ourselves
-  },
-}
+// Configure for larger uploads (App Router format)
+// This sets the max request body size for this route
+export const maxDuration = 60 // Allow up to 60 seconds for processing large ZIPs

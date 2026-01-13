@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
     ],
   },
   output: 'standalone',
+  experimental: {
+    serverActions: {
+      bodySizeLimit: '100mb', // Allow large ZIP uploads
+    },
+  },
 };
 
 // Sentry configuration options
