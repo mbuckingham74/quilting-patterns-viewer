@@ -56,6 +56,20 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const zip = await JSZip.loadAsync(arrayBuffer)
 
+    // Save the raw ZIP file to storage for backup/recovery
+    const zipTimestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const zipStoragePath = `uploads/${zipTimestamp}_${file.name}`
+    const { error: zipUploadError } = await serviceClient.storage
+      .from('patterns')
+      .upload(zipStoragePath, new Uint8Array(arrayBuffer), {
+        contentType: 'application/zip',
+        upsert: false,
+      })
+
+    if (zipUploadError) {
+      console.warn(`Could not save raw ZIP file: ${zipUploadError.message}`)
+    }
+
     // Catalog files by normalized pattern name
     const patterns: Map<string, { qli?: string; pdf?: string }> = new Map()
 
@@ -117,6 +131,7 @@ export async function POST(request: NextRequest) {
         .from('upload_logs')
         .insert({
           zip_filename: file.name,
+          zip_storage_path: zipUploadError ? null : zipStoragePath,
           uploaded_by: user.id,
           total_patterns: validPatterns.length,
           uploaded_count: 0, // Will update after processing
@@ -209,11 +224,26 @@ export async function POST(request: NextRequest) {
           throw patternUploadError
         }
 
-        // Generate thumbnail from PDF if available
+        // Process PDF if available: save to storage and generate thumbnail
         let thumbnailUrl: string | null = null
         if (pattern.pdf) {
           try {
             const pdfData = await zip.file(pattern.pdf)!.async('uint8array')
+
+            // Store the PDF file for future thumbnail regeneration
+            const pdfPath = `${patternId}.pdf`
+            const { error: pdfUploadError } = await serviceClient.storage
+              .from('patterns')
+              .upload(pdfPath, pdfData, {
+                contentType: 'application/pdf',
+                upsert: false,
+              })
+
+            if (pdfUploadError) {
+              console.warn(`Could not save PDF for ${pattern.name}:`, pdfUploadError.message)
+            }
+
+            // Render PDF to thumbnail
             const thumbnailData = await renderPdfToThumbnail(pdfData)
 
             if (thumbnailData) {
@@ -290,6 +320,7 @@ export async function POST(request: NextRequest) {
       try {
         await serviceClient.from('upload_logs').insert({
           zip_filename: file.name,
+          zip_storage_path: zipUploadError ? null : zipStoragePath,
           uploaded_by: user.id,
           total_patterns: validPatterns.length,
           uploaded_count: uploaded.length,
@@ -409,22 +440,68 @@ function extractAuthorFromQli(qliData: Uint8Array): {
 }
 
 // Helper: Render PDF to thumbnail
-// Note: This is a simplified version - PDF rendering in Node.js is complex
-// For now, we return null and let patterns without PDFs use a placeholder
-// A more robust solution would use pdf-lib or a headless browser
+// Uses pdftoppm (from poppler-utils) to convert first page to PNG
 async function renderPdfToThumbnail(pdfData: Uint8Array): Promise<Uint8Array | null> {
-  // PDF rendering in pure Node.js is complex
-  // Options:
-  // 1. Use pdf-lib (can't render to image, only manipulate PDFs)
-  // 2. Use pdfjs-dist (complex setup, needs canvas)
-  // 3. Use sharp with PDF support (requires libvips with poppler)
-  // 4. Call external tool like pdftoppm
-  //
-  // For now, we'll skip thumbnail generation in the web API
-  // and rely on the local Python script for full functionality
-  //
-  // TODO: Implement proper PDF rendering or use a service
-  return null
+  const { exec } = await import('child_process')
+  const { promisify } = await import('util')
+  const fs = await import('fs/promises')
+  const path = await import('path')
+  const os = await import('os')
+  
+  const execAsync = promisify(exec)
+  
+  // Create temporary directory for processing
+  const tmpDir = os.tmpdir()
+  const id = Math.random().toString(36).substring(2, 15)
+  const pdfPath = path.join(tmpDir, `temp-${id}.pdf`)
+  const outPrefix = path.join(tmpDir, `thumb-${id}`)
+  
+  try {
+    // Write PDF to temp file
+    await fs.writeFile(pdfPath, Buffer.from(pdfData))
+    
+    // Convert first page to PNG using pdftoppm
+    // -png: Output PNG format
+    // -f 1 -l 1: First page only
+    // -scale-to 600: Scale to 600px width (maintains aspect ratio)
+    try {
+      await execAsync(`pdftoppm -png -f 1 -l 1 -scale-to 600 "${pdfPath}" "${outPrefix}"`)
+    } catch (error) {
+      console.error('pdftoppm failed:', error)
+      // Check if pdftoppm is installed
+      try {
+        await execAsync('which pdftoppm')
+      } catch {
+        console.error('pdftoppm not found. Please install poppler-utils.')
+      }
+      return null
+    }
+    
+    // pdftoppm adds -1.png (or -01.png) to the prefix
+    // Try to find the output file
+    const files = await fs.readdir(tmpDir)
+    const generatedFile = files.find(f => f.startsWith(`thumb-${id}`) && f.endsWith('.png'))
+    
+    if (!generatedFile) {
+      console.error('Thumbnail generated but output file not found')
+      return null
+    }
+    
+    // Read the generated PNG
+    const thumbPath = path.join(tmpDir, generatedFile)
+    const thumbnailData = await fs.readFile(thumbPath)
+    
+    // Clean up specific output file
+    await fs.unlink(thumbPath).catch(() => {})
+    
+    return thumbnailData
+  } catch (e) {
+    console.error('PDF rendering error:', e)
+    return null
+  } finally {
+    // Clean up input file
+    await fs.unlink(pdfPath).catch(() => {})
+  }
 }
 
 // Configure for larger uploads (App Router format)
