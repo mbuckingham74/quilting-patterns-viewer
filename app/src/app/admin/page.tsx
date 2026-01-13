@@ -200,6 +200,21 @@ export default async function AdminDashboardPage() {
             </Link>
 
             <Link
+              href="/admin/recent-imports"
+              className="flex items-center gap-3 p-4 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-teal-200 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-teal-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-stone-800">Recent Imports</p>
+                <p className="text-sm text-stone-500">Last 25 patterns added</p>
+              </div>
+            </Link>
+
+            <Link
               href="/browse"
               className="flex items-center gap-3 p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
             >
