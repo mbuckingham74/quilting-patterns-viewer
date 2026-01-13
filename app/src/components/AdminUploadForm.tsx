@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface UploadResult {
   success: boolean
@@ -15,13 +16,17 @@ interface UploadResult {
   }
   error?: string
   details?: string
+  batch_id?: number
+  is_staged?: boolean
 }
 
 export default function AdminUploadForm() {
+  const router = useRouter()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [result, setResult] = useState<UploadResult | null>(null)
+  const [skipReview, setSkipReview] = useState(false)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -71,6 +76,8 @@ export default function AdminUploadForm() {
     try {
       const formData = new FormData()
       formData.append('file', selectedFile)
+      // If skipReview is checked, set staged=false to commit immediately
+      formData.append('staged', skipReview ? 'false' : 'true')
 
       const response = await fetch('/api/admin/upload', {
         method: 'POST',
@@ -80,6 +87,13 @@ export default function AdminUploadForm() {
       const data: UploadResult = await response.json()
       setResult(data)
 
+      // If upload was successful and staged, redirect to review page
+      if (data.success && data.is_staged && data.batch_id && data.summary && data.summary.uploaded > 0) {
+        router.push(`/admin/batches/${data.batch_id}/review`)
+        return
+      }
+
+      // For non-staged uploads or if no patterns were uploaded, just show results
       if (data.success && data.summary && data.summary.uploaded > 0) {
         setSelectedFile(null)
       }
@@ -157,6 +171,20 @@ export default function AdminUploadForm() {
         )}
       </div>
 
+      {/* Skip review option */}
+      {selectedFile && (
+        <label className="flex items-center gap-2 text-sm text-stone-600 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={skipReview}
+            onChange={(e) => setSkipReview(e.target.checked)}
+            className="rounded border-stone-300 text-purple-600 focus:ring-purple-500"
+            disabled={isUploading}
+          />
+          Skip review (commit patterns immediately without editing)
+        </label>
+      )}
+
       {/* Action buttons */}
       {selectedFile && (
         <div className="flex gap-4">
@@ -179,8 +207,10 @@ export default function AdminUploadForm() {
                 </svg>
                 Processing...
               </span>
+            ) : skipReview ? (
+              'Upload & Commit'
             ) : (
-              'Upload Patterns'
+              'Upload & Review'
             )}
           </button>
           <button
@@ -193,7 +223,7 @@ export default function AdminUploadForm() {
         </div>
       )}
 
-      {/* Results */}
+      {/* Results (only shown for skip-review mode or errors) */}
       {result && (
         <div className={`rounded-xl p-6 ${result.success ? 'bg-white border border-purple-100' : 'bg-red-50 border border-red-200'}`}>
           {result.error ? (
@@ -201,7 +231,7 @@ export default function AdminUploadForm() {
               <p className="font-medium">{result.error}</p>
               {result.details && <p className="text-sm mt-1">{result.details}</p>}
             </div>
-          ) : result.summary && (
+          ) : result.summary && !result.is_staged && (
             <div className="space-y-4">
               <h3 className="font-semibold text-stone-800">Upload Complete</h3>
 

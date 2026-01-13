@@ -1,0 +1,281 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import BulkKeywordSelector from './BulkKeywordSelector'
+import PatternReviewCard from './PatternReviewCard'
+import { useToast } from './Toast'
+
+interface Keyword {
+  id: number
+  value: string
+}
+
+interface Pattern {
+  id: number
+  file_name: string
+  notes: string | null
+  author: string | null
+  author_notes: string | null
+  thumbnail_url: string | null
+  keywords: Keyword[]
+}
+
+interface Batch {
+  id: number
+  zip_filename: string
+  uploaded_at: string
+  status: string
+  uploaded_count: number
+  skipped_count: number
+  error_count: number
+}
+
+interface BatchReviewContentProps {
+  initialBatch: Batch
+  initialPatterns: Pattern[]
+}
+
+export default function BatchReviewContent({
+  initialBatch,
+  initialPatterns,
+}: BatchReviewContentProps) {
+  const router = useRouter()
+  const { showSuccess, showError } = useToast()
+  const [batch] = useState(initialBatch)
+  const [patterns, setPatterns] = useState(initialPatterns)
+  const [selectedBulkKeywords, setSelectedBulkKeywords] = useState<Keyword[]>([])
+  const [isCommitting, setIsCommitting] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+
+  const handleUpdatePattern = (patternId: number, updates: Partial<Pattern>) => {
+    setPatterns(prev => prev.map(p =>
+      p.id === patternId ? { ...p, ...updates } : p
+    ))
+  }
+
+  const handleDeletePattern = async (patternId: number) => {
+    try {
+      const res = await fetch(`/api/admin/patterns/${patternId}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setPatterns(prev => prev.filter(p => p.id !== patternId))
+        showSuccess('Pattern deleted')
+      } else {
+        const data = await res.json()
+        showError(data.error || 'Failed to delete pattern')
+      }
+    } catch (e) {
+      showError('Failed to delete pattern')
+    }
+  }
+
+  const handleThumbnailChange = (patternId: number, newUrl: string) => {
+    setPatterns(prev => prev.map(p =>
+      p.id === patternId ? { ...p, thumbnail_url: newUrl } : p
+    ))
+  }
+
+  const handleBulkKeywords = async (keywordIds: number[], action: 'add' | 'remove') => {
+    try {
+      const res = await fetch(`/api/admin/batches/${batch.id}/keywords`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword_ids: keywordIds, action }),
+      })
+
+      if (res.ok) {
+        // Refresh patterns to get updated keywords
+        const refreshRes = await fetch(`/api/admin/batches/${batch.id}`)
+        if (refreshRes.ok) {
+          const data = await refreshRes.json()
+          setPatterns(data.patterns)
+        }
+        showSuccess(`Keywords ${action === 'add' ? 'added to' : 'removed from'} all patterns`)
+        setSelectedBulkKeywords([])
+      } else {
+        const data = await res.json()
+        showError(data.error || 'Failed to update keywords')
+      }
+    } catch (e) {
+      showError('Failed to update keywords')
+    }
+  }
+
+  const handleCommit = async () => {
+    if (!confirm(`Commit ${patterns.length} patterns? They will become visible in browse.`)) {
+      return
+    }
+
+    setIsCommitting(true)
+    try {
+      const res = await fetch(`/api/admin/batches/${batch.id}/commit`, {
+        method: 'POST',
+      })
+
+      if (res.ok) {
+        showSuccess(`Successfully committed ${patterns.length} patterns!`)
+        router.push('/admin/upload')
+      } else {
+        const data = await res.json()
+        showError(data.error || 'Failed to commit batch')
+      }
+    } catch (e) {
+      showError('Failed to commit batch')
+    } finally {
+      setIsCommitting(false)
+    }
+  }
+
+  const handleCancel = async () => {
+    if (!confirm(`Cancel this upload and delete all ${patterns.length} patterns? This cannot be undone.`)) {
+      return
+    }
+
+    setIsCancelling(true)
+    try {
+      const res = await fetch(`/api/admin/batches/${batch.id}/cancel`, {
+        method: 'POST',
+      })
+
+      if (res.ok) {
+        showSuccess('Batch cancelled and patterns deleted')
+        router.push('/admin/upload')
+      } else {
+        const data = await res.json()
+        showError(data.error || 'Failed to cancel batch')
+      }
+    } catch (e) {
+      showError('Failed to cancel batch')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
+
+  const uploadDate = new Date(batch.uploaded_at).toLocaleString()
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-purple-200 sticky top-0 z-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/admin/upload" className="text-stone-500 hover:text-purple-600 transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+              <div>
+                <h1 className="text-xl font-bold text-stone-800">Review Upload</h1>
+                <p className="text-sm text-stone-500">{batch.zip_filename}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleCancel}
+                disabled={isCancelling || isCommitting}
+                className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isCancelling ? 'Cancelling...' : 'Cancel Upload'}
+              </button>
+              <button
+                onClick={handleCommit}
+                disabled={isCommitting || isCancelling || patterns.length === 0}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isCommitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Committing...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Commit {patterns.length} Patterns
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Batch info */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 mb-6 text-white shadow-lg">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-purple-100 text-sm font-medium">Staged Upload</p>
+              <p className="text-3xl font-bold">{patterns.length} Patterns</p>
+              <p className="text-purple-100 text-sm mt-1">Uploaded {uploadDate}</p>
+            </div>
+            <div className="flex gap-6 text-sm">
+              <div className="text-center">
+                <p className="text-2xl font-bold">{batch.uploaded_count}</p>
+                <p className="text-purple-100">Uploaded</p>
+              </div>
+              {batch.skipped_count > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-bold">{batch.skipped_count}</p>
+                  <p className="text-purple-100">Skipped</p>
+                </div>
+              )}
+              {batch.error_count > 0 && (
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-red-300">{batch.error_count}</p>
+                  <p className="text-purple-100">Errors</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Bulk keyword selector */}
+        <div className="mb-6">
+          <BulkKeywordSelector
+            selectedKeywords={selectedBulkKeywords}
+            onKeywordsChange={setSelectedBulkKeywords}
+            onApplyToAll={handleBulkKeywords}
+            patternCount={patterns.length}
+            disabled={isCommitting || isCancelling}
+          />
+        </div>
+
+        {/* Pattern grid */}
+        {patterns.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center">
+            <svg className="w-16 h-16 text-stone-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            <p className="text-lg font-medium text-stone-600">No patterns to review</p>
+            <p className="text-stone-500 mt-1">All patterns have been deleted from this batch.</p>
+            <Link
+              href="/admin/upload"
+              className="inline-block mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Back to Upload
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            {patterns.map(pattern => (
+              <PatternReviewCard
+                key={pattern.id}
+                pattern={pattern}
+                onUpdate={handleUpdatePattern}
+                onDelete={handleDeletePattern}
+                onThumbnailChange={handleThumbnailChange}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

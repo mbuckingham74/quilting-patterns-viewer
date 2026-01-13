@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import AuthButton from '@/components/AuthButton'
 import UploadLogsSection from '@/components/UploadLogsSection'
 
@@ -31,6 +31,15 @@ export default async function AdminDashboardPage() {
 
   const pendingUsers = allProfiles?.filter(p => !p.is_approved).length || 0
   const approvedUsers = allProfiles?.filter(p => p.is_approved).length || 0
+
+  // Get staged batches (pending review)
+  const serviceClient = createServiceClient()
+  const { data: stagedBatches } = await serviceClient
+    .from('upload_logs')
+    .select('id, zip_filename, uploaded_at, uploaded_count')
+    .eq('status', 'staged')
+    .order('uploaded_at', { ascending: false })
+    .limit(5)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -112,6 +121,44 @@ export default async function AdminDashboardPage() {
             </div>
           </Link>
         </div>
+
+        {/* Pending Reviews Alert */}
+        {stagedBatches && stagedBatches.length > 0 && (
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-xl p-6 mb-8 text-white shadow-lg">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">Pending Upload Reviews</h3>
+                <p className="text-amber-100 text-sm mt-1">
+                  You have {stagedBatches.length} upload{stagedBatches.length !== 1 ? 's' : ''} waiting to be reviewed
+                </p>
+                <div className="mt-4 space-y-2">
+                  {stagedBatches.map(batch => (
+                    <Link
+                      key={batch.id}
+                      href={`/admin/batches/${batch.id}/review`}
+                      className="flex items-center justify-between bg-white/10 hover:bg-white/20 rounded-lg p-3 transition-colors"
+                    >
+                      <div>
+                        <p className="font-medium">{batch.zip_filename}</p>
+                        <p className="text-xs text-amber-100">
+                          {batch.uploaded_count} patterns • {new Date(batch.uploaded_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Quick Links */}
         <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-6">

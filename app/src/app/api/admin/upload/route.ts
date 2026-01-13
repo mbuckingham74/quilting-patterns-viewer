@@ -7,6 +7,7 @@ const PATTERN_EXTENSIONS = new Set(['.qli'])
 const PDF_EXTENSION = '.pdf'
 
 // POST /api/admin/upload - Upload patterns from ZIP file
+// Supports staged mode: patterns go to review before being visible in browse
 export async function POST(request: NextRequest) {
   // Use anon client for auth check (respects user session)
   const supabase = await createClient()
@@ -36,9 +37,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Get the uploaded file
+    // Get the uploaded file and staging option
     const formData = await request.formData()
     const file = formData.get('file') as File | null
+    const stagedParam = formData.get('staged')
+    // Default to staged mode (true) unless explicitly set to 'false'
+    const isStaged = stagedParam !== 'false'
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -106,6 +110,33 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Create upload log first to get batch ID (for staged uploads)
+    let batchId: number | null = null
+    if (isStaged && newPatterns.length > 0) {
+      const { data: uploadLog, error: logError } = await serviceClient
+        .from('upload_logs')
+        .insert({
+          zip_filename: file.name,
+          uploaded_by: user.id,
+          total_patterns: validPatterns.length,
+          uploaded_count: 0, // Will update after processing
+          skipped_count: duplicates.length,
+          error_count: 0,
+          uploaded_patterns: [],
+          skipped_patterns: duplicates.map(p => ({ name: p.name, reason: 'Duplicate' })),
+          error_patterns: [],
+          status: 'staged',
+        })
+        .select('id')
+        .single()
+
+      if (logError || !uploadLog) {
+        console.error('Failed to create upload log:', logError)
+        return NextResponse.json({ error: 'Failed to initialize upload batch' }, { status: 500 })
+      }
+      batchId = uploadLog.id
+    }
+
     // Process each new pattern
     const uploaded: Array<{
       id: number
@@ -146,6 +177,8 @@ export async function POST(request: NextRequest) {
             notes: displayName,
             thumbnail_url: null, // Will update after storage upload
             pattern_file_url: null, // Will update after storage upload
+            is_staged: isStaged,
+            upload_batch_id: batchId,
           })
           .select('id')
           .single()
@@ -237,23 +270,39 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Save upload log to database
+    // Save or update upload log
     const skippedPatterns = duplicates.map(p => ({ name: p.name, reason: 'Duplicate' }))
-    try {
-      await serviceClient.from('upload_logs').insert({
-        zip_filename: file.name,
-        uploaded_by: user.id,
-        total_patterns: validPatterns.length,
-        uploaded_count: uploaded.length,
-        skipped_count: duplicates.length,
-        error_count: errors.length,
-        uploaded_patterns: uploaded,
-        skipped_patterns: skippedPatterns,
-        error_patterns: errors
-      })
-    } catch (logError) {
-      // Don't fail the upload if logging fails
-      console.error('Failed to save upload log:', logError)
+
+    if (isStaged && batchId) {
+      // Update the existing staged upload log with results
+      try {
+        await serviceClient.from('upload_logs').update({
+          uploaded_count: uploaded.length,
+          error_count: errors.length,
+          uploaded_patterns: uploaded,
+          error_patterns: errors,
+        }).eq('id', batchId)
+      } catch (logError) {
+        console.error('Failed to update upload log:', logError)
+      }
+    } else {
+      // Create a committed upload log (non-staged mode)
+      try {
+        await serviceClient.from('upload_logs').insert({
+          zip_filename: file.name,
+          uploaded_by: user.id,
+          total_patterns: validPatterns.length,
+          uploaded_count: uploaded.length,
+          skipped_count: duplicates.length,
+          error_count: errors.length,
+          uploaded_patterns: uploaded,
+          skipped_patterns: skippedPatterns,
+          error_patterns: errors,
+          status: 'committed',
+        })
+      } catch (logError) {
+        console.error('Failed to save upload log:', logError)
+      }
     }
 
     return NextResponse.json({
@@ -266,7 +315,10 @@ export async function POST(request: NextRequest) {
         uploaded: uploaded.length,
         skipped: duplicates.length,
         errors: errors.length
-      }
+      },
+      // Include batch info for staged uploads
+      batch_id: batchId,
+      is_staged: isStaged,
     })
 
   } catch (e) {
