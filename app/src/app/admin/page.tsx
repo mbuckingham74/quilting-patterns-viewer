@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import AuthButton from '@/components/AuthButton'
+import UploadLogsSection from '@/components/UploadLogsSection'
 
 export default async function AdminDashboardPage() {
   const supabase = await createClient()
@@ -257,6 +258,11 @@ export default async function AdminDashboardPage() {
               </div>
             </Link>
           </div>
+        </div>
+
+        {/* Upload Logs Section */}
+        <div className="mt-8">
+          <UploadLogsSection />
         </div>
       </div>
     </div>

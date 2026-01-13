@@ -107,7 +107,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Process each new pattern
-    const uploaded: Array<{ id: number; name: string; hasThumbnail: boolean }> = []
+    const uploaded: Array<{
+      id: number
+      name: string
+      hasThumbnail: boolean
+      thumbnailUrl: string | null
+      fileSize: number
+      author: string | null
+    }> = []
     const errors: Array<{ name: string; error: string }> = []
 
     for (const pattern of newPatterns) {
@@ -215,7 +222,10 @@ export async function POST(request: NextRequest) {
         uploaded.push({
           id: patternId,
           name: pattern.name,
-          hasThumbnail: thumbnailUrl !== null
+          hasThumbnail: thumbnailUrl !== null,
+          thumbnailUrl,
+          fileSize: qliSize,
+          author: authorInfo.author
         })
 
       } catch (e) {
@@ -227,10 +237,29 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Save upload log to database
+    const skippedPatterns = duplicates.map(p => ({ name: p.name, reason: 'Duplicate' }))
+    try {
+      await serviceClient.from('upload_logs').insert({
+        zip_filename: file.name,
+        uploaded_by: user.id,
+        total_patterns: validPatterns.length,
+        uploaded_count: uploaded.length,
+        skipped_count: duplicates.length,
+        error_count: errors.length,
+        uploaded_patterns: uploaded,
+        skipped_patterns: skippedPatterns,
+        error_patterns: errors
+      })
+    } catch (logError) {
+      // Don't fail the upload if logging fails
+      console.error('Failed to save upload log:', logError)
+    }
+
     return NextResponse.json({
       success: true,
       uploaded,
-      skipped: duplicates.map(p => ({ name: p.name, reason: 'Duplicate' })),
+      skipped: skippedPatterns,
       errors,
       summary: {
         total: validPatterns.length,
