@@ -76,7 +76,14 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 
 ### Admin Features
 - **User Management** - Approve/reject new signups, view approved users with last login
-- **Pattern Upload** - Bulk upload patterns from ZIP files
+- **Staged Upload Workflow** - Upload patterns to a staging area for review before publishing:
+  - Bulk upload patterns from ZIP files to staging
+  - Review page with thumbnail grid showing all uploaded patterns
+  - Bulk keyword assignment - apply keywords to all patterns at once
+  - Individual pattern editing - metadata, keywords, and thumbnails
+  - Thumbnail controls - rotate, flip, and delete on each pattern
+  - Commit to publish patterns or Cancel to delete entire batch
+  - Pending reviews alert on admin dashboard
 - **Duplicate Finder** - Identify and manage similar patterns
 - **Quick Rotate Review** - AI-assisted thumbnail orientation and mirror fixes with filter tabs
 - **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
@@ -194,6 +201,7 @@ erDiagram
     PATTERNS ||--o{ PATTERN_KEYWORDS : has
     PATTERNS ||--o{ FAVORITES : in
     PATTERNS ||--o{ SHARED_COLLECTION_PATTERNS : in
+    UPLOAD_LOGS ||--o{ PATTERNS : contains
     KEYWORDS ||--o{ PATTERN_KEYWORDS : has
     KEYWORD_GROUPS ||--o{ KEYWORD_GROUP_KEYWORDS : has
     KEYWORDS ||--o{ KEYWORD_GROUP_KEYWORDS : in
@@ -208,6 +216,18 @@ erDiagram
         text thumbnail_url
         text pattern_file_url
         vector embedding
+        boolean is_staged
+        int upload_batch_id FK
+    }
+
+    UPLOAD_LOGS {
+        int id PK
+        text zip_filename
+        int uploaded_count
+        int skipped_count
+        int error_count
+        text status
+        timestamptz uploaded_at
     }
 
     KEYWORDS {
@@ -389,7 +409,7 @@ The app uses Supabase Postgres with the following main tables:
 
 | Table | Description |
 |-------|-------------|
-| **patterns** | Pattern metadata, file URLs, and vector embeddings |
+| **patterns** | Pattern metadata, file URLs, vector embeddings, and staging status |
 | **keywords** | Searchable keyword taxonomy |
 | **pattern_keywords** | Many-to-many junction table |
 | **profiles** | User profiles with approval status and admin flag |
@@ -398,6 +418,7 @@ The app uses Supabase Postgres with the following main tables:
 | **shared_collections** | Pattern shares sent to customers |
 | **shared_collection_patterns** | Patterns included in each share |
 | **shared_collection_feedback** | Customer rankings and notes |
+| **upload_logs** | Upload batch history with staging status |
 | **duplicate_reviews** | Admin reviews of similar pattern pairs |
 | **orientation_analysis** | AI-detected thumbnail rotation issues |
 | **mirror_analysis** | AI-detected horizontally mirrored thumbnails |
@@ -418,7 +439,11 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/shares` | GET/POST | Required | Create and list pattern shares |
 | `/api/shares/[token]` | GET | Public | Get share details by token |
 | `/api/shares/[token]/feedback` | POST | Public | Submit customer rankings |
-| `/api/admin/upload` | POST | Admin | Upload new patterns |
+| `/api/admin/upload` | POST | Admin | Upload new patterns (staged by default) |
+| `/api/admin/batches/[id]` | GET | Admin | Get batch details with patterns |
+| `/api/admin/batches/[id]/commit` | POST | Admin | Commit staged batch (publish patterns) |
+| `/api/admin/batches/[id]/cancel` | POST | Admin | Cancel batch (delete all patterns) |
+| `/api/admin/batches/[id]/keywords` | POST | Admin | Bulk add/remove keywords from batch |
 | `/api/admin/users` | GET | Admin | User management |
 | `/api/admin/duplicates` | GET | Admin | Find similar patterns |
 | `/api/admin/duplicates/review` | POST | Admin | Mark duplicate status |
