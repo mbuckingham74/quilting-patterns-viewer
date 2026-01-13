@@ -261,7 +261,7 @@ export default async function AdminDashboardPage() {
         </div>
 
         {/* Upload Logs Section */}
-        <div className="mt-8">
+        <div id="upload-logs" className="mt-8 scroll-mt-20">
           <UploadLogsSection />
         </div>
       </div>
