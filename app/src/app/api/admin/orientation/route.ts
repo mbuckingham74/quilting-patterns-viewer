@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 // GET /api/admin/orientation - Get patterns flagged for rotation or mirroring
 export async function GET(request: Request) {
@@ -155,10 +155,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
   }
 
-  // Get rotation stats
+  // Get rotation stats (include reviewed field for proper counting)
   const { data: stats } = await supabase
     .from('orientation_analysis')
-    .select('orientation, confidence')
+    .select('orientation, confidence, reviewed')
 
   // Get mirror stats for combined display
   const { data: mirrorStats } = await supabase
@@ -168,11 +168,13 @@ export async function GET(request: Request) {
   const statsBreakdown = {
     total: stats?.length || 0,
     correct: stats?.filter(s => s.orientation === 'correct').length || 0,
-    needs_rotation: stats?.filter(s => s.orientation !== 'correct').length || 0,
+    // Only count non-reviewed patterns as needing rotation
+    needs_rotation: stats?.filter(s => s.orientation !== 'correct' && !s.reviewed).length || 0,
     mirrored: mirrorStats?.filter(s => s.is_mirrored && !s.reviewed).length || 0,
-    high_confidence: stats?.filter(s => s.orientation !== 'correct' && s.confidence === 'high').length || 0,
-    medium_confidence: stats?.filter(s => s.orientation !== 'correct' && s.confidence === 'medium').length || 0,
-    low_confidence: stats?.filter(s => s.orientation !== 'correct' && s.confidence === 'low').length || 0,
+    // Only count non-reviewed patterns in confidence breakdown
+    high_confidence: stats?.filter(s => s.orientation !== 'correct' && !s.reviewed && s.confidence === 'high').length || 0,
+    medium_confidence: stats?.filter(s => s.orientation !== 'correct' && !s.reviewed && s.confidence === 'medium').length || 0,
+    low_confidence: stats?.filter(s => s.orientation !== 'correct' && !s.reviewed && s.confidence === 'low').length || 0,
   }
 
   const total = count || 0
@@ -222,10 +224,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'pattern_ids must be an array' }, { status: 400 })
   }
 
+  // Use service client for update (bypasses RLS)
+  const serviceClient = createServiceClient()
+
   // Determine which table to update based on source
   const tableName = source === 'mirror_analysis' ? 'mirror_analysis' : 'orientation_analysis'
 
-  const { error } = await supabase
+  const { error } = await serviceClient
     .from(tableName)
     .update({ reviewed: reviewed ?? true, reviewed_at: new Date().toISOString() })
     .in('pattern_id', pattern_ids)
