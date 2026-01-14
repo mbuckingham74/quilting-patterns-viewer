@@ -282,6 +282,9 @@ export default function BatchReviewContent({
                 onKeywordsChange={setSelectedBulkKeywords}
                 onApplyToPattern={handleApplyKeywordsToPattern}
                 selectedPatternCount={selectedPatternIds.length}
+                totalPatternCount={patterns.length}
+                onSelectAll={() => setSelectedPatternIds(patterns.map(p => p.id))}
+                onClearSelection={() => setSelectedPatternIds([])}
                 disabled={isCommitting || isCancelling}
               />
             </div>

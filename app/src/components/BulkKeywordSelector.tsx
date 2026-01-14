@@ -12,6 +12,9 @@ interface BulkKeywordSelectorProps {
   onKeywordsChange: (keywords: Keyword[]) => void
   onApplyToPattern: (keywordIds: number[]) => Promise<void>
   selectedPatternCount: number
+  totalPatternCount: number
+  onSelectAll: () => void
+  onClearSelection: () => void
   disabled?: boolean
 }
 
@@ -20,6 +23,9 @@ export default function BulkKeywordSelector({
   onKeywordsChange,
   onApplyToPattern,
   selectedPatternCount,
+  totalPatternCount,
+  onSelectAll,
+  onClearSelection,
   disabled = false,
 }: BulkKeywordSelectorProps) {
   const [allKeywords, setAllKeywords] = useState<Keyword[]>([])
@@ -98,22 +104,41 @@ export default function BulkKeywordSelector({
       {/* Selected pattern indicator */}
       {selectedPatternCount > 0 ? (
         <div className="p-3 border-b border-stone-200 bg-blue-50">
-          <p className="text-xs text-blue-600 font-medium mb-1">Selected:</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs text-blue-600 font-medium">Selected:</p>
+            <button
+              onClick={onClearSelection}
+              disabled={disabled}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Clear
+            </button>
+          </div>
           <p className="text-sm text-blue-800 font-semibold">
-            {selectedPatternCount} pattern{selectedPatternCount !== 1 ? 's' : ''}
+            {selectedPatternCount} of {totalPatternCount} pattern{totalPatternCount !== 1 ? 's' : ''}
           </p>
-          <p className="text-xs text-blue-500 mt-1">
-            Hold Ctrl and click to select more
-          </p>
+          {selectedPatternCount < totalPatternCount && (
+            <button
+              onClick={onSelectAll}
+              disabled={disabled}
+              className="mt-2 w-full px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-700 text-xs font-medium rounded-lg transition-colors"
+            >
+              Select All {totalPatternCount}
+            </button>
+          )}
         </div>
       ) : (
         <div className="p-3 border-b border-stone-200 bg-amber-50">
-          <p className="text-xs text-amber-700">
-            Click a pattern to select it, then choose keywords to apply.
+          <p className="text-xs text-amber-700 mb-2">
+            Click a pattern to select it, or use the button below.
           </p>
-          <p className="text-xs text-amber-600 mt-1">
-            Hold Ctrl to select multiple patterns.
-          </p>
+          <button
+            onClick={onSelectAll}
+            disabled={disabled}
+            className="w-full px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-medium rounded-lg transition-colors"
+          >
+            Select All {totalPatternCount} Patterns
+          </button>
         </div>
       )}
 
