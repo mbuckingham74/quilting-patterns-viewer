@@ -25,7 +25,7 @@ interface PatternReviewCardProps {
   onDelete: (patternId: number) => void
   onThumbnailChange: (patternId: number, newUrl: string) => void
   isSelected?: boolean
-  onSelect?: (patternId: number) => void
+  onSelect?: (patternId: number, ctrlKey: boolean) => void
 }
 
 export default function PatternReviewCard({
@@ -99,7 +99,7 @@ export default function PatternReviewCard({
     ) {
       return
     }
-    onSelect?.(pattern.id)
+    onSelect?.(pattern.id, e.ctrlKey || e.metaKey) // metaKey for Mac Cmd key
   }
 
   return (

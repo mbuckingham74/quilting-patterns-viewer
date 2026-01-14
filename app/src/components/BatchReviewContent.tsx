@@ -46,17 +46,16 @@ export default function BatchReviewContent({
   const [batch] = useState(initialBatch)
   const [patterns, setPatterns] = useState(initialPatterns)
   const [selectedBulkKeywords, setSelectedBulkKeywords] = useState<Keyword[]>([])
-  const [selectedPatternId, setSelectedPatternId] = useState<number | null>(null)
+  const [selectedPatternIds, setSelectedPatternIds] = useState<number[]>([])
   const [isCommitting, setIsCommitting] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
   const [keywordModal, setKeywordModal] = useState<{
     isOpen: boolean
-    patternName: string
+    patternNames: string[]
     addedKeywords: string[]
-    allKeywords: string[]
-  }>({ isOpen: false, patternName: '', addedKeywords: [], allKeywords: [] })
+  }>({ isOpen: false, patternNames: [], addedKeywords: [] })
 
-  const selectedPattern = patterns.find(p => p.id === selectedPatternId) || null
+  const selectedPatterns = patterns.filter(p => selectedPatternIds.includes(p.id))
 
 
   const handleUpdatePattern = (patternId: number, updates: Partial<Pattern>) => {
@@ -88,42 +87,51 @@ export default function BatchReviewContent({
     ))
   }
 
-  const handleApplyKeywordsToPattern = async (keywordIds: number[]) => {
-    if (!selectedPatternId || !selectedPattern) return
+  const handleSelectPattern = (patternId: number, ctrlKey: boolean) => {
+    if (ctrlKey) {
+      // Ctrl+Click: toggle this pattern in the selection
+      setSelectedPatternIds(prev =>
+        prev.includes(patternId)
+          ? prev.filter(id => id !== patternId)
+          : [...prev, patternId]
+      )
+    } else {
+      // Regular click: select only this pattern
+      setSelectedPatternIds([patternId])
+    }
+  }
 
-    // Capture the keywords being added (before clearing selection)
+  const handleApplyKeywordsToPattern = async (keywordIds: number[]) => {
+    if (selectedPatternIds.length === 0 || selectedPatterns.length === 0) return
+
+    // Capture the keywords being added and pattern names
     const addedKeywordNames = selectedBulkKeywords.map(k => k.value)
-    const patternName = selectedPattern.notes || selectedPattern.file_name
+    const patternNames = selectedPatterns.map(p => p.notes || p.file_name)
 
     try {
-      // Add keywords one by one to the selected pattern
-      for (const keywordId of keywordIds) {
-        await fetch(`/api/admin/patterns/${selectedPatternId}/keywords`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ keyword_id: keywordId }),
-        })
+      // Add keywords to each selected pattern
+      for (const patternId of selectedPatternIds) {
+        for (const keywordId of keywordIds) {
+          await fetch(`/api/admin/patterns/${patternId}/keywords`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ keyword_id: keywordId }),
+          })
+        }
       }
 
       // Refresh patterns to get updated keywords
       const refreshRes = await fetch(`/api/admin/batches/${batch.id}`)
-      let allKeywordNames: string[] = []
       if (refreshRes.ok) {
         const data = await refreshRes.json()
         setPatterns(data.patterns)
-        // Get the updated pattern's keywords
-        const updatedPattern = data.patterns.find((p: Pattern) => p.id === selectedPatternId)
-        if (updatedPattern) {
-          allKeywordNames = updatedPattern.keywords.map((k: Keyword) => k.value)
-        }
       }
 
       // Show the confirmation modal
       setKeywordModal({
         isOpen: true,
-        patternName,
+        patternNames,
         addedKeywords: addedKeywordNames,
-        allKeywords: allKeywordNames,
       })
 
       setSelectedBulkKeywords([])
@@ -273,10 +281,7 @@ export default function BatchReviewContent({
                 selectedKeywords={selectedBulkKeywords}
                 onKeywordsChange={setSelectedBulkKeywords}
                 onApplyToPattern={handleApplyKeywordsToPattern}
-                selectedPattern={selectedPattern ? {
-                  id: selectedPattern.id,
-                  name: selectedPattern.notes || selectedPattern.file_name
-                } : null}
+                selectedPatternCount={selectedPatternIds.length}
                 disabled={isCommitting || isCancelling}
               />
             </div>
@@ -307,8 +312,8 @@ export default function BatchReviewContent({
                     onUpdate={handleUpdatePattern}
                     onDelete={handleDeletePattern}
                     onThumbnailChange={handleThumbnailChange}
-                    isSelected={selectedPatternId === pattern.id}
-                    onSelect={setSelectedPatternId}
+                    isSelected={selectedPatternIds.includes(pattern.id)}
+                    onSelect={handleSelectPattern}
                   />
                 ))}
               </div>
@@ -331,8 +336,8 @@ export default function BatchReviewContent({
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-white">Keywords Applied!</h3>
-                  <p className="text-green-100 text-sm truncate" title={keywordModal.patternName}>
-                    {keywordModal.patternName}
+                  <p className="text-green-100 text-sm">
+                    {keywordModal.patternNames.length} pattern{keywordModal.patternNames.length !== 1 ? 's' : ''} updated
                   </p>
                 </div>
               </div>
@@ -343,7 +348,7 @@ export default function BatchReviewContent({
               {/* Added keywords */}
               <div className="mb-4">
                 <p className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">
-                  Just Added
+                  Keywords Added
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {keywordModal.addedKeywords.map((kw, i) => (
@@ -360,28 +365,22 @@ export default function BatchReviewContent({
                 </div>
               </div>
 
-              {/* All keywords on pattern */}
+              {/* Patterns that received keywords */}
               <div>
                 <p className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">
-                  All Keywords on Pattern
+                  Applied To
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {keywordModal.allKeywords.length > 0 ? (
-                    keywordModal.allKeywords.map((kw, i) => (
-                      <span
-                        key={i}
-                        className={`px-3 py-1 text-sm font-medium rounded-full ${
-                          keywordModal.addedKeywords.includes(kw)
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-blue-100 text-blue-800'
-                        }`}
-                      >
-                        {kw}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-stone-400 text-sm">No keywords assigned</span>
-                  )}
+                <div className="max-h-32 overflow-y-auto">
+                  <ul className="space-y-1">
+                    {keywordModal.patternNames.map((name, i) => (
+                      <li key={i} className="text-sm text-stone-700 truncate flex items-center gap-2">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="truncate" title={name}>{name}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>
@@ -389,7 +388,7 @@ export default function BatchReviewContent({
             {/* Footer */}
             <div className="px-6 py-4 bg-stone-50 border-t border-stone-200">
               <button
-                onClick={() => setKeywordModal({ isOpen: false, patternName: '', addedKeywords: [], allKeywords: [] })}
+                onClick={() => setKeywordModal({ isOpen: false, patternNames: [], addedKeywords: [] })}
                 className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
               >
                 Done
