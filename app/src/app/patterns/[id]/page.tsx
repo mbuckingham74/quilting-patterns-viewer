@@ -224,9 +224,6 @@ export default async function PatternPage({ params }: PageProps) {
                   </Link>
                 )}
               </div>
-              <p className="mt-2 text-sm text-stone-500">
-                Sign in required to download
-              </p>
             </div>
           </div>
         </div>
