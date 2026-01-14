@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import ThumbnailControls from './ThumbnailControls'
 
@@ -24,6 +24,7 @@ interface PatternReviewCardProps {
   onUpdate: (patternId: number, updates: Partial<Pattern>) => void
   onDelete: (patternId: number) => void
   onThumbnailChange: (patternId: number, newUrl: string) => void
+  allKeywords: Keyword[] // Pass from parent to avoid duplicate fetches
 }
 
 export default function PatternReviewCard({
@@ -31,6 +32,7 @@ export default function PatternReviewCard({
   onUpdate,
   onDelete,
   onThumbnailChange,
+  allKeywords,
 }: PatternReviewCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedNotes, setEditedNotes] = useState(pattern.notes || '')
@@ -39,38 +41,9 @@ export default function PatternReviewCard({
   const [thumbnailUrl, setThumbnailUrl] = useState(pattern.thumbnail_url)
 
   // Keyword management
-  const [allKeywords, setAllKeywords] = useState<Keyword[]>([])
-  const [keywordSearch, setKeywordSearch] = useState('')
-  const [isKeywordDropdownOpen, setIsKeywordDropdownOpen] = useState(false)
+  const [keywordFilter, setKeywordFilter] = useState('')
   const [isAddingKeyword, setIsAddingKeyword] = useState(false)
-  const dropdownRef = useRef<HTMLDivElement>(null)
-
-  // Fetch all keywords for dropdown
-  useEffect(() => {
-    async function fetchKeywords() {
-      try {
-        const res = await fetch('/api/keywords')
-        if (res.ok) {
-          const data = await res.json()
-          setAllKeywords(data.keywords || [])
-        }
-      } catch (e) {
-        console.error('Failed to fetch keywords:', e)
-      }
-    }
-    fetchKeywords()
-  }, [])
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsKeywordDropdownOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const [showKeywords, setShowKeywords] = useState(false)
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -103,12 +76,12 @@ export default function PatternReviewCard({
     onDelete(patternId)
   }
 
-  // Filter keywords for dropdown
+  // Filter available keywords (not already assigned to this pattern)
   const existingKeywordIds = new Set(pattern.keywords.map(k => k.id))
-  const filteredKeywords = allKeywords
-    .filter(k => !existingKeywordIds.has(k.id))
-    .filter(k => k.value.toLowerCase().includes(keywordSearch.toLowerCase()))
-    .slice(0, 10)
+  const availableKeywords = allKeywords.filter(k => !existingKeywordIds.has(k.id))
+  const filteredKeywords = keywordFilter
+    ? availableKeywords.filter(k => k.value.toLowerCase().includes(keywordFilter.toLowerCase()))
+    : availableKeywords
 
   const addKeyword = async (keyword: Keyword) => {
     setIsAddingKeyword(true)
@@ -125,8 +98,6 @@ export default function PatternReviewCard({
       console.error('Failed to add keyword:', e)
     } finally {
       setIsAddingKeyword(false)
-      setKeywordSearch('')
-      setIsKeywordDropdownOpen(false)
     }
   }
 
@@ -225,6 +196,7 @@ export default function PatternReviewCard({
 
         {/* Keywords */}
         <div className="mb-3">
+          {/* Assigned keywords */}
           <div className="flex flex-wrap gap-1 mb-2 min-h-[24px]">
             {pattern.keywords.length === 0 ? (
               <span className="text-xs text-stone-400 italic">No keywords</span>
@@ -248,35 +220,52 @@ export default function PatternReviewCard({
             )}
           </div>
 
-          {/* Add keyword dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <input
-              type="text"
-              value={keywordSearch}
-              onChange={(e) => {
-                setKeywordSearch(e.target.value)
-                setIsKeywordDropdownOpen(true)
-              }}
-              onFocus={() => setIsKeywordDropdownOpen(true)}
-              placeholder="Add keyword..."
-              className="w-full px-2 py-1 text-xs border border-stone-300 rounded focus:ring-1 focus:ring-purple-500"
-              disabled={isAddingKeyword}
-            />
-            {isKeywordDropdownOpen && filteredKeywords.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-stone-200 rounded shadow-lg max-h-32 overflow-y-auto">
-                {filteredKeywords.map(keyword => (
+          {/* Toggle to show/hide available keywords */}
+          <button
+            onClick={() => setShowKeywords(!showKeywords)}
+            className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1"
+          >
+            <svg className={`w-3 h-3 transition-transform ${showKeywords ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            {showKeywords ? 'Hide keywords' : 'Add keywords'}
+          </button>
+
+          {/* Clickable keyword pills */}
+          {showKeywords && (
+            <div className="mt-2 p-2 bg-stone-50 rounded-lg border border-stone-200">
+              {/* Filter input */}
+              <input
+                type="text"
+                value={keywordFilter}
+                onChange={(e) => setKeywordFilter(e.target.value)}
+                placeholder="Filter..."
+                className="w-full px-2 py-1 text-xs border border-stone-300 rounded mb-2 focus:ring-1 focus:ring-purple-500"
+                disabled={isAddingKeyword}
+              />
+              {/* Available keywords as clickable pills */}
+              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                {filteredKeywords.slice(0, 20).map(keyword => (
                   <button
                     key={keyword.id}
                     onClick={() => addKeyword(keyword)}
-                    className="w-full px-2 py-1 text-left text-xs hover:bg-purple-50 text-stone-700"
                     disabled={isAddingKeyword}
+                    className="px-1.5 py-0.5 bg-white border border-stone-300 text-stone-600 text-xs rounded-full hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors disabled:opacity-50"
                   >
                     {keyword.value}
                   </button>
                 ))}
+                {filteredKeywords.length === 0 && (
+                  <span className="text-xs text-stone-400 italic">
+                    {keywordFilter ? 'No matches' : 'All keywords assigned'}
+                  </span>
+                )}
+                {filteredKeywords.length > 20 && (
+                  <span className="text-xs text-stone-400">+{filteredKeywords.length - 20} more</span>
+                )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Thumbnail controls */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BulkKeywordSelector from './BulkKeywordSelector'
@@ -48,6 +48,23 @@ export default function BatchReviewContent({
   const [selectedBulkKeywords, setSelectedBulkKeywords] = useState<Keyword[]>([])
   const [isCommitting, setIsCommitting] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [allKeywords, setAllKeywords] = useState<Keyword[]>([])
+
+  // Fetch all keywords once for the whole page
+  useEffect(() => {
+    async function fetchKeywords() {
+      try {
+        const res = await fetch('/api/keywords')
+        if (res.ok) {
+          const data = await res.json()
+          setAllKeywords(data.keywords || [])
+        }
+      } catch (e) {
+        console.error('Failed to fetch keywords:', e)
+      }
+    }
+    fetchKeywords()
+  }, [])
 
   const handleUpdatePattern = (patternId: number, updates: Partial<Pattern>) => {
     setPatterns(prev => prev.map(p =>
@@ -271,6 +288,7 @@ export default function BatchReviewContent({
                 onUpdate={handleUpdatePattern}
                 onDelete={handleDeletePattern}
                 onThumbnailChange={handleThumbnailChange}
+                allKeywords={allKeywords}
               />
             ))}
           </div>
