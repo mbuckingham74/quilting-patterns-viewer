@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50)
   const offset = parseInt(searchParams.get('offset') || '0')
 
-  // Fetch upload logs with uploader info
+  // Fetch upload logs with uploader info (only committed uploads, not staged/cancelled)
   const { data: logs, error, count } = await supabase
     .from('upload_logs')
     .select(`
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
       skipped_patterns,
       error_patterns
     `, { count: 'exact' })
+    .eq('status', 'committed')
     .order('uploaded_at', { ascending: false })
     .range(offset, offset + limit - 1)
 

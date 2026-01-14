@@ -99,14 +99,14 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to delete patterns' }, { status: 500 })
   }
 
-  // Update batch status to cancelled
-  const { error: updateError } = await serviceClient
+  // Delete the upload_log record entirely (cancelled uploads have no value to keep)
+  const { error: deleteLogError } = await serviceClient
     .from('upload_logs')
-    .update({ status: 'cancelled' })
+    .delete()
     .eq('id', batchId)
 
-  if (updateError) {
-    console.error('Error updating batch status:', updateError)
+  if (deleteLogError) {
+    console.error('Error deleting upload log:', deleteLogError)
   }
 
   return NextResponse.json({
