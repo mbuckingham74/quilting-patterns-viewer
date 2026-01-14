@@ -28,11 +28,13 @@ export async function GET(request: NextRequest) {
     ? requestedOrigin
     : DEFAULT_ORIGIN
 
-  // Log cookies received for debugging
+  // Log cookies received for debugging (development only to avoid exposing sensitive data)
   const allCookies = request.cookies.getAll()
-  console.log('Callback received cookies:', allCookies.map(c => c.name).join(', '))
   const hasVerifier = allCookies.some(c => c.name.includes('code-verifier'))
-  console.log('Has PKCE verifier cookie:', hasVerifier)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Callback received cookies:', allCookies.map(c => c.name).join(', '))
+    console.log('Has PKCE verifier cookie:', hasVerifier)
+  }
 
   if (!code) {
     return NextResponse.redirect(`${origin}/?error=no_code`)
@@ -53,7 +55,9 @@ export async function GET(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          console.log('Setting cookies:', cookiesToSet.map(c => c.name).join(', '))
+          if (process.env.NODE_ENV === 'development') {
+            console.log('Setting cookies:', cookiesToSet.map(c => c.name).join(', '))
+          }
           cookiesToSet.forEach(({ name, value, options }) => {
             cookiesToSetLater.push({ name, value, options: options || {} })
           })
@@ -73,7 +77,9 @@ export async function GET(request: NextRequest) {
       secure: true,
     })
   })
-  console.log('Applied cookies to response:', cookiesToSetLater.map(c => c.name).join(', '))
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Applied cookies to response:', cookiesToSetLater.map(c => c.name).join(', '))
+  }
 
   if (error) {
     console.error('Exchange code error:', error)
@@ -85,7 +91,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${origin}/?error=no_user`)
   }
 
-  console.log('User authenticated:', user.email)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('User authenticated:', user.email)
+  }
 
   // Check if profile exists
   const { data: existingProfile } = await supabase
@@ -129,7 +137,8 @@ export async function GET(request: NextRequest) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+            // Use dedicated internal secret, fall back to service role key for compatibility
+            'x-internal-secret': process.env.INTERNAL_API_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
           },
           body: JSON.stringify({ email: user.email }),
         })

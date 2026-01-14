@@ -4,8 +4,13 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 // GET /api/admin/orientation - Get patterns flagged for rotation or mirroring
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const limit = Math.min(parseInt(searchParams.get('limit') || '24', 10), 100)
+
+  // Parse and validate pagination params with NaN handling
+  const parsedPage = parseInt(searchParams.get('page') || '1', 10)
+  const parsedLimit = parseInt(searchParams.get('limit') || '24', 10)
+  const page = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage
+  const limit = Math.min(Number.isNaN(parsedLimit) || parsedLimit < 1 ? 24 : parsedLimit, 100)
+
   const filter = searchParams.get('filter') || 'needs_rotation' // 'needs_rotation', 'mirrored', 'all', 'reviewed'
   const confidence = searchParams.get('confidence') // 'high', 'medium', 'low' or null for all
 

@@ -1,19 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
 
-// Internal API secret - must match the caller (OAuth callback)
-// Uses SUPABASE_SERVICE_ROLE_KEY as the shared secret since it's already available
-// in both locations and is appropriately secret
-const INTERNAL_API_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY
+// Dedicated internal API secret - separate from service role key to reduce blast radius
+// Falls back to service role key for backwards compatibility during transition
+const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY
 
 // POST /api/admin/notify-signup - Send email notification to admins
-// This is an internal-only endpoint called by the OAuth callback
+// Called by OAuth callback (server-side with secret) or client-side signup (with session)
 export async function POST(request: NextRequest) {
   try {
-    // Validate internal API secret to prevent external abuse
+    // Check for internal secret header (server-to-server calls like OAuth callback)
     const authHeader = request.headers.get('x-internal-secret')
-    if (!INTERNAL_API_SECRET || authHeader !== INTERNAL_API_SECRET) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const isInternalCall = INTERNAL_API_SECRET && authHeader === INTERNAL_API_SECRET
+
+    if (!isInternalCall) {
+      // For client-side calls, verify this is a legitimate new signup
+      // by checking authenticated user was created within the last 5 minutes
+      const supabase = await createServerClient()
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+
+      const userCreatedAt = new Date(user.created_at).getTime()
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+
+      if (userCreatedAt < fiveMinutesAgo) {
+        // User account is too old - this isn't a new signup notification
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
     }
 
     const { email } = await request.json()
