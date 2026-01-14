@@ -356,7 +356,7 @@ export default async function AdminHelpPage() {
             </div>
 
             <p className="text-stone-600 mb-6">
-              Add new pattern files to your collection from a ZIP file.
+              Add new pattern files to your collection from a ZIP file. Patterns are uploaded to a staging area where you can review them, assign keywords, and then commit them to make them visible.
             </p>
 
             <div className="space-y-4">
@@ -385,15 +385,79 @@ export default async function AdminHelpPage() {
                 <div>
                   <p className="font-medium text-stone-800">Select and upload</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    Click &quot;Choose File&quot; and select your ZIP. Then click &quot;Upload&quot;. Wait for it to finish!
+                    Click &quot;Choose File&quot; and select your ZIP. Then click &quot;Upload&quot;. Wait for it to finish — this goes to a staging area for review.
                   </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-green-50 rounded-lg">
+                <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-green-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Review your upload</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    After uploading, you&apos;ll see a review page with all the patterns displayed as thumbnail cards. Here you can:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Edit pattern info</strong> — click &quot;Edit info&quot; on any card to change the name or author</li>
+                    <li>&bull; <strong>Rotate/flip thumbnails</strong> — fix incorrectly oriented images</li>
+                    <li>&bull; <strong>Delete patterns</strong> — remove any you don&apos;t want to keep</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-green-50 rounded-lg">
+                <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-green-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Assign keywords to patterns</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Use the keyword sidebar on the left to assign keywords. You have three ways to select patterns:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Single pattern</strong> — click a pattern card to select just that one</li>
+                    <li>&bull; <strong>Multiple patterns</strong> — hold <span className="px-1.5 py-0.5 bg-stone-200 rounded text-xs font-mono">Ctrl</span> (or <span className="px-1.5 py-0.5 bg-stone-200 rounded text-xs font-mono">Cmd</span> on Mac) and click to add patterns to your selection</li>
+                    <li>&bull; <strong>All patterns</strong> — click &quot;Select All&quot; in the sidebar to select every pattern at once</li>
+                  </ul>
+                  <p className="text-stone-600 text-sm mt-2">
+                    Selected patterns show a <span className="text-blue-600 font-medium">blue border</span>. Then check the keywords you want and click the purple &quot;Apply&quot; button.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-green-50 rounded-lg">
+                <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-green-700">6</div>
+                <div>
+                  <p className="font-medium text-stone-800">See confirmation</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    After applying keywords, a confirmation dialog shows which keywords were added to which patterns. Click &quot;Done&quot; to continue assigning more keywords or move to the next step.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-green-50 rounded-lg">
+                <div className="w-8 h-8 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-green-700">7</div>
+                <div>
+                  <p className="font-medium text-stone-800">Commit or Cancel</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    When you&apos;re done reviewing:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; Click <span className="text-green-600 font-medium">&quot;Commit&quot;</span> to publish all patterns — they&apos;ll become visible in Browse</li>
+                    <li>&bull; Click <span className="text-red-600 font-medium">&quot;Cancel Upload&quot;</span> to delete the entire batch if you change your mind</li>
+                  </ul>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="font-medium text-green-800">Note about processing time</p>
+              <p className="font-medium text-green-800">Tip: Work in batches!</p>
               <p className="text-green-700 text-sm mt-1">
+                If your patterns need different keywords, work through them in groups. Select similar patterns (like all the flower patterns), apply their keywords, then select the next group.
+              </p>
+            </div>
+
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="font-medium text-amber-800">Note about processing time</p>
+              <p className="text-amber-700 text-sm mt-1">
                 Large uploads may take a few minutes. The AI needs to analyze each pattern image for the smart search feature.
               </p>
             </div>
