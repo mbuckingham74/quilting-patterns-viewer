@@ -46,8 +46,11 @@ export default function BatchReviewContent({
   const [batch] = useState(initialBatch)
   const [patterns, setPatterns] = useState(initialPatterns)
   const [selectedBulkKeywords, setSelectedBulkKeywords] = useState<Keyword[]>([])
+  const [selectedPatternId, setSelectedPatternId] = useState<number | null>(null)
   const [isCommitting, setIsCommitting] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+
+  const selectedPattern = patterns.find(p => p.id === selectedPatternId) || null
 
 
   const handleUpdatePattern = (patternId: number, updates: Partial<Pattern>) => {
@@ -79,29 +82,31 @@ export default function BatchReviewContent({
     ))
   }
 
-  const handleBulkKeywords = async (keywordIds: number[], action: 'add' | 'remove') => {
-    try {
-      const res = await fetch(`/api/admin/batches/${batch.id}/keywords`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword_ids: keywordIds, action }),
-      })
+  const handleApplyKeywordsToPattern = async (keywordIds: number[]) => {
+    if (!selectedPatternId) return
 
-      if (res.ok) {
-        // Refresh patterns to get updated keywords
-        const refreshRes = await fetch(`/api/admin/batches/${batch.id}`)
-        if (refreshRes.ok) {
-          const data = await refreshRes.json()
-          setPatterns(data.patterns)
-        }
-        showSuccess(`Keywords ${action === 'add' ? 'added to' : 'removed from'} all patterns`)
-        setSelectedBulkKeywords([])
-      } else {
-        const data = await res.json()
-        showError(data.error || 'Failed to update keywords')
+    try {
+      // Add keywords one by one to the selected pattern
+      for (const keywordId of keywordIds) {
+        await fetch(`/api/admin/patterns/${selectedPatternId}/keywords`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keyword_id: keywordId }),
+        })
       }
+
+      // Refresh patterns to get updated keywords
+      const refreshRes = await fetch(`/api/admin/batches/${batch.id}`)
+      if (refreshRes.ok) {
+        const data = await refreshRes.json()
+        setPatterns(data.patterns)
+      }
+
+      const patternName = selectedPattern?.notes || selectedPattern?.file_name || 'pattern'
+      showSuccess(`Keywords added to "${patternName}"`)
+      setSelectedBulkKeywords([])
     } catch (e) {
-      showError('Failed to update keywords')
+      showError('Failed to add keywords')
     }
   }
 
@@ -245,8 +250,11 @@ export default function BatchReviewContent({
               <BulkKeywordSelector
                 selectedKeywords={selectedBulkKeywords}
                 onKeywordsChange={setSelectedBulkKeywords}
-                onApplyToAll={handleBulkKeywords}
-                patternCount={patterns.length}
+                onApplyToPattern={handleApplyKeywordsToPattern}
+                selectedPattern={selectedPattern ? {
+                  id: selectedPattern.id,
+                  name: selectedPattern.notes || selectedPattern.file_name
+                } : null}
                 disabled={isCommitting || isCancelling}
               />
             </div>
@@ -277,6 +285,8 @@ export default function BatchReviewContent({
                     onUpdate={handleUpdatePattern}
                     onDelete={handleDeletePattern}
                     onThumbnailChange={handleThumbnailChange}
+                    isSelected={selectedPatternId === pattern.id}
+                    onSelect={setSelectedPatternId}
                   />
                 ))}
               </div>

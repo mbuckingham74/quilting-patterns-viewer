@@ -24,6 +24,8 @@ interface PatternReviewCardProps {
   onUpdate: (patternId: number, updates: Partial<Pattern>) => void
   onDelete: (patternId: number) => void
   onThumbnailChange: (patternId: number, newUrl: string) => void
+  isSelected?: boolean
+  onSelect?: (patternId: number) => void
 }
 
 export default function PatternReviewCard({
@@ -31,6 +33,8 @@ export default function PatternReviewCard({
   onUpdate,
   onDelete,
   onThumbnailChange,
+  isSelected = false,
+  onSelect,
 }: PatternReviewCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedNotes, setEditedNotes] = useState(pattern.notes || '')
@@ -84,8 +88,35 @@ export default function PatternReviewCard({
     }
   }
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger selection if clicking on buttons/inputs/links
+    const target = e.target as HTMLElement
+    if (
+      target.closest('button') ||
+      target.closest('input') ||
+      target.closest('a') ||
+      target.closest('[role="button"]')
+    ) {
+      return
+    }
+    onSelect?.(pattern.id)
+  }
+
   return (
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden hover:shadow-md transition-shadow">
+    <div
+      onClick={handleCardClick}
+      className={`bg-white rounded-xl border-2 overflow-hidden transition-all cursor-pointer ${
+        isSelected
+          ? 'border-blue-500 ring-2 ring-blue-200 shadow-lg'
+          : 'border-stone-200 hover:shadow-md hover:border-stone-300'
+      }`}
+    >
+      {/* Selection indicator */}
+      {isSelected && (
+        <div className="bg-blue-500 text-white text-xs font-medium px-3 py-1 text-center">
+          Selected - Choose keywords to apply
+        </div>
+      )}
       {/* Thumbnail */}
       <div className="aspect-square bg-stone-100 relative">
         {thumbnailUrl ? (

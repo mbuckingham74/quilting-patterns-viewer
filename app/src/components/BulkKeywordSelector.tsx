@@ -7,19 +7,24 @@ interface Keyword {
   value: string
 }
 
+interface SelectedPattern {
+  id: number
+  name: string
+}
+
 interface BulkKeywordSelectorProps {
   selectedKeywords: Keyword[]
   onKeywordsChange: (keywords: Keyword[]) => void
-  onApplyToAll: (keywordIds: number[], action: 'add' | 'remove') => Promise<void>
-  patternCount: number
+  onApplyToPattern: (keywordIds: number[]) => Promise<void>
+  selectedPattern: SelectedPattern | null
   disabled?: boolean
 }
 
 export default function BulkKeywordSelector({
   selectedKeywords,
   onKeywordsChange,
-  onApplyToAll,
-  patternCount,
+  onApplyToPattern,
+  selectedPattern,
   disabled = false,
 }: BulkKeywordSelectorProps) {
   const [allKeywords, setAllKeywords] = useState<Keyword[]>([])
@@ -56,10 +61,10 @@ export default function BulkKeywordSelector({
   }
 
   const handleApplyAdd = async () => {
-    if (selectedKeywords.length === 0) return
+    if (selectedKeywords.length === 0 || !selectedPattern) return
     setIsApplying(true)
     try {
-      await onApplyToAll(selectedKeywords.map(k => k.id), 'add')
+      await onApplyToPattern(selectedKeywords.map(k => k.id))
     } finally {
       setIsApplying(false)
     }
@@ -95,12 +100,28 @@ export default function BulkKeywordSelector({
         />
       </div>
 
-      {/* Apply button - shown when keywords selected */}
+      {/* Selected pattern indicator */}
+      {selectedPattern ? (
+        <div className="p-3 border-b border-stone-200 bg-blue-50">
+          <p className="text-xs text-blue-600 font-medium mb-1">Selected Pattern:</p>
+          <p className="text-sm text-blue-800 font-semibold truncate" title={selectedPattern.name}>
+            {selectedPattern.name}
+          </p>
+        </div>
+      ) : (
+        <div className="p-3 border-b border-stone-200 bg-amber-50">
+          <p className="text-xs text-amber-700">
+            Click a pattern to select it, then choose keywords to apply.
+          </p>
+        </div>
+      )}
+
+      {/* Apply button - shown when keywords selected AND pattern selected */}
       {selectedKeywords.length > 0 && (
         <div className="p-3 border-b border-stone-200 bg-purple-50">
           <button
             onClick={handleApplyAdd}
-            disabled={disabled || isApplying}
+            disabled={disabled || isApplying || !selectedPattern}
             className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isApplying ? (
@@ -108,8 +129,10 @@ export default function BulkKeywordSelector({
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Applying...
               </>
+            ) : !selectedPattern ? (
+              <>Select a pattern first</>
             ) : (
-              <>Apply to All {patternCount}</>
+              <>Apply to Selected</>
             )}
           </button>
           <p className="text-xs text-purple-600 mt-2 text-center">
