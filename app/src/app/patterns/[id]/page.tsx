@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import PatternDetailThumbnail from '@/components/PatternDetailThumbnail'
+import ViewLogger from '@/components/ViewLogger'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -77,6 +78,9 @@ export default async function PatternPage({ params }: PageProps) {
 
   return (
     <div className="min-h-screen bg-stone-50">
+      {/* Log page view */}
+      <ViewLogger patternId={patternId} />
+
       {/* Header */}
       <header className="bg-white border-b border-stone-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">

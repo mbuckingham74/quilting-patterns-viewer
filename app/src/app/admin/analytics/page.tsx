@@ -6,6 +6,7 @@ import AuthButton from '@/components/AuthButton'
 import StatCard from '@/components/analytics/StatCard'
 import ActivityChart from '@/components/analytics/ActivityChart'
 import TopPatternsList from '@/components/analytics/TopPatternsList'
+import TopViewsList from '@/components/analytics/TopViewsList'
 import TopSearchesList from '@/components/analytics/TopSearchesList'
 
 async function getAnalyticsData() {
@@ -178,6 +179,50 @@ async function getTopSearches() {
     .slice(0, 10)
 }
 
+async function getTopViews() {
+  const supabase = await createClient()
+
+  const { data: viewLogs } = await supabase.from('view_logs').select('pattern_id')
+
+  const viewCounts = new Map<number, number>()
+  for (const log of viewLogs || []) {
+    viewCounts.set(log.pattern_id, (viewCounts.get(log.pattern_id) || 0) + 1)
+  }
+
+  const topPatternIds = Array.from(viewCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([id]) => id)
+
+  if (topPatternIds.length === 0) return []
+
+  const { data: patterns } = await supabase
+    .from('patterns')
+    .select('id, file_name, thumbnail_url, author')
+    .in('id', topPatternIds)
+
+  const { data: downloadLogs } = await supabase
+    .from('download_logs')
+    .select('pattern_id')
+    .in('pattern_id', topPatternIds)
+
+  const downloadCounts = new Map<number, number>()
+  for (const log of downloadLogs || []) {
+    downloadCounts.set(log.pattern_id, (downloadCounts.get(log.pattern_id) || 0) + 1)
+  }
+
+  return patterns
+    ?.map(p => ({
+      id: p.id,
+      file_name: p.file_name,
+      thumbnail_url: p.thumbnail_url,
+      author: p.author,
+      view_count: viewCounts.get(p.id) || 0,
+      download_count: downloadCounts.get(p.id) || 0,
+    }))
+    .sort((a, b) => b.view_count - a.view_count) || []
+}
+
 export default async function AnalyticsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -196,10 +241,11 @@ export default async function AnalyticsPage() {
     redirect('/browse')
   }
 
-  const [stats, activity, topPatterns, topSearches] = await Promise.all([
+  const [stats, activity, topPatterns, topViews, topSearches] = await Promise.all([
     getAnalyticsData(),
     getActivityData(),
     getTopPatterns(),
+    getTopViews(),
     getTopSearches(),
   ])
 
@@ -344,9 +390,10 @@ export default async function AnalyticsPage() {
           />
         </div>
 
-        {/* Top Patterns and Searches */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Patterns, Views, and Searches */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <TopPatternsList patterns={topPatterns} />
+          <TopViewsList patterns={topViews} />
           <TopSearchesList searches={topSearches} />
         </div>
       </div>
