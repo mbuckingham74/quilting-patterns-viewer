@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   const supabase = await createClient()
 
@@ -63,8 +65,8 @@ export async function GET() {
   const totalUsers = totalUsersResult.count || 0
   const pendingUsers = pendingUsersResult.count || 0
   const newUsersLast7Days = newUsersResult.count || 0
-  // RPC returns the count directly as data, not as .count
-  const activeUsersLast30Days = activeUsersResult.data ?? 0
+  // RPC returns the count directly as data (number), handle potential error
+  const activeUsersLast30Days = activeUsersResult.error ? 0 : (activeUsersResult.data ?? 0)
 
   const totalPatterns = totalPatternsResult.count || 0
   const totalDownloads = totalDownloadsResult.count || 0

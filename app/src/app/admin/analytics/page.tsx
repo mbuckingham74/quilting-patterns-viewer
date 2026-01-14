@@ -13,7 +13,6 @@ async function getAnalyticsData() {
 
   const now = new Date()
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   // Fetch all stats in parallel
   const [
@@ -33,7 +32,7 @@ async function getAnalyticsData() {
     supabase.from('profiles').select('*', { count: 'exact', head: true }),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('is_approved', false),
     supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgo),
-    supabase.from('profiles').select('*', { count: 'exact', head: true }).gte('last_login', thirtyDaysAgo),
+    supabase.rpc('count_active_users', { days_ago: 30 }),
     supabase.from('patterns').select('*', { count: 'exact', head: true }),
     supabase.from('download_logs').select('*', { count: 'exact', head: true }),
     supabase.from('download_logs').select('*', { count: 'exact', head: true }).gte('downloaded_at', sevenDaysAgo),
@@ -47,7 +46,8 @@ async function getAnalyticsData() {
   const totalUsers = totalUsersResult.count || 0
   const pendingUsers = pendingUsersResult.count || 0
   const newUsersLast7Days = newUsersResult.count || 0
-  const activeUsersLast30Days = activeUsersResult.count || 0
+  // RPC returns data directly, not .count
+  const activeUsersLast30Days = activeUsersResult.error ? 0 : (activeUsersResult.data ?? 0)
 
   const totalPatterns = totalPatternsResult.count || 0
   const totalDownloads = totalDownloadsResult.count || 0
