@@ -87,7 +87,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - **Duplicate Finder** - Identify and manage similar patterns
 - **Quick Rotate Review** - AI-assisted thumbnail orientation and mirror fixes with filter tabs
 - **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
-- **Pattern Analytics** - Dashboard showing downloads, searches, user activity, top patterns, and popular search queries
+- **Pattern Analytics** - Dashboard showing downloads, pattern views, searches, user activity, top downloaded patterns, most viewed patterns, and popular search queries
 - **How-To Guide** - Built-in help documentation for non-technical users
 
 ### Error Handling
@@ -425,6 +425,7 @@ The app uses Supabase Postgres with the following main tables:
 | **admin_emails** | Admin notification recipients |
 | **download_logs** | Pattern download tracking for analytics |
 | **search_logs** | Search query tracking for analytics |
+| **view_logs** | Pattern detail page view tracking for analytics |
 
 ---
 
@@ -455,7 +456,9 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/analytics` | GET | Admin | Overview stats (users, downloads, searches, shares) |
 | `/api/admin/analytics/activity` | GET | Admin | 30-day activity chart data |
 | `/api/admin/analytics/top-patterns` | GET | Admin | Most downloaded patterns |
+| `/api/admin/analytics/top-views` | GET | Admin | Most viewed patterns |
 | `/api/admin/analytics/top-searches` | GET | Admin | Most popular search queries |
+| `/api/views` | POST | Required | Log a pattern detail page view |
 | `/api/keywords` | GET | Required | List all keywords |
 
 ---
