@@ -14,6 +14,8 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('x-internal-secret')
     const isInternalCall = INTERNAL_API_SECRET && authHeader === INTERNAL_API_SECRET
 
+    let email: string | undefined
+
     if (!isInternalCall) {
       // For client-side calls, verify this is a legitimate new signup
       // by checking authenticated user was created within the last 5 minutes
@@ -31,9 +33,16 @@ export async function POST(request: NextRequest) {
         // User account is too old - this isn't a new signup notification
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
-    }
 
-    const { email } = await request.json()
+      // SECURITY: Use the authenticated user's email, not request body
+      // This prevents abuse where a newly created user could spam notifications
+      // with arbitrary email addresses within the 5-minute window
+      email = user.email
+    } else {
+      // Internal calls (OAuth callback) can specify email in body
+      const body = await request.json()
+      email = body.email
+    }
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })

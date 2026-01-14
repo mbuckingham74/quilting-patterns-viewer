@@ -4,19 +4,30 @@
  */
 
 // Allowlist of hosts that can serve thumbnails
+// In development, also allow localhost for local Supabase
 const ALLOWED_THUMBNAIL_HOSTS = [
-  'base.tachyonfuture.com', // Supabase storage
+  'base.tachyonfuture.com', // Supabase storage (production)
+  ...(process.env.NODE_ENV === 'development' ? ['localhost', '127.0.0.1'] : []),
 ]
 
 // Maximum image size (10MB)
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024
 
 /**
+ * Validate that a URL host is in the allowlist
+ */
+function isHostAllowed(url: URL): boolean {
+  // Check exact host match (handles ports automatically since host includes port)
+  const hostWithoutPort = url.hostname
+  return ALLOWED_THUMBNAIL_HOSTS.includes(hostWithoutPort)
+}
+
+/**
  * Safely fetch a thumbnail from an allowlisted host
  * @param url - The thumbnail URL to fetch
  * @param timeoutMs - Request timeout in milliseconds (default 30s)
  * @returns Buffer containing the image data
- * @throws Error if host not allowed, timeout, or image too large
+ * @throws Error if host not allowed, timeout, redirect to disallowed host, or image too large
  */
 export async function fetchThumbnailSafe(
   url: string,
@@ -31,7 +42,7 @@ export async function fetchThumbnailSafe(
   }
 
   // Check host against allowlist
-  if (!ALLOWED_THUMBNAIL_HOSTS.includes(parsed.host)) {
+  if (!isHostAllowed(parsed)) {
     throw new Error(`Disallowed thumbnail host: ${parsed.host}`)
   }
 
@@ -40,14 +51,57 @@ export async function fetchThumbnailSafe(
     throw new Error('HTTPS required for thumbnail URLs in production')
   }
 
+  // Use redirect: 'manual' to prevent automatic following of redirects
+  // This prevents SSRF bypass via redirect to internal/disallowed hosts
   const response = await fetch(url, {
     signal: AbortSignal.timeout(timeoutMs),
+    redirect: 'manual',
   })
+
+  // Handle redirects manually - validate the target host
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location')
+    if (!location) {
+      throw new Error('Redirect without Location header')
+    }
+
+    // Parse redirect URL (handle relative URLs)
+    let redirectUrl: URL
+    try {
+      redirectUrl = new URL(location, url)
+    } catch {
+      throw new Error(`Invalid redirect URL: ${location}`)
+    }
+
+    // Validate redirect target is also allowlisted
+    if (!isHostAllowed(redirectUrl)) {
+      throw new Error(`Redirect to disallowed host: ${redirectUrl.host}`)
+    }
+
+    // Follow the redirect with the same protections (one level only to prevent loops)
+    const redirectResponse = await fetch(redirectUrl.toString(), {
+      signal: AbortSignal.timeout(timeoutMs),
+      redirect: 'error', // No more redirects allowed
+    })
+
+    if (!redirectResponse.ok) {
+      throw new Error(`Failed to download thumbnail after redirect: HTTP ${redirectResponse.status}`)
+    }
+
+    return readResponseBuffer(redirectResponse)
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to download thumbnail: HTTP ${response.status}`)
   }
 
+  return readResponseBuffer(response)
+}
+
+/**
+ * Read response body with size validation
+ */
+async function readResponseBuffer(response: Response): Promise<Buffer> {
   // Check Content-Length header if present
   const contentLength = response.headers.get('content-length')
   if (contentLength) {
