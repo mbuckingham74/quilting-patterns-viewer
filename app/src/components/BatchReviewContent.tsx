@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import BulkKeywordSelector from './BulkKeywordSelector'
@@ -206,7 +206,7 @@ export default function BatchReviewContent({
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main content with sidebar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Batch info */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 mb-6 text-white shadow-lg">
@@ -237,45 +237,52 @@ export default function BatchReviewContent({
           </div>
         </div>
 
-        {/* Bulk keyword selector */}
-        <div className="mb-6">
-          <BulkKeywordSelector
-            selectedKeywords={selectedBulkKeywords}
-            onKeywordsChange={setSelectedBulkKeywords}
-            onApplyToAll={handleBulkKeywords}
-            patternCount={patterns.length}
-            disabled={isCommitting || isCancelling}
-          />
-        </div>
-
-        {/* Pattern grid */}
-        {patterns.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center">
-            <svg className="w-16 h-16 text-stone-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-            </svg>
-            <p className="text-lg font-medium text-stone-600">No patterns to review</p>
-            <p className="text-stone-500 mt-1">All patterns have been deleted from this batch.</p>
-            <Link
-              href="/admin/upload"
-              className="inline-block mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-            >
-              Back to Upload
-            </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {patterns.map(pattern => (
-              <PatternReviewCard
-                key={pattern.id}
-                pattern={pattern}
-                onUpdate={handleUpdatePattern}
-                onDelete={handleDeletePattern}
-                onThumbnailChange={handleThumbnailChange}
+        {/* Sidebar layout */}
+        <div className="flex gap-6">
+          {/* Left sidebar - Keywords */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-24">
+              <BulkKeywordSelector
+                selectedKeywords={selectedBulkKeywords}
+                onKeywordsChange={setSelectedBulkKeywords}
+                onApplyToAll={handleBulkKeywords}
+                patternCount={patterns.length}
+                disabled={isCommitting || isCancelling}
               />
-            ))}
-          </div>
-        )}
+            </div>
+          </aside>
+
+          {/* Main content area - Pattern grid */}
+          <main className="flex-1 min-w-0">
+            {patterns.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-sm border border-stone-200 p-12 text-center">
+                <svg className="w-16 h-16 text-stone-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <p className="text-lg font-medium text-stone-600">No patterns to review</p>
+                <p className="text-stone-500 mt-1">All patterns have been deleted from this batch.</p>
+                <Link
+                  href="/admin/upload"
+                  className="inline-block mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                >
+                  Back to Upload
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {patterns.map(pattern => (
+                  <PatternReviewCard
+                    key={pattern.id}
+                    pattern={pattern}
+                    onUpdate={handleUpdatePattern}
+                    onDelete={handleDeletePattern}
+                    onThumbnailChange={handleThumbnailChange}
+                  />
+                ))}
+              </div>
+            )}
+          </main>
+        </div>
       </div>
     </div>
   )

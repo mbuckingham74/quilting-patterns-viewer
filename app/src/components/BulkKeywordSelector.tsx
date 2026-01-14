@@ -25,7 +25,6 @@ export default function BulkKeywordSelector({
   const [allKeywords, setAllKeywords] = useState<Keyword[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isApplying, setIsApplying] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(true)
 
   // Fetch all keywords on mount
   useEffect(() => {
@@ -71,105 +70,79 @@ export default function BulkKeywordSelector({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-stone-200">
-      {/* Collapsed header - always visible */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-stone-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <svg className={`w-5 h-5 text-stone-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="font-medium text-stone-800">Bulk Keyword Assignment</span>
+    <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-sm border border-stone-200 overflow-hidden">
+      {/* Header */}
+      <div className="p-4 border-b border-stone-200">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-stone-800">Keywords</h3>
           {selectedKeywords.length > 0 && (
-            <span className="bg-purple-500 text-white text-xs rounded-full px-2 py-0.5">
-              {selectedKeywords.length} selected
-            </span>
+            <button
+              onClick={clearAll}
+              disabled={disabled || isApplying}
+              className="text-xs text-purple-600 hover:text-purple-700 font-medium"
+            >
+              Clear ({selectedKeywords.length})
+            </button>
           )}
         </div>
-        <span className="text-sm text-stone-500">
-          {patternCount} pattern{patternCount !== 1 ? 's' : ''}
-        </span>
-      </button>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Filter keywords..."
+          className="w-full px-3 py-2 text-sm rounded-lg border border-stone-200 bg-white focus:outline-none focus:ring-1 focus:ring-purple-400"
+          disabled={disabled || isApplying}
+        />
+      </div>
 
-      {/* Expanded content */}
-      {isExpanded && (
-        <div className="border-t border-stone-200 p-4">
-          <div className="flex gap-4">
-            {/* Keyword list - vertical with checkboxes */}
-            <div className="flex-1">
-              {/* Search filter */}
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search keywords..."
-                className="w-full px-3 py-2 border border-stone-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500 mb-3"
-                disabled={disabled || isApplying}
-              />
-
-              {/* Scrollable keyword list */}
-              <div className="max-h-48 overflow-y-auto border border-stone-200 rounded-lg">
-                {filteredKeywords.map((keyword) => (
-                  <label
-                    key={keyword.id}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-stone-50 cursor-pointer border-b border-stone-100 last:border-b-0"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(keyword.id)}
-                      onChange={() => toggleKeyword(keyword)}
-                      disabled={disabled || isApplying}
-                      className="rounded border-stone-300 text-purple-600 focus:ring-purple-500"
-                    />
-                    <span className="text-sm text-stone-700">{keyword.value}</span>
-                  </label>
-                ))}
-                {filteredKeywords.length === 0 && (
-                  <div className="px-3 py-4 text-sm text-stone-400 text-center">
-                    No keywords found
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Actions panel */}
-            <div className="w-48 flex flex-col gap-2">
-              <button
-                onClick={handleApplyAdd}
-                disabled={disabled || isApplying || selectedKeywords.length === 0}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isApplying ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Applying...
-                  </>
-                ) : (
-                  'Apply to All'
-                )}
-              </button>
-
-              {selectedKeywords.length > 0 && (
-                <button
-                  onClick={clearAll}
-                  disabled={disabled || isApplying}
-                  className="w-full px-4 py-2 text-stone-600 hover:text-stone-800 text-sm font-medium rounded-lg border border-stone-300 hover:bg-stone-50 transition-colors disabled:opacity-50"
-                >
-                  Clear Selection
-                </button>
-              )}
-
-              {selectedKeywords.length > 0 && (
-                <div className="mt-2 text-xs text-stone-500">
-                  Selected: {selectedKeywords.map(k => k.value).join(', ')}
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Apply button - shown when keywords selected */}
+      {selectedKeywords.length > 0 && (
+        <div className="p-3 border-b border-stone-200 bg-purple-50">
+          <button
+            onClick={handleApplyAdd}
+            disabled={disabled || isApplying}
+            className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isApplying ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Applying...
+              </>
+            ) : (
+              <>Apply to All {patternCount}</>
+            )}
+          </button>
+          <p className="text-xs text-purple-600 mt-2 text-center">
+            {selectedKeywords.map(k => k.value).join(', ')}
+          </p>
         </div>
       )}
+
+      {/* Keyword list */}
+      <div className="max-h-[calc(100vh-400px)] overflow-y-auto p-2">
+        {filteredKeywords.map((keyword) => (
+          <label
+            key={keyword.id}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+              selectedIds.has(keyword.id)
+                ? 'bg-purple-100 text-purple-800'
+                : 'hover:bg-stone-50 text-stone-700'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={selectedIds.has(keyword.id)}
+              onChange={() => toggleKeyword(keyword)}
+              disabled={disabled || isApplying}
+              className="rounded border-stone-300 text-purple-500 focus:ring-purple-500"
+            />
+            <span className="text-sm">{keyword.value}</span>
+          </label>
+        ))}
+        {filteredKeywords.length === 0 && (
+          <p className="text-sm text-stone-400 text-center py-4">No keywords found</p>
+        )}
+      </div>
     </div>
   )
 }
