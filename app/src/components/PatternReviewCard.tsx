@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Image from 'next/image'
 import ThumbnailControls from './ThumbnailControls'
 
@@ -24,7 +24,6 @@ interface PatternReviewCardProps {
   onUpdate: (patternId: number, updates: Partial<Pattern>) => void
   onDelete: (patternId: number) => void
   onThumbnailChange: (patternId: number, newUrl: string) => void
-  allKeywords: Keyword[] // Pass from parent to avoid duplicate fetches
 }
 
 export default function PatternReviewCard({
@@ -32,18 +31,12 @@ export default function PatternReviewCard({
   onUpdate,
   onDelete,
   onThumbnailChange,
-  allKeywords,
 }: PatternReviewCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedNotes, setEditedNotes] = useState(pattern.notes || '')
   const [editedAuthor, setEditedAuthor] = useState(pattern.author || '')
   const [isSaving, setIsSaving] = useState(false)
   const [thumbnailUrl, setThumbnailUrl] = useState(pattern.thumbnail_url)
-
-  // Keyword management
-  const [keywordFilter, setKeywordFilter] = useState('')
-  const [isAddingKeyword, setIsAddingKeyword] = useState(false)
-  const [showKeywords, setShowKeywords] = useState(false)
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -74,31 +67,6 @@ export default function PatternReviewCard({
 
   const handleDeleted = (patternId: number) => {
     onDelete(patternId)
-  }
-
-  // Filter available keywords (not already assigned to this pattern)
-  const existingKeywordIds = new Set(pattern.keywords.map(k => k.id))
-  const availableKeywords = allKeywords.filter(k => !existingKeywordIds.has(k.id))
-  const filteredKeywords = keywordFilter
-    ? availableKeywords.filter(k => k.value.toLowerCase().includes(keywordFilter.toLowerCase()))
-    : availableKeywords
-
-  const addKeyword = async (keyword: Keyword) => {
-    setIsAddingKeyword(true)
-    try {
-      const res = await fetch(`/api/admin/patterns/${pattern.id}/keywords`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword_id: keyword.id }),
-      })
-      if (res.ok) {
-        onUpdate(pattern.id, { keywords: [...pattern.keywords, keyword] })
-      }
-    } catch (e) {
-      console.error('Failed to add keyword:', e)
-    } finally {
-      setIsAddingKeyword(false)
-    }
   }
 
   const removeKeyword = async (keywordId: number) => {
@@ -194,79 +162,28 @@ export default function PatternReviewCard({
           </div>
         )}
 
-        {/* Keywords */}
-        <div className="mb-3">
-          {/* Assigned keywords */}
-          <div className="flex flex-wrap gap-1 mb-2 min-h-[24px]">
-            {pattern.keywords.length === 0 ? (
-              <span className="text-xs text-stone-400 italic">No keywords</span>
-            ) : (
-              pattern.keywords.map(keyword => (
-                <span
-                  key={keyword.id}
-                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+        {/* Assigned keywords - display only, removal allowed */}
+        {pattern.keywords.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-3">
+            {pattern.keywords.map(keyword => (
+              <span
+                key={keyword.id}
+                className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+              >
+                {keyword.value}
+                <button
+                  onClick={() => removeKeyword(keyword.id)}
+                  className="hover:bg-blue-200 rounded-full"
+                  title="Remove keyword"
                 >
-                  {keyword.value}
-                  <button
-                    onClick={() => removeKeyword(keyword.id)}
-                    className="hover:bg-blue-200 rounded-full"
-                  >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </span>
-              ))
-            )}
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </span>
+            ))}
           </div>
-
-          {/* Toggle to show/hide available keywords */}
-          <button
-            onClick={() => setShowKeywords(!showKeywords)}
-            className="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1"
-          >
-            <svg className={`w-3 h-3 transition-transform ${showKeywords ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-            {showKeywords ? 'Hide keywords' : 'Add keywords'}
-          </button>
-
-          {/* Clickable keyword pills */}
-          {showKeywords && (
-            <div className="mt-2 p-2 bg-stone-50 rounded-lg border border-stone-200">
-              {/* Filter input */}
-              <input
-                type="text"
-                value={keywordFilter}
-                onChange={(e) => setKeywordFilter(e.target.value)}
-                placeholder="Filter..."
-                className="w-full px-2 py-1 text-xs border border-stone-300 rounded mb-2 focus:ring-1 focus:ring-purple-500"
-                disabled={isAddingKeyword}
-              />
-              {/* Available keywords as clickable pills */}
-              <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                {filteredKeywords.slice(0, 20).map(keyword => (
-                  <button
-                    key={keyword.id}
-                    onClick={() => addKeyword(keyword)}
-                    disabled={isAddingKeyword}
-                    className="px-1.5 py-0.5 bg-white border border-stone-300 text-stone-600 text-xs rounded-full hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-colors disabled:opacity-50"
-                  >
-                    {keyword.value}
-                  </button>
-                ))}
-                {filteredKeywords.length === 0 && (
-                  <span className="text-xs text-stone-400 italic">
-                    {keywordFilter ? 'No matches' : 'All keywords assigned'}
-                  </span>
-                )}
-                {filteredKeywords.length > 20 && (
-                  <span className="text-xs text-stone-400">+{filteredKeywords.length - 20} more</span>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Thumbnail controls */}
         {thumbnailUrl && (
