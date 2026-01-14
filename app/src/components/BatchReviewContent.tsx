@@ -49,6 +49,12 @@ export default function BatchReviewContent({
   const [selectedPatternId, setSelectedPatternId] = useState<number | null>(null)
   const [isCommitting, setIsCommitting] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
+  const [keywordModal, setKeywordModal] = useState<{
+    isOpen: boolean
+    patternName: string
+    addedKeywords: string[]
+    allKeywords: string[]
+  }>({ isOpen: false, patternName: '', addedKeywords: [], allKeywords: [] })
 
   const selectedPattern = patterns.find(p => p.id === selectedPatternId) || null
 
@@ -83,7 +89,11 @@ export default function BatchReviewContent({
   }
 
   const handleApplyKeywordsToPattern = async (keywordIds: number[]) => {
-    if (!selectedPatternId) return
+    if (!selectedPatternId || !selectedPattern) return
+
+    // Capture the keywords being added (before clearing selection)
+    const addedKeywordNames = selectedBulkKeywords.map(k => k.value)
+    const patternName = selectedPattern.notes || selectedPattern.file_name
 
     try {
       // Add keywords one by one to the selected pattern
@@ -97,13 +107,25 @@ export default function BatchReviewContent({
 
       // Refresh patterns to get updated keywords
       const refreshRes = await fetch(`/api/admin/batches/${batch.id}`)
+      let allKeywordNames: string[] = []
       if (refreshRes.ok) {
         const data = await refreshRes.json()
         setPatterns(data.patterns)
+        // Get the updated pattern's keywords
+        const updatedPattern = data.patterns.find((p: Pattern) => p.id === selectedPatternId)
+        if (updatedPattern) {
+          allKeywordNames = updatedPattern.keywords.map((k: Keyword) => k.value)
+        }
       }
 
-      const patternName = selectedPattern?.notes || selectedPattern?.file_name || 'pattern'
-      showSuccess(`Keywords added to "${patternName}"`)
+      // Show the confirmation modal
+      setKeywordModal({
+        isOpen: true,
+        patternName,
+        addedKeywords: addedKeywordNames,
+        allKeywords: allKeywordNames,
+      })
+
       setSelectedBulkKeywords([])
     } catch (e) {
       showError('Failed to add keywords')
@@ -294,6 +316,88 @@ export default function BatchReviewContent({
           </main>
         </div>
       </div>
+
+      {/* Keywords Applied Modal */}
+      {keywordModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="bg-green-500 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-white/20 rounded-full p-2">
+                  <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Keywords Applied!</h3>
+                  <p className="text-green-100 text-sm truncate" title={keywordModal.patternName}>
+                    {keywordModal.patternName}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="px-6 py-5">
+              {/* Added keywords */}
+              <div className="mb-4">
+                <p className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">
+                  Just Added
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {keywordModal.addedKeywords.map((kw, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* All keywords on pattern */}
+              <div>
+                <p className="text-xs font-medium text-stone-500 uppercase tracking-wide mb-2">
+                  All Keywords on Pattern
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {keywordModal.allKeywords.length > 0 ? (
+                    keywordModal.allKeywords.map((kw, i) => (
+                      <span
+                        key={i}
+                        className={`px-3 py-1 text-sm font-medium rounded-full ${
+                          keywordModal.addedKeywords.includes(kw)
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}
+                      >
+                        {kw}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-stone-400 text-sm">No keywords assigned</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-stone-50 border-t border-stone-200">
+              <button
+                onClick={() => setKeywordModal({ isOpen: false, patternName: '', addedKeywords: [], allKeywords: [] })}
+                className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
