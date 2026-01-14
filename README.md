@@ -79,7 +79,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - **Staged Upload Workflow** - Upload patterns to a staging area for review before publishing:
   - Bulk upload patterns from ZIP files to staging
   - Review page with thumbnail grid showing all uploaded patterns
-  - Bulk keyword assignment - apply keywords to all patterns at once
+  - Per-pattern keyword assignment - click a pattern to select it, then apply keywords to just that pattern
   - Individual pattern editing - metadata, keywords, and thumbnails
   - Thumbnail controls - rotate, flip, and delete on each pattern
   - Commit to publish patterns or Cancel to delete entire batch
