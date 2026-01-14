@@ -28,6 +28,15 @@ rsync -avz --progress /tmp/quilting-patterns.tar.gz "$SERVER:/tmp/"
 echo "Deploying..."
 ssh "$SERVER" "cd ~/quilting-patterns-viewer && gunzip -c /tmp/quilting-patterns.tar.gz | docker load && docker compose down && docker compose up -d"
 
+# Clean up dangling images on server
+echo "Cleaning up server images..."
+ssh "$SERVER" "docker image prune -f"
+
+# Clean up local dangling images
+echo "Cleaning up local images..."
+docker image prune -f
+rm -f /tmp/quilting-patterns.tar.gz
+
 echo "Verifying..."
 sleep 3
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://patterns.tachyonfuture.com/)
