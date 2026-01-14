@@ -25,7 +25,7 @@ export default function BulkKeywordSelector({
   const [allKeywords, setAllKeywords] = useState<Keyword[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isApplying, setIsApplying] = useState(false)
-  const [isExpanded, setIsExpanded] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(true)
 
   // Fetch all keywords on mount
   useEffect(() => {
