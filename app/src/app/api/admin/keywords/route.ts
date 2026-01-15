@@ -28,13 +28,13 @@ export async function GET(request: NextRequest) {
 
   const serviceClient = createServiceClient()
 
-  // Get keywords with pattern counts using a subquery
-  // We need to count patterns per keyword
+  // Use RPC function for efficient aggregation (pushes counting to SQL)
   const { data: keywords, error: keywordsError } = await serviceClient
-    .from('keywords')
-    .select('id, value')
-    .ilike('value', `%${search}%`)
-    .order('value', { ascending: true })
+    .rpc('get_keywords_with_counts', {
+      search_term: search,
+      sort_by: sortBy,
+      sort_order: sortOrder,
+    })
 
   if (keywordsError) {
     console.error('Error fetching keywords:', keywordsError)
@@ -44,67 +44,19 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Get pattern counts for all keywords
-  const { data: counts, error: countsError } = await serviceClient
-    .from('pattern_keywords')
-    .select('keyword_id')
+  // Get count of patterns without keywords using RPC (efficient NOT EXISTS query)
+  const { data: patternsWithoutKeywordsCount, error: countError } = await serviceClient
+    .rpc('count_patterns_without_keywords')
 
-  if (countsError) {
-    console.error('Error fetching keyword counts:', countsError)
-    return NextResponse.json(
-      { error: 'Failed to fetch keyword counts', details: countsError.message },
-      { status: 500 }
-    )
+  if (countError) {
+    console.error('Error fetching patterns without keywords count:', countError)
+    // Non-fatal - return 0 if count fails
   }
-
-  // Count patterns per keyword
-  const countMap = new Map<number, number>()
-  for (const row of counts || []) {
-    countMap.set(row.keyword_id, (countMap.get(row.keyword_id) || 0) + 1)
-  }
-
-  // Combine keywords with counts
-  const keywordsWithCounts = (keywords || []).map(kw => ({
-    ...kw,
-    pattern_count: countMap.get(kw.id) || 0,
-  }))
-
-  // Sort based on parameters
-  keywordsWithCounts.sort((a, b) => {
-    if (sortBy === 'count') {
-      const diff = a.pattern_count - b.pattern_count
-      return sortOrder === 'asc' ? diff : -diff
-    } else {
-      const diff = a.value.toLowerCase().localeCompare(b.value.toLowerCase())
-      return sortOrder === 'asc' ? diff : -diff
-    }
-  })
-
-  // Get total count of patterns without keywords
-  const { count: patternsWithoutKeywords } = await serviceClient
-    .from('patterns')
-    .select('id', { count: 'exact', head: true })
-    .is('is_staged', false)
-    .not('id', 'in', `(SELECT DISTINCT pattern_id FROM pattern_keywords)`)
-
-  // Alternative approach - get all pattern IDs with keywords, then count patterns not in that set
-  const { data: patternsWithKeywords } = await serviceClient
-    .from('pattern_keywords')
-    .select('pattern_id')
-
-  const patternIdsWithKeywords = new Set((patternsWithKeywords || []).map(p => p.pattern_id))
-
-  const { data: allPatterns } = await serviceClient
-    .from('patterns')
-    .select('id')
-    .is('is_staged', false)
-
-  const patternsWithoutKeywordsCount = (allPatterns || []).filter(p => !patternIdsWithKeywords.has(p.id)).length
 
   return NextResponse.json({
-    keywords: keywordsWithCounts,
-    total: keywordsWithCounts.length,
-    patterns_without_keywords: patternsWithoutKeywordsCount,
+    keywords: keywords || [],
+    total: keywords?.length || 0,
+    patterns_without_keywords: patternsWithoutKeywordsCount || 0,
   })
 }
 
