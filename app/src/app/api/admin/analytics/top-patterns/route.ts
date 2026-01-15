@@ -27,10 +27,12 @@ export async function GET() {
 
   if (error) {
     console.error('Error fetching top patterns:', error)
-    // Fallback to basic query if RPC not available yet
+    // PGRST202 = RPC function doesn't exist - migration needs to be run
     if (error.code === 'PGRST202') {
-      // RPC function doesn't exist, return empty for now
-      return NextResponse.json({ patterns: [] })
+      return NextResponse.json(
+        { error: 'Analytics RPC function not found. Run migration 027_performance_indexes.sql and 028_secure_analytics_rpcs.sql.' },
+        { status: 503 }
+      )
     }
     return NextResponse.json({ error: 'Failed to fetch pattern data' }, { status: 500 })
   }

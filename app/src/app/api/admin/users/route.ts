@@ -22,10 +22,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
   }
 
-  // Parse pagination params
+  // Parse pagination params with NaN protection
   const searchParams = request.nextUrl.searchParams
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
-  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)))
+  const parsedPage = parseInt(searchParams.get('page') || '1', 10)
+  const parsedLimit = parseInt(searchParams.get('limit') || '50', 10)
+  const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage)
+  const limit = Math.min(100, Math.max(1, Number.isNaN(parsedLimit) ? 50 : parsedLimit))
   const offset = (page - 1) * limit
 
   // Fetch profiles with pagination and get total count

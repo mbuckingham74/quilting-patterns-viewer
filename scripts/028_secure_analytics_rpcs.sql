@@ -1,50 +1,14 @@
--- Migration: Add performance indexes and RPC functions
--- Run this in Supabase SQL Editor
+-- Migration: Secure analytics RPC functions
+--
+-- Issue: The analytics RPCs (get_top_downloaded_patterns, get_top_viewed_patterns,
+-- get_top_searches) use SECURITY DEFINER without admin checks, allowing any
+-- authenticated user to bypass RLS and access aggregated analytics data.
+--
+-- Fix: Add is_admin check inside functions, SET search_path, and restrict grants.
+-- Non-admins get empty results to avoid leaking admin status.
 
 -- =====================================================
--- ADDITIONAL INDEXES FOR QUERY PERFORMANCE
--- =====================================================
-
--- Index for patterns WITH embeddings (used by semantic search to quickly find searchable patterns)
-CREATE INDEX IF NOT EXISTS idx_patterns_embedding_not_null
-  ON patterns(id)
-  WHERE embedding IS NOT NULL;
-
--- Composite index for analytics time-series queries
-CREATE INDEX IF NOT EXISTS idx_download_logs_user_date
-  ON download_logs(user_id, downloaded_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_search_logs_user_date
-  ON search_logs(user_id, searched_at DESC);
-
--- Index for view_logs if it exists
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'view_logs') THEN
-    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_view_logs_pattern_date ON view_logs(pattern_id, viewed_at DESC)';
-  END IF;
-END $$;
-
--- Index for orientation_analysis pattern lookups
-CREATE INDEX IF NOT EXISTS idx_orientation_analysis_pattern_id
-  ON orientation_analysis(pattern_id);
-
--- Partial index for unreviewed mirror analysis (more selective)
-DROP INDEX IF EXISTS idx_mirror_analysis_reviewed;
-CREATE INDEX IF NOT EXISTS idx_mirror_analysis_unreviewed
-  ON mirror_analysis(reviewed)
-  WHERE reviewed = FALSE;
-
--- Index for admin_activity_log queries
-CREATE INDEX IF NOT EXISTS idx_admin_activity_log_admin_date
-  ON admin_activity_log(admin_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_admin_activity_log_type
-  ON admin_activity_log(action_type, target_type);
-
--- =====================================================
--- RPC FUNCTION: Get top downloaded patterns with SQL aggregation
--- Much more efficient than loading all logs into memory
+-- SECURE RPC: Get top downloaded patterns (admin only)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION get_top_downloaded_patterns(
@@ -61,12 +25,19 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
   WITH download_counts AS (
     SELECT
       dl.pattern_id,
       COUNT(*) as download_count
     FROM download_logs dl
+    -- Only execute if caller is admin
+    WHERE EXISTS (
+      SELECT 1 FROM profiles caller
+      WHERE caller.id = auth.uid()
+      AND caller.is_admin = true
+    )
     GROUP BY dl.pattern_id
     ORDER BY download_count DESC
     LIMIT p_limit
@@ -92,11 +63,13 @@ AS $$
   ORDER BY dc.download_count DESC;
 $$;
 
--- Grant execute to authenticated users (admin check done in API)
+-- Revoke from public/anon, only grant to authenticated
+REVOKE ALL ON FUNCTION get_top_downloaded_patterns(INT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_top_downloaded_patterns(INT) FROM anon;
 GRANT EXECUTE ON FUNCTION get_top_downloaded_patterns(INT) TO authenticated;
 
 -- =====================================================
--- RPC FUNCTION: Get top viewed patterns
+-- SECURE RPC: Get top viewed patterns (admin only)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION get_top_viewed_patterns(
@@ -112,6 +85,7 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT
     p.id as pattern_id,
@@ -121,17 +95,25 @@ AS $$
     COUNT(vl.id) as view_count
   FROM patterns p
   LEFT JOIN view_logs vl ON p.id = vl.pattern_id
+  -- Only execute if caller is admin
+  WHERE EXISTS (
+    SELECT 1 FROM profiles caller
+    WHERE caller.id = auth.uid()
+    AND caller.is_admin = true
+  )
   GROUP BY p.id, p.file_name, p.thumbnail_url, p.author
   HAVING COUNT(vl.id) > 0
   ORDER BY view_count DESC
   LIMIT p_limit;
 $$;
 
--- Grant execute to authenticated users
+-- Revoke from public/anon, only grant to authenticated
+REVOKE ALL ON FUNCTION get_top_viewed_patterns(INT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_top_viewed_patterns(INT) FROM anon;
 GRANT EXECUTE ON FUNCTION get_top_viewed_patterns(INT) TO authenticated;
 
 -- =====================================================
--- RPC FUNCTION: Get top searches
+-- SECURE RPC: Get top searches (admin only)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION get_top_searches(
@@ -145,17 +127,27 @@ RETURNS TABLE (
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
   SELECT
     LOWER(TRIM(sl.query)) as query,
     COUNT(*) as search_count,
     ROUND(AVG(sl.result_count), 1) as avg_results
   FROM search_logs sl
-  WHERE sl.query IS NOT NULL AND LENGTH(TRIM(sl.query)) > 0
+  WHERE sl.query IS NOT NULL
+    AND LENGTH(TRIM(sl.query)) > 0
+    -- Only execute if caller is admin
+    AND EXISTS (
+      SELECT 1 FROM profiles caller
+      WHERE caller.id = auth.uid()
+      AND caller.is_admin = true
+    )
   GROUP BY LOWER(TRIM(sl.query))
   ORDER BY search_count DESC
   LIMIT p_limit;
 $$;
 
--- Grant execute to authenticated users
+-- Revoke from public/anon, only grant to authenticated
+REVOKE ALL ON FUNCTION get_top_searches(INT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION get_top_searches(INT) FROM anon;
 GRANT EXECUTE ON FUNCTION get_top_searches(INT) TO authenticated;
