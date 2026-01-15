@@ -158,12 +158,15 @@ patterns/
 │   │   ├── Toast.tsx           # Toast notification system
 │   │   ├── ErrorBoundary.tsx   # React error boundary
 │   │   ├── FlipButton.tsx      # Horizontal flip button for mirrored thumbnails
-│   │   └── PatternDetailThumbnail.tsx  # Client-side thumbnail with flip support
+│   │   ├── PatternDetailThumbnail.tsx  # Client-side thumbnail with flip support
+│   │   └── AdminActivityLog.tsx # Admin activity audit log with undo
 │   ├── lib/
 │   │   ├── supabase/
 │   │   │   ├── client.ts       # Browser client
 │   │   │   ├── server.ts       # Server client
 │   │   │   └── middleware.ts
+│   │   ├── activity-log.ts     # Admin activity logging utility
+│   │   ├── embeddings.ts       # Voyage AI embedding generation
 │   │   ├── errors.ts           # Error codes, parsing, Sentry integration
 │   │   ├── api-response.ts     # API route response helpers
 │   │   ├── fetch-with-retry.ts # Fetch wrapper with retry logic
@@ -321,13 +324,55 @@ Add a search bar that:
 - Displays results in the same grid format
 - Optionally shows similarity score or "why this matched"
 
+## Admin Features
+
+### Admin Activity Log
+
+Track all admin actions for audit purposes. Located at `/admin/activity`.
+
+**Database Table** (`admin_activity_log`):
+```sql
+CREATE TABLE admin_activity_log (
+  id SERIAL PRIMARY KEY,
+  admin_id UUID NOT NULL REFERENCES profiles(id),
+  action_type TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id TEXT,
+  description TEXT NOT NULL,
+  details JSONB,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+**Logged Actions**:
+- `user.approve` / `user.reject` - User account management
+- `pattern.delete` / `pattern.update` / `pattern.transform` - Pattern changes
+- `keyword.create` / `keyword.update` / `keyword.delete` / `keyword.merge` - Keyword management
+- `orientation.review` - Thumbnail review status
+
+**Undo Feature**: Some actions can be undone via the activity log UI:
+- `keyword.update` - Restore original keyword name
+- `user.approve` - Revoke user approval
+
+API: `POST /api/admin/activity/undo` with `{ activity_id: number }`
+
+### Auto-Generated Embeddings
+
+When an admin commits a batch of imported patterns, embeddings are automatically generated in the background:
+
+1. Admin uploads ZIP → patterns staged for review
+2. Admin reviews on Recent Imports page
+3. Admin clicks "Save" (commit) → patterns become visible
+4. **Embeddings automatically generate** → patterns become AI-searchable
+
+Implementation: `app/src/lib/embeddings.ts` - Voyage AI integration called from batch commit endpoint.
+
+The manual script `scripts/generate_embeddings.py` can still be run to backfill any patterns missing embeddings.
+
 ## Phase 2 Features (Future)
 
-- Upload new patterns (accept .zip, extract, add to DB)
-  - Auto-generate embedding for new uploads
 - User favorites/collections
 - Pattern sharing links
-- Admin panel for Pam to manage patterns
 - Claude-powered "explain this match" feature
 
 ## Docker Configuration
