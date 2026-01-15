@@ -28,40 +28,38 @@ export async function GET(request: NextRequest) {
 
   const serviceClient = createServiceClient()
 
-  // Get all pattern IDs that have keywords
-  const { data: patternsWithKeywords } = await serviceClient
-    .from('pattern_keywords')
-    .select('pattern_id')
-
-  const patternIdsWithKeywords = new Set((patternsWithKeywords || []).map(p => p.pattern_id))
-
-  // Get all non-staged patterns
-  const { data: allPatterns, error: patternsError } = await serviceClient
-    .from('patterns')
-    .select('id, file_name, notes, author, thumbnail_url, file_extension, created_at')
-    .is('is_staged', false)
-    .order('file_name', { ascending: true })
+  // Get patterns without keywords using RPC (efficient NOT EXISTS query with pagination)
+  const { data: patterns, error: patternsError } = await serviceClient
+    .rpc('get_patterns_without_keywords', {
+      page_limit: limit,
+      page_offset: offset,
+    })
 
   if (patternsError) {
-    console.error('Error fetching patterns:', patternsError)
+    console.error('Error fetching patterns without keywords:', patternsError)
     return NextResponse.json(
       { error: 'Failed to fetch patterns', details: patternsError.message },
       { status: 500 }
     )
   }
 
-  // Filter to only patterns without keywords
-  const patternsWithoutKeywords = (allPatterns || []).filter(p => !patternIdsWithKeywords.has(p.id))
+  // Get total count for pagination
+  const { data: total, error: countError } = await serviceClient
+    .rpc('count_patterns_without_keywords')
 
-  // Apply pagination
-  const paginatedPatterns = patternsWithoutKeywords.slice(offset, offset + limit)
-  const total = patternsWithoutKeywords.length
+  if (countError) {
+    console.error('Error fetching patterns count:', countError)
+    return NextResponse.json(
+      { error: 'Failed to fetch patterns count', details: countError.message },
+      { status: 500 }
+    )
+  }
 
   return NextResponse.json({
-    patterns: paginatedPatterns,
-    total,
+    patterns: patterns || [],
+    total: total || 0,
     page,
     limit,
-    total_pages: Math.ceil(total / limit),
+    total_pages: Math.ceil((total || 0) / limit),
   })
 }
