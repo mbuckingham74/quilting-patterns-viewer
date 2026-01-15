@@ -5,6 +5,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import { ShareProvider } from "@/contexts/ShareContext";
 import ShareBasket from "@/components/ShareBasket";
+import WebVitals from "@/components/WebVitals";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,6 +40,7 @@ export default function RootLayout({
         </Script>
       </head>
       <body className={`${inter.className} antialiased bg-gradient-to-br from-purple-300 via-blue-300 to-indigo-400 min-h-screen`}>
+        <WebVitals />
         <ToastProvider>
           <ShareProvider>
             {children}

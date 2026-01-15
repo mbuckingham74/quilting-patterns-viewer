@@ -347,21 +347,57 @@ const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage)
 
 ---
 
+## Phase 6: Web Vitals Monitoring (Completed)
+
+### Real User Performance Metrics
+
+**Problem**: No visibility into actual user performance experience. Optimizations were made without data on real-world impact.
+
+**Solution**: Added Web Vitals tracking using the `web-vitals` library, integrated with existing Matomo analytics.
+
+**Files Added/Modified**:
+- `app/src/components/WebVitals.tsx` (new)
+- `app/src/app/layout.tsx` (added WebVitals component)
+- `package.json` (added `web-vitals` dependency)
+
+**Metrics Tracked**:
+| Metric | Description | Good Threshold |
+|--------|-------------|----------------|
+| **LCP** | Largest Contentful Paint - main content load time | < 2.5s |
+| **INP** | Interaction to Next Paint - responsiveness | < 200ms |
+| **CLS** | Cumulative Layout Shift - visual stability | < 0.1 |
+| **FCP** | First Contentful Paint - initial render | < 1.8s |
+| **TTFB** | Time to First Byte - server response | < 800ms |
+
+**Integration**: Metrics are sent to Matomo as custom events:
+- Category: "Web Vitals"
+- Action: metric name (LCP, INP, CLS, etc.)
+- Label: page path
+- Value: metric value (rounded)
+
+**Viewing Data**: In Matomo dashboard:
+1. Go to Behavior → Events
+2. Filter by Category: "Web Vitals"
+3. View metrics by page and over time
+
+**Development**: Metrics also log to browser console in dev mode for debugging.
+
+---
+
 ## Future Optimization Opportunities
 
 ### Not Yet Implemented
 
 1. **Streaming SSR**: Use React Suspense for progressive page loading
-3. **Connection Pooling**: If experiencing connection limits, add PgBouncer
-4. **CDN Caching**: Add edge caching for static API responses
-5. **Database Partitioning**: If logs tables grow very large, consider time-based partitioning
+2. **Connection Pooling**: If experiencing connection limits, add PgBouncer
+3. **CDN Caching**: Add edge caching for static API responses
+4. **Database Partitioning**: If logs tables grow very large, consider time-based partitioning
 
 ### Monitoring Suggestions
 
-- Add performance metrics to track actual improvements
 - Monitor database query times in Supabase dashboard
 - Use Chrome DevTools Lighthouse for frontend performance audits
-- Consider adding Web Vitals tracking (LCP, FID, CLS)
+- Review Web Vitals data in Matomo to identify slow pages
 
 ---
 
