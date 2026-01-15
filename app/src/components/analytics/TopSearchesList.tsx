@@ -1,5 +1,3 @@
-'use client'
-
 interface TopSearch {
   query: string
   count: number
