@@ -1,7 +1,3 @@
-'use client'
-
-import { useMemo } from 'react'
-
 interface ActivityData {
   date: string
   count: number
@@ -14,11 +10,9 @@ interface ActivityChartProps {
 }
 
 export default function ActivityChart({ downloads, searches, signups }: ActivityChartProps) {
-  // Find max value for scaling
-  const maxValue = useMemo(() => {
-    const allCounts = [...downloads, ...searches, ...signups].map(d => d.count)
-    return Math.max(...allCounts, 1)
-  }, [downloads, searches, signups])
+  // Find max value for scaling (computed at render time in Server Component)
+  const allCounts = [...downloads, ...searches, ...signups].map(d => d.count)
+  const maxValue = Math.max(...allCounts, 1)
 
   // Calculate height percentage for a value
   const getHeight = (value: number) => {
