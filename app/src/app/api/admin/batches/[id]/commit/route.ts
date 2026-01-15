@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { generateEmbeddingsForBatch } from '@/lib/embeddings'
 
 // POST /api/admin/batches/[id]/commit - Commit batch (make patterns visible in browse)
 export async function POST(
@@ -74,9 +75,15 @@ export async function POST(
     // Patterns are already committed, so just log the error
   }
 
+  // Generate embeddings for the batch asynchronously (don't block the response)
+  // This runs in the background so users don't have to wait
+  generateEmbeddingsForBatch(batchId).catch((error) => {
+    console.error(`Error generating embeddings for batch ${batchId}:`, error)
+  })
+
   return NextResponse.json({
     success: true,
-    message: `Committed ${patternsCount || 0} patterns`,
+    message: `Committed ${patternsCount || 0} patterns. Embeddings will be generated in the background.`,
     batch_id: batchId,
   })
 }
