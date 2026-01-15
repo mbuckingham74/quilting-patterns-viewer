@@ -101,6 +101,9 @@ export default async function AdminHelpPage() {
             <a href="#analytics" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">8.</span> View Analytics
             </a>
+            <a href="#keywords" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">9.</span> Manage Keywords
+            </a>
           </div>
         </div>
 
@@ -691,6 +694,109 @@ export default async function AdminHelpPage() {
               <p className="font-medium text-indigo-800">Note about historical data</p>
               <p className="text-indigo-700 text-sm mt-1">
                 Analytics tracking starts from when this feature was added. Downloads and searches from before that time aren&apos;t counted.
+              </p>
+            </div>
+          </section>
+
+          {/* Manage Keywords */}
+          <section id="keywords" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-pink-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">Manage Keywords</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              Keywords help organize patterns so they&apos;re easy to find. Add new keywords, fix typos, merge duplicates, and find patterns that need keywords.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-pink-50 rounded-lg">
+                <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-pink-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to Manage Keywords</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    From the <Link href="/admin" className="text-pink-700 underline">Admin Panel</Link>, click &quot;Manage Keywords&quot;
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-pink-50 rounded-lg">
+                <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-pink-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">View all keywords</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    You&apos;ll see a list of all keywords with how many patterns use each one. Use the search box to find specific keywords, or sort by name or count.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-pink-50 rounded-lg">
+                <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-pink-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Add a new keyword</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Click <span className="text-pink-600 font-medium">&quot;+ Add Keyword&quot;</span> at the top, type the keyword name, and click &quot;Add&quot;.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-pink-50 rounded-lg">
+                <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-pink-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Edit or delete a keyword</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Click on any keyword row to see its options:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Edit</strong> — fix typos or rename the keyword</li>
+                    <li>&bull; <strong>Delete</strong> — remove the keyword (patterns keep their other keywords)</li>
+                    <li>&bull; <strong>View patterns</strong> — see all patterns with this keyword</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-pink-50 rounded-lg">
+                <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-pink-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Merge duplicate keywords</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    If you have two similar keywords (like &quot;Flower&quot; and &quot;Flowers&quot;), you can merge them:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; Click on the keyword you want to <strong>remove</strong> (the source)</li>
+                    <li>&bull; Click <span className="text-purple-600 font-medium">&quot;Merge into...&quot;</span></li>
+                    <li>&bull; Select the keyword you want to <strong>keep</strong> (the target)</li>
+                    <li>&bull; All patterns will be moved to the target keyword, and the source is deleted</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-pink-50 rounded-lg">
+                <div className="w-8 h-8 bg-pink-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-pink-700">6</div>
+                <div>
+                  <p className="font-medium text-stone-800">Find patterns without keywords</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    At the top of the page, you&apos;ll see a count of patterns that have no keywords assigned. Click <span className="text-pink-600 font-medium">&quot;View patterns without keywords&quot;</span> to see them and add keywords.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-pink-50 border border-pink-200 rounded-lg">
+              <p className="font-medium text-pink-800">Why are keywords important?</p>
+              <p className="text-pink-700 text-sm mt-1">
+                Keywords help users find patterns when browsing by category. Patterns without keywords can only be found through AI search or by scrolling. Keep your keywords organized for the best browsing experience!
+              </p>
+            </div>
+
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="font-medium text-amber-800">Tip: Look for low-count keywords</p>
+              <p className="text-amber-700 text-sm mt-1">
+                Sort by &quot;Count&quot; to find keywords with only 1-2 patterns. These might be typos or duplicates that should be merged with similar keywords.
               </p>
             </div>
           </section>
