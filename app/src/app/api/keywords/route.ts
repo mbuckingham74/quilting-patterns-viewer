@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 // GET /api/keywords - Get all keywords (for dropdown selection)
+// Keywords change infrequently, so cache for 5 minutes
 export async function GET() {
   const supabase = await createClient()
 
@@ -25,7 +26,16 @@ export async function GET() {
     )
   }
 
-  return NextResponse.json({ keywords })
+  // Cache keywords for 5 minutes since they rarely change
+  // stale-while-revalidate allows serving cached data while fetching fresh
+  return NextResponse.json(
+    { keywords },
+    {
+      headers: {
+        'Cache-Control': 'private, max-age=300, stale-while-revalidate=60',
+      },
+    }
+  )
 }
 
 // POST /api/keywords - Create a new keyword (admin only)

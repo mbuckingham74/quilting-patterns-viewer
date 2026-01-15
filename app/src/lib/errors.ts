@@ -288,7 +288,13 @@ export function parseError(error: unknown): ParsedError {
 // Error logging with Sentry integration
 // ============================================================================
 
-import * as Sentry from '@sentry/nextjs'
+import {
+  withScope,
+  captureException,
+  captureMessage,
+  setUser,
+  addBreadcrumb,
+} from '@sentry/nextjs'
 
 export interface ErrorLogContext {
   component?: string
@@ -317,7 +323,7 @@ export function logError(error: unknown, context?: ErrorLogContext): void {
   // In production, send to Sentry
   if (process.env.NODE_ENV === 'production') {
     // Set error context as tags and extra data
-    Sentry.withScope((scope) => {
+    withScope((scope) => {
       // Set error code as a tag for filtering
       scope.setTag('error_code', parsed.code)
       scope.setTag('retryable', String(parsed.retryable))
@@ -333,9 +339,9 @@ export function logError(error: unknown, context?: ErrorLogContext): void {
 
       // Capture the error
       if (error instanceof Error) {
-        Sentry.captureException(error)
+        captureException(error)
       } else {
-        Sentry.captureMessage(parsed.message, 'error')
+        captureMessage(parsed.message, 'error')
       }
     })
   }
@@ -345,14 +351,14 @@ export function logError(error: unknown, context?: ErrorLogContext): void {
  * Set user context for Sentry (call after login)
  */
 export function setErrorUser(userId: string, email?: string): void {
-  Sentry.setUser({ id: userId, email })
+  setUser({ id: userId, email })
 }
 
 /**
  * Clear user context from Sentry (call after logout)
  */
 export function clearErrorUser(): void {
-  Sentry.setUser(null)
+  setUser(null)
 }
 
 /**
@@ -363,7 +369,7 @@ export function addErrorBreadcrumb(
   category: string = 'app',
   data?: Record<string, unknown>
 ): void {
-  Sentry.addBreadcrumb({
+  addBreadcrumb({
     message,
     category,
     data,

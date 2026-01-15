@@ -1,5 +1,10 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import bundleAnalyzer from "@next/bundle-analyzer";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
 
 const nextConfig: NextConfig = {
   images: {
@@ -47,8 +52,11 @@ const sentryWebpackPluginOptions = {
 };
 
 // Only wrap with Sentry if DSN is configured
-const config = process.env.NEXT_PUBLIC_SENTRY_DSN
+const configWithSentry = process.env.NEXT_PUBLIC_SENTRY_DSN
   ? withSentryConfig(nextConfig, sentryWebpackPluginOptions)
   : nextConfig;
+
+// Wrap with bundle analyzer (only active when ANALYZE=true)
+const config = withBundleAnalyzer(configWithSentry);
 
 export default config;

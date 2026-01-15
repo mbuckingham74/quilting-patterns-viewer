@@ -18,20 +18,21 @@ describe('GET /api/admin/analytics/top-patterns', () => {
   function createMockSupabase(options: {
     user?: { id: string } | null
     adminProfile?: { is_admin: boolean } | null
-    downloadLogs?: Array<{ pattern_id: number }>
-    patterns?: Array<{ id: number; file_name: string; thumbnail_url: string | null; author: string | null }>
-    favorites?: Array<{ pattern_id: number }>
-    downloadError?: { message: string } | null
-    patternsError?: { message: string } | null
+    rpcData?: Array<{
+      pattern_id: number
+      file_name: string
+      thumbnail_url: string | null
+      author: string | null
+      download_count: number
+      favorite_count: number
+    }> | null
+    rpcError?: { message: string; code?: string } | null
   }) {
     const {
       user = { id: 'admin-user' },
       adminProfile = { is_admin: true },
-      downloadLogs = [],
-      patterns = [],
-      favorites = [],
-      downloadError = null,
-      patternsError = null,
+      rpcData = [],
+      rpcError = null,
     } = options
 
     return {
@@ -51,31 +52,9 @@ describe('GET /api/admin/analytics/top-patterns', () => {
             }),
           }
         }
-
-        if (table === 'download_logs') {
-          return {
-            select: vi.fn().mockResolvedValue({ data: downloadLogs, error: downloadError }),
-          }
-        }
-
-        if (table === 'patterns') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({ data: patterns, error: patternsError }),
-            }),
-          }
-        }
-
-        if (table === 'user_favorites') {
-          return {
-            select: vi.fn().mockReturnValue({
-              in: vi.fn().mockResolvedValue({ data: favorites, error: null }),
-            }),
-          }
-        }
-
         return {}
       }),
+      rpc: vi.fn().mockResolvedValue({ data: rpcData, error: rpcError }),
     }
   }
 
@@ -100,7 +79,7 @@ describe('GET /api/admin/analytics/top-patterns', () => {
   })
 
   it('returns empty array when no downloads exist', async () => {
-    const mockSupabase = createMockSupabase({ downloadLogs: [] })
+    const mockSupabase = createMockSupabase({ rpcData: [] })
     mockCreateClient.mockResolvedValue(mockSupabase as any)
 
     const response = await GET()
@@ -110,26 +89,14 @@ describe('GET /api/admin/analytics/top-patterns', () => {
     expect(body.patterns).toEqual([])
   })
 
-  it('returns top patterns sorted by download count', async () => {
-    const downloadLogs = [
-      { pattern_id: 1 },
-      { pattern_id: 1 },
-      { pattern_id: 1 },
-      { pattern_id: 2 },
-      { pattern_id: 2 },
-      { pattern_id: 3 },
-    ]
-    const patterns = [
-      { id: 1, file_name: 'pattern1.qli', thumbnail_url: 'url1', author: 'Author1' },
-      { id: 2, file_name: 'pattern2.qli', thumbnail_url: 'url2', author: 'Author2' },
-      { id: 3, file_name: 'pattern3.qli', thumbnail_url: 'url3', author: 'Author3' },
-    ]
-    const favorites = [
-      { pattern_id: 1 },
-      { pattern_id: 1 },
+  it('returns top patterns from RPC function', async () => {
+    const rpcData = [
+      { pattern_id: 1, file_name: 'pattern1.qli', thumbnail_url: 'url1', author: 'Author1', download_count: 3, favorite_count: 2 },
+      { pattern_id: 2, file_name: 'pattern2.qli', thumbnail_url: 'url2', author: 'Author2', download_count: 2, favorite_count: 0 },
+      { pattern_id: 3, file_name: 'pattern3.qli', thumbnail_url: 'url3', author: 'Author3', download_count: 1, favorite_count: 1 },
     ]
 
-    const mockSupabase = createMockSupabase({ downloadLogs, patterns, favorites })
+    const mockSupabase = createMockSupabase({ rpcData })
     mockCreateClient.mockResolvedValue(mockSupabase as any)
 
     const response = await GET()
@@ -142,11 +109,25 @@ describe('GET /api/admin/analytics/top-patterns', () => {
     expect(body.patterns[0].favorite_count).toBe(2)
     expect(body.patterns[1].id).toBe(2)
     expect(body.patterns[1].download_count).toBe(2)
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('get_top_downloaded_patterns', { p_limit: 10 })
   })
 
-  it('returns 500 on download logs error', async () => {
+  it('returns 503 when RPC function does not exist', async () => {
     const mockSupabase = createMockSupabase({
-      downloadError: { message: 'Database error' },
+      rpcError: { message: 'function not found', code: 'PGRST202' },
+    })
+    mockCreateClient.mockResolvedValue(mockSupabase as any)
+
+    const response = await GET()
+    const body = await response.json()
+
+    expect(response.status).toBe(503)
+    expect(body.error).toContain('RPC function not found')
+  })
+
+  it('returns 500 on other RPC errors', async () => {
+    const mockSupabase = createMockSupabase({
+      rpcError: { message: 'Database error' },
     })
     mockCreateClient.mockResolvedValue(mockSupabase as any)
 
