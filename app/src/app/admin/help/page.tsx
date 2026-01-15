@@ -886,6 +886,20 @@ export default async function AdminHelpPage() {
               </ul>
             </div>
 
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="font-medium text-amber-800">Undo certain actions</p>
+              <p className="text-amber-700 text-sm mt-1">
+                Some actions can be undone directly from the activity log:
+              </p>
+              <ul className="mt-2 text-sm text-amber-700 space-y-1">
+                <li>&bull; <strong>Keyword renames</strong> — click &quot;Undo Rename&quot; to restore the original name</li>
+                <li>&bull; <strong>User approvals</strong> — click &quot;Unapprove&quot; to revoke access</li>
+              </ul>
+              <p className="text-amber-600 text-xs mt-2">
+                Note: Deletions and merges cannot be undone.
+              </p>
+            </div>
+
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="font-medium text-blue-800">Tip: Use this for troubleshooting</p>
               <p className="text-blue-700 text-sm mt-1">

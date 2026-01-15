@@ -9,6 +9,24 @@ interface AdminActivityLogProps {
 
 type FilterTarget = 'all' | 'user' | 'pattern' | 'keyword' | 'batch'
 
+// Actions that can be undone
+const REVERSIBLE_ACTIONS = ['keyword.update', 'user.approve']
+
+function isReversible(action: string): boolean {
+  return REVERSIBLE_ACTIONS.includes(action)
+}
+
+function getUndoLabel(action: string): string {
+  switch (action) {
+    case 'keyword.update':
+      return 'Undo Rename'
+    case 'user.approve':
+      return 'Unapprove'
+    default:
+      return 'Undo'
+  }
+}
+
 export default function AdminActivityLog({
   initialLogs = [],
 }: AdminActivityLogProps) {
@@ -26,6 +44,11 @@ export default function AdminActivityLog({
 
   // Available filter options (fetched from API)
   const [actionTypes, setActionTypes] = useState<string[]>([])
+
+  // Undo state
+  const [undoingId, setUndoingId] = useState<number | null>(null)
+  const [undoError, setUndoError] = useState<string | null>(null)
+  const [undoSuccess, setUndoSuccess] = useState<string | null>(null)
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
@@ -186,8 +209,67 @@ export default function AdminActivityLog({
   const hasActiveFilters =
     targetFilter !== 'all' || actionFilter !== 'all' || dateFrom || dateTo
 
+  // Check if this action was already undone (by looking for an undo entry)
+  const isAlreadyUndone = (log: AdminActivityLogWithAdmin): boolean => {
+    // If the description contains "Undid" it's an undo action itself, not undoable
+    if (log.description.includes('Undid')) return true
+    // Check if details contain undone_activity_id (this entry IS an undo)
+    const details = log.details as Record<string, unknown> | null
+    if (details?.undone_activity_id) return true
+    return false
+  }
+
+  const handleUndo = async (activityId: number) => {
+    if (!confirm('Are you sure you want to undo this action?')) return
+
+    setUndoingId(activityId)
+    setUndoError(null)
+    setUndoSuccess(null)
+
+    try {
+      const response = await fetch('/api/admin/activity/undo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activity_id: activityId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setUndoError(data.error || 'Failed to undo action')
+        return
+      }
+
+      setUndoSuccess('Action undone successfully!')
+      // Refresh the logs to show the new undo entry
+      fetchLogs()
+    } catch (error) {
+      setUndoError('Network error - please try again')
+      console.error('Undo error:', error)
+    } finally {
+      setUndoingId(null)
+      // Clear messages after a delay
+      setTimeout(() => {
+        setUndoError(null)
+        setUndoSuccess(null)
+      }, 5000)
+    }
+  }
+
   return (
     <div>
+      {/* Success/Error Messages */}
+      {undoSuccess && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-800 text-sm">
+          {undoSuccess}
+        </div>
+      )}
+      {undoError && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+          {undoError}
+        </div>
+      )}
+
       {/* Filter Controls */}
       <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-4 mb-6">
         <div className="flex flex-wrap gap-4 items-end">
@@ -342,9 +424,46 @@ export default function AdminActivityLog({
                       </p>
                     )}
                   </div>
-                  <span className="text-xs text-stone-400 whitespace-nowrap">
-                    {formatDate(log.created_at)}
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="text-xs text-stone-400 whitespace-nowrap">
+                      {formatDate(log.created_at)}
+                    </span>
+                    {isReversible(log.action_type) && !isAlreadyUndone(log) && (
+                      <button
+                        onClick={() => handleUndo(log.id)}
+                        disabled={undoingId === log.id}
+                        className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        title="Undo this action"
+                      >
+                        {undoingId === log.id ? (
+                          <span className="flex items-center gap-1">
+                            <svg
+                              className="animate-spin h-3 w-3"
+                              viewBox="0 0 24 24"
+                            >
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            Undoing...
+                          </span>
+                        ) : (
+                          getUndoLabel(log.action_type)
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
