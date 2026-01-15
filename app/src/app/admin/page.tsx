@@ -230,6 +230,21 @@ export default async function AdminDashboardPage() {
             </Link>
 
             <Link
+              href="/admin/keywords"
+              className="flex items-center gap-3 p-4 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-pink-200 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-pink-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-stone-800">Manage Keywords</p>
+                <p className="text-sm text-stone-500">Add, edit, merge keywords</p>
+              </div>
+            </Link>
+
+            <Link
               href="/admin/duplicates"
               className="flex items-center gap-3 p-4 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
             >
