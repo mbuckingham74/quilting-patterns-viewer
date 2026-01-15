@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 interface UpdatePatternRequest {
   file_name?: string
@@ -119,6 +120,16 @@ export async function DELETE(
     )
   }
 
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.PATTERN_DELETE,
+    targetType: 'pattern',
+    targetId: patternId,
+    description: `Deleted pattern ${existingPattern.file_name || patternId}`,
+    details: { file_name: existingPattern.file_name },
+  })
+
   return NextResponse.json({
     success: true,
     deleted_pattern_id: patternId,
@@ -214,6 +225,16 @@ export async function PATCH(
       { status: 500 }
     )
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.PATTERN_UPDATE,
+    targetType: 'pattern',
+    targetId: patternId,
+    description: `Updated pattern ${updatedPattern.file_name || patternId}`,
+    details: { updated_fields: Object.keys(updateData) },
+  })
 
   return NextResponse.json({
     success: true,

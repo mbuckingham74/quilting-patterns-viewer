@@ -79,3 +79,21 @@ export interface Profile {
 // NOTE: Admin emails are now stored in the database (admin_emails table)
 // and checked via an AFTER INSERT trigger on profiles.
 // This prevents client-side manipulation of admin/approval status.
+
+export interface AdminActivityLog {
+  id: number
+  admin_id: string
+  action_type: string
+  target_type: 'user' | 'pattern' | 'keyword' | 'batch'
+  target_id: string | null
+  description: string
+  details: Record<string, unknown>
+  created_at: string
+}
+
+export interface AdminActivityLogWithAdmin extends AdminActivityLog {
+  profiles: {
+    email: string
+    display_name: string | null
+  }
+}

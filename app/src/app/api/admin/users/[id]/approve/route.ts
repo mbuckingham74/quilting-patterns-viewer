@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // POST /api/admin/users/[id]/approve - Approve a user
 export async function POST(
@@ -40,6 +41,23 @@ export async function POST(
     console.error('Error approving user:', error)
     return NextResponse.json({ error: 'Failed to approve user' }, { status: 500 })
   }
+
+  // Get the approved user's email for the activity log
+  const { data: approvedUser } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .single()
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.USER_APPROVE,
+    targetType: 'user',
+    targetId: userId,
+    description: `Approved user ${approvedUser?.email || userId}`,
+    details: { email: approvedUser?.email },
+  })
 
   return NextResponse.json({ success: true })
 }

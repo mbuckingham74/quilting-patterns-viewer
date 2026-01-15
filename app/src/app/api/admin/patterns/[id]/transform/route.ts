@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchThumbnailSafe } from '@/lib/safe-fetch'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 import sharp from 'sharp'
 
 type TransformOperation = 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
@@ -134,6 +135,16 @@ export async function POST(
       console.error('Update error:', updateError)
       throw new Error('Failed to update pattern')
     }
+
+    // Log the activity
+    await logAdminActivity({
+      adminId: user.id,
+      action: ActivityAction.PATTERN_TRANSFORM,
+      targetType: 'pattern',
+      targetId: patternId,
+      description: `Transformed thumbnail: ${operation.replace('_', ' ')}`,
+      details: { operation },
+    })
 
     return NextResponse.json({
       success: true,

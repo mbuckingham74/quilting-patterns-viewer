@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // POST /api/admin/users/[id]/reject - Reject (delete) a user
 export async function POST(
@@ -31,6 +32,13 @@ export async function POST(
     return NextResponse.json({ error: 'Cannot reject yourself' }, { status: 400 })
   }
 
+  // Get the user's email before deleting for the activity log
+  const { data: rejectedUser } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', userId)
+    .single()
+
   // Delete the profile (user will need to sign up again)
   const { error } = await supabase
     .from('profiles')
@@ -41,6 +49,16 @@ export async function POST(
     console.error('Error rejecting user:', error)
     return NextResponse.json({ error: 'Failed to reject user' }, { status: 500 })
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.USER_REJECT,
+    targetType: 'user',
+    targetId: userId,
+    description: `Rejected user ${rejectedUser?.email || userId}`,
+    details: { email: rejectedUser?.email },
+  })
 
   return NextResponse.json({ success: true })
 }

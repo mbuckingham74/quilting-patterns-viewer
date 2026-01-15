@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -148,6 +149,16 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     )
   }
 
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.KEYWORD_UPDATE,
+    targetType: 'keyword',
+    targetId: keywordId,
+    description: `Renamed keyword "${existing.value}" to "${keyword.value}"`,
+    details: { old_value: existing.value, new_value: keyword.value },
+  })
+
   return NextResponse.json({ keyword })
 }
 
@@ -216,6 +227,16 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       { status: 500 }
     )
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.KEYWORD_DELETE,
+    targetType: 'keyword',
+    targetId: keywordId,
+    description: `Deleted keyword "${existing.value}"`,
+    details: { value: existing.value, patterns_affected: count || 0 },
+  })
 
   return NextResponse.json({
     success: true,

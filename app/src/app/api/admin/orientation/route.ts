@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // GET /api/admin/orientation - Get patterns flagged for rotation or mirroring
 export async function GET(request: Request) {
@@ -244,6 +245,20 @@ export async function PATCH(request: Request) {
     console.error(`Error updating ${tableName}:`, error)
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.ORIENTATION_REVIEW,
+    targetType: 'pattern',
+    targetId: pattern_ids.length === 1 ? pattern_ids[0] : undefined,
+    description: `Marked ${pattern_ids.length} pattern(s) as reviewed (${source || 'orientation'})`,
+    details: {
+      pattern_ids,
+      source: source || 'orientation_analysis',
+      reviewed: reviewed ?? true,
+    },
+  })
 
   return NextResponse.json({ success: true })
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // GET /api/admin/keywords - Get all keywords with usage counts
 export async function GET(request: NextRequest) {
@@ -115,6 +116,16 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.KEYWORD_CREATE,
+    targetType: 'keyword',
+    targetId: keyword.id,
+    description: `Created keyword "${keyword.value}"`,
+    details: { value: keyword.value },
+  })
 
   return NextResponse.json({ keyword }, { status: 201 })
 }

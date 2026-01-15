@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // POST /api/admin/keywords/merge - Merge one keyword into another
 export async function POST(request: NextRequest) {
@@ -65,6 +66,22 @@ export async function POST(request: NextRequest) {
       { status }
     )
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.KEYWORD_MERGE,
+    targetType: 'keyword',
+    targetId: targetId,
+    description: `Merged keyword "${result?.source}" into "${result?.target}"`,
+    details: {
+      source_id: sourceId,
+      source_value: result?.source,
+      target_id: targetId,
+      target_value: result?.target,
+      patterns_moved: result?.patterns_moved ?? 0,
+    },
+  })
 
   return NextResponse.json({
     success: result?.success ?? true,

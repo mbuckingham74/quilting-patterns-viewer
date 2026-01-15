@@ -275,6 +275,21 @@ export default async function AdminDashboardPage() {
             </Link>
 
             <Link
+              href="/admin/activity"
+              className="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <div className="w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="font-medium text-stone-800">Activity Log</p>
+                <p className="text-sm text-stone-500">Admin actions audit trail</p>
+              </div>
+            </Link>
+
+            <Link
               href="/admin/exceptions"
               className="flex items-center gap-3 p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
             >

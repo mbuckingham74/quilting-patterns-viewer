@@ -104,6 +104,9 @@ export default async function AdminHelpPage() {
             <a href="#keywords" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">9.</span> Manage Keywords
             </a>
+            <a href="#activity" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">10.</span> Audit Admin Activity
+            </a>
           </div>
         </div>
 
@@ -797,6 +800,96 @@ export default async function AdminHelpPage() {
               <p className="font-medium text-amber-800">Tip: Look for low-count keywords</p>
               <p className="text-amber-700 text-sm mt-1">
                 Sort by &quot;Count&quot; to find keywords with only 1-2 patterns. These might be typos or duplicates that should be merged with similar keywords.
+              </p>
+            </div>
+          </section>
+
+          {/* Activity Log */}
+          <section id="activity" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">Audit Admin Activity</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              See a complete history of all admin actions — who did what and when. Useful for tracking changes and troubleshooting.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-slate-50 rounded-lg">
+                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-slate-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to Activity Log</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    From the <Link href="/admin" className="text-slate-700 underline">Admin Panel</Link>, click &quot;Activity Log&quot; in the Quick Actions grid
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-slate-50 rounded-lg">
+                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-slate-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">View recent activity</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    You&apos;ll see a list of all admin actions, showing:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Action type</strong> — what was done (approve, delete, update, etc.)</li>
+                    <li>&bull; <strong>Who did it</strong> — which admin performed the action</li>
+                    <li>&bull; <strong>Target</strong> — what was affected (pattern, user, keyword)</li>
+                    <li>&bull; <strong>When</strong> — date and time of the action</li>
+                    <li>&bull; <strong>Description</strong> — details about what changed</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-slate-50 rounded-lg">
+                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-slate-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Filter the activity</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Use the filter dropdowns to narrow down the list:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Target Type</strong> — show only actions on patterns, users, or keywords</li>
+                    <li>&bull; <strong>Action</strong> — show only specific actions like deletes or approvals</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-slate-50 rounded-lg">
+                <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-slate-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Browse through history</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Use the pagination at the bottom to see older activity. The log keeps a complete history of all admin actions.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+              <p className="font-medium text-slate-800">What gets logged?</p>
+              <p className="text-slate-700 text-sm mt-1">
+                The activity log tracks:
+              </p>
+              <ul className="mt-2 text-sm text-slate-700 space-y-1">
+                <li>&bull; User approvals and rejections</li>
+                <li>&bull; Pattern deletions and updates</li>
+                <li>&bull; Thumbnail rotations and flips</li>
+                <li>&bull; Keyword creation, edits, deletes, and merges</li>
+                <li>&bull; Orientation review markings</li>
+              </ul>
+            </div>
+
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="font-medium text-blue-800">Tip: Use this for troubleshooting</p>
+              <p className="text-blue-700 text-sm mt-1">
+                If something looks wrong (a pattern is missing, a user can&apos;t log in), check the activity log to see what happened and when. This helps you understand what changed and who made the change.
               </p>
             </div>
           </section>
