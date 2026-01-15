@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { fetchThumbnailSafe } from '@/lib/safe-fetch'
 import sharp from 'sharp'
 
 type TransformOperation = 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
@@ -68,12 +69,8 @@ export async function POST(
   }
 
   try {
-    // Download the current thumbnail
-    const thumbnailResponse = await fetch(pattern.thumbnail_url)
-    if (!thumbnailResponse.ok) {
-      throw new Error('Failed to download thumbnail')
-    }
-    const imageBuffer = Buffer.from(await thumbnailResponse.arrayBuffer())
+    // Download the current thumbnail with SSRF protection
+    const imageBuffer = await fetchThumbnailSafe(pattern.thumbnail_url)
 
     // Apply transformation using sharp
     let transformer = sharp(imageBuffer)

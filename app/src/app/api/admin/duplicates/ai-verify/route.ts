@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { fetchThumbnailAsBase64 } from '@/lib/safe-fetch'
 
 interface VerifyRequest {
   pattern_id_1: number
@@ -83,10 +84,10 @@ export async function POST(request: Request) {
   const pattern1 = patterns.find(p => p.id === pattern_id_1)!
   const pattern2 = patterns.find(p => p.id === pattern_id_2)!
 
-  // Download both thumbnails
+  // Download both thumbnails with SSRF protection
   const [thumbnail1, thumbnail2] = await Promise.all([
-    downloadImageAsBase64(pattern1.thumbnail_url),
-    downloadImageAsBase64(pattern2.thumbnail_url)
+    fetchThumbnailAsBase64(pattern1.thumbnail_url),
+    fetchThumbnailAsBase64(pattern2.thumbnail_url)
   ])
 
   if (!thumbnail1 || !thumbnail2) {
@@ -244,24 +245,3 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   }
 }
 
-async function downloadImageAsBase64(url: string | null): Promise<string | null> {
-  if (!url) return null
-
-  try {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(30000)
-    })
-
-    if (!response.ok) {
-      console.error(`Failed to download image: ${response.status}`)
-      return null
-    }
-
-    const arrayBuffer = await response.arrayBuffer()
-    const base64 = Buffer.from(arrayBuffer).toString('base64')
-    return base64
-  } catch (error) {
-    console.error('Error downloading image:', error)
-    return null
-  }
-}

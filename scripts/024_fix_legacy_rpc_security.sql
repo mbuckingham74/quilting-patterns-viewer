@@ -1,20 +1,20 @@
--- ============================================================
--- DEPRECATED: DO NOT RE-RUN THIS SCRIPT
--- This script has been superseded by 024_fix_legacy_rpc_security.sql
--- Re-running this will reintroduce security vulnerabilities:
---   - SECURITY DEFINER bypasses RLS policies
---   - GRANT TO anon allows unauthenticated access
--- ============================================================
---
--- Migration: Update keyword filter function to exclude patterns without thumbnails
--- Unless the "No Thumbnail" keyword (ID 616) is explicitly selected
+-- Migration: Fix legacy RPC function security
+-- Addresses security issues from scripts 004 and 006:
+-- - Revokes anon grants (anonymous users should not call these functions)
+-- - Converts to SECURITY INVOKER so RLS policies are enforced
 --
 -- Run this in Supabase SQL Editor
 
--- Drop existing function
-DROP FUNCTION IF EXISTS get_patterns_by_keywords(integer[], integer, integer, text);
+-- ============================================================
+-- Fix get_patterns_by_keywords function
+-- Originally defined in 004_keyword_filter_function.sql and 006_exclude_no_thumbnail.sql
+-- ============================================================
 
--- Create updated function
+-- Revoke anon access (anon users should not be able to call this)
+REVOKE EXECUTE ON FUNCTION get_patterns_by_keywords(integer[], integer, integer, text) FROM anon;
+
+-- Recreate the function with SECURITY INVOKER (respects RLS)
+-- This is the latest version from 006_exclude_no_thumbnail.sql
 CREATE OR REPLACE FUNCTION get_patterns_by_keywords(
   keyword_ids integer[],
   page_offset integer DEFAULT 0,
@@ -36,7 +36,7 @@ RETURNS TABLE (
   total_count bigint
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER  -- Changed from SECURITY DEFINER to respect RLS
 AS $$
 DECLARE
   no_thumbnail_keyword_id integer := 616;
@@ -83,6 +83,11 @@ BEGIN
 END;
 $$;
 
--- Grant execute to authenticated users
+-- Only grant to authenticated users
 GRANT EXECUTE ON FUNCTION get_patterns_by_keywords TO authenticated;
-GRANT EXECUTE ON FUNCTION get_patterns_by_keywords TO anon;
+
+-- Verify the changes
+DO $$
+BEGIN
+  RAISE NOTICE 'Migration 024 complete: get_patterns_by_keywords is now SECURITY INVOKER with authenticated-only access';
+END $$;

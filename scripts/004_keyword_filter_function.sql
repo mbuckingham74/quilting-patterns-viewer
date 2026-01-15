@@ -1,3 +1,11 @@
+-- ============================================================
+-- DEPRECATED: DO NOT RE-RUN THIS SCRIPT
+-- This script has been superseded by 024_fix_legacy_rpc_security.sql
+-- Re-running this will reintroduce security vulnerabilities:
+--   - SECURITY DEFINER bypasses RLS policies
+--   - GRANT TO anon allows unauthenticated access
+-- ============================================================
+--
 -- Migration: Add RPC function for keyword filtering
 -- This avoids the 414 URI Too Large error when filtering by keywords with many matches
 --

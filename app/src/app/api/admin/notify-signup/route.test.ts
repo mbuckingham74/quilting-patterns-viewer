@@ -5,7 +5,17 @@ import { NextRequest } from 'next/server'
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
-// Mock Supabase client
+// Mock server Supabase client for session-based auth
+const mockGetUser = vi.fn()
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(() => Promise.resolve({
+    auth: {
+      getUser: mockGetUser,
+    },
+  })),
+}))
+
+// Mock Supabase client (for admin email fetching with service role)
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     from: vi.fn(() => ({
@@ -38,6 +48,9 @@ describe('POST /api/admin/notify-signup', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key'
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co'
     process.env.RESEND_API_KEY = 'test-resend-key'
+
+    // Default: no authenticated user (forces internal secret auth)
+    mockGetUser.mockResolvedValue({ data: { user: null } })
   })
 
   function createRequest(body: Record<string, unknown>, includeSecret = true): NextRequest {
@@ -52,8 +65,10 @@ describe('POST /api/admin/notify-signup', () => {
     })
   }
 
-  describe('authentication', () => {
-    it('returns 401 when x-internal-secret header is missing', async () => {
+  describe('authentication - internal secret', () => {
+    it('returns 401 when x-internal-secret is missing and no valid session', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null } })
+
       const response = await POST(createRequest({ email: 'test@example.com' }, false))
 
       expect(response.status).toBe(401)
@@ -61,7 +76,9 @@ describe('POST /api/admin/notify-signup', () => {
       expect(json.error).toBe('Unauthorized')
     })
 
-    it('returns 401 when x-internal-secret header is invalid', async () => {
+    it('returns 401 when x-internal-secret header is invalid and no valid session', async () => {
+      mockGetUser.mockResolvedValue({ data: { user: null } })
+
       const request = new NextRequest('http://localhost:3000/api/admin/notify-signup', {
         method: 'POST',
         headers: {
@@ -74,6 +91,88 @@ describe('POST /api/admin/notify-signup', () => {
       const response = await POST(request)
 
       expect(response.status).toBe(401)
+    })
+
+    it('succeeds with valid internal secret', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'email-id' }),
+      })
+
+      const response = await POST(createRequest({ email: 'test@example.com' }, true))
+
+      expect(response.status).toBe(200)
+    })
+  })
+
+  describe('authentication - session-based (client-side signup)', () => {
+    it('returns 401 when user account is older than 5 minutes', async () => {
+      // User created 10 minutes ago
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user-123',
+            email: 'newuser@example.com',
+            created_at: tenMinutesAgo,
+          },
+        },
+      })
+
+      const response = await POST(createRequest({ email: 'newuser@example.com' }, false))
+
+      expect(response.status).toBe(401)
+    })
+
+    it('succeeds when user account is within 5-minute window', async () => {
+      // User created 1 minute ago
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString()
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user-123',
+            email: 'newuser@example.com',
+            created_at: oneMinuteAgo,
+          },
+        },
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'email-id' }),
+      })
+
+      const response = await POST(createRequest({ email: 'attacker@evil.com' }, false))
+
+      // Should succeed but use session email, not request body email
+      expect(response.status).toBe(200)
+    })
+
+    it('uses session email not request body email to prevent abuse', async () => {
+      // User created 1 minute ago with email newuser@example.com
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000).toISOString()
+      mockGetUser.mockResolvedValue({
+        data: {
+          user: {
+            id: 'user-123',
+            email: 'newuser@example.com',
+            created_at: oneMinuteAgo,
+          },
+        },
+      })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ id: 'email-id' }),
+      })
+
+      // Attacker tries to send notification for a different email
+      await POST(createRequest({ email: 'victim@example.com' }, false))
+
+      // Verify the email sent contains the SESSION email, not the attacker's choice
+      const fetchCall = mockFetch.mock.calls[0]
+      const body = JSON.parse(fetchCall[1].body)
+      expect(body.html).toContain('newuser@example.com')
+      expect(body.html).not.toContain('victim@example.com')
+      expect(body.subject).toContain('newuser@example.com')
     })
   })
 
