@@ -373,7 +373,7 @@ const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage)
 - Category: "Web Vitals"
 - Action: metric name (LCP, INP, CLS, etc.)
 - Label: page path
-- Value: metric value (rounded)
+- Value: metric value (rounded; CLS is scaled by 1000 to preserve decimals, e.g., 0.05 CLS = 50)
 
 **Viewing Data**: In Matomo dashboard:
 1. Go to Behavior → Events
