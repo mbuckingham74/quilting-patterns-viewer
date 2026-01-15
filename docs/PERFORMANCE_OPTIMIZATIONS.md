@@ -260,6 +260,66 @@ captureException(error)
 
 ---
 
+## Phase 4: Security Hardening (Completed)
+
+### Analytics RPC Security
+
+**Problem**: The analytics RPC functions (`get_top_downloaded_patterns`, `get_top_viewed_patterns`, `get_top_searches`) used `SECURITY DEFINER` without admin checks, allowing any authenticated user to bypass RLS and access aggregated analytics data.
+
+**Solution**: Added in-function admin verification, search path protection, and restricted grants.
+
+**Migration**: `scripts/028_secure_analytics_rpcs.sql`
+
+**Security Controls Added**:
+| Control | Purpose |
+|---------|---------|
+| `WHERE EXISTS (SELECT ... is_admin = true)` | Verify caller is admin |
+| `SET search_path = public` | Prevent search path injection attacks |
+| `REVOKE ALL FROM PUBLIC, anon` | Remove default access |
+| `GRANT EXECUTE TO authenticated` | Only allow authenticated users to call |
+
+**Behavior**: Non-admin users receive empty result sets rather than errors, avoiding leakage of admin status.
+
+---
+
+### API Error Handling Improvements
+
+**Problem**: Missing RPC functions silently returned empty arrays, masking migration failures.
+
+**Solution**: Return HTTP 503 with clear error message when RPC is missing.
+
+**File Modified**: `app/src/app/api/admin/analytics/top-patterns/route.ts`
+
+```typescript
+if (error.code === 'PGRST202') {
+  return NextResponse.json(
+    { error: 'Analytics RPC function not found. Run migration...' },
+    { status: 503 }
+  )
+}
+```
+
+**Impact**: Clear feedback when migrations haven't been run.
+
+---
+
+### Pagination Input Validation
+
+**Problem**: Invalid pagination parameters (e.g., `?page=abc`) caused NaN values that corrupted range calculations.
+
+**Solution**: Added `Number.isNaN()` checks with fallback to safe defaults.
+
+**File Modified**: `app/src/app/api/admin/users/route.ts`
+
+```typescript
+const parsedPage = parseInt(searchParams.get('page') || '1', 10)
+const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage)
+```
+
+**Impact**: Graceful handling of malformed query parameters.
+
+---
+
 ## Future Optimization Opportunities
 
 ### Not Yet Implemented
@@ -283,4 +343,4 @@ captureException(error)
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for instructions on running SQL migrations.
 
-Current latest migration: `027_performance_indexes.sql`
+Current latest migration: `028_secure_analytics_rpcs.sql`
