@@ -12,9 +12,19 @@ interface PageProps {
 async function getPattern(id: number) {
   const supabase = await createClient()
 
+  // Single query with JOIN to get pattern and keywords together
+  // This replaces 2-3 separate queries with one efficient query
   const { data: pattern, error } = await supabase
     .from('patterns')
-    .select('*')
+    .select(`
+      *,
+      pattern_keywords (
+        keywords (
+          id,
+          value
+        )
+      )
+    `)
     .eq('id', id)
     .single()
 
@@ -22,25 +32,16 @@ async function getPattern(id: number) {
     return null
   }
 
-  // Get keywords for this pattern
-  const { data: patternKeywords } = await supabase
-    .from('pattern_keywords')
-    .select('keyword_id')
-    .eq('pattern_id', id)
+  // Extract and sort keywords from the nested structure
+  const keywords = (pattern.pattern_keywords || [])
+    .map((pk: { keywords: { id: number; value: string } | null }) => pk.keywords)
+    .filter((k: { id: number; value: string } | null): k is { id: number; value: string } => k !== null)
+    .sort((a: { value: string }, b: { value: string }) => a.value.localeCompare(b.value))
 
-  const keywordIds = patternKeywords?.map(pk => pk.keyword_id) || []
+  // Remove the nested structure from the pattern object
+  const { pattern_keywords: _, ...patternData } = pattern
 
-  let keywords: { id: number; value: string }[] = []
-  if (keywordIds.length > 0) {
-    const { data } = await supabase
-      .from('keywords')
-      .select('*')
-      .in('id', keywordIds)
-      .order('value')
-    keywords = data || []
-  }
-
-  return { ...pattern, keywords }
+  return { ...patternData, keywords }
 }
 
 export default async function PatternPage({ params }: PageProps) {
