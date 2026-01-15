@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Pattern } from '@/lib/types'
@@ -17,7 +17,7 @@ interface PatternCardProps {
   showFlipButton?: boolean
 }
 
-export default function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false }: PatternCardProps) {
+const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false }: PatternCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState(pattern.thumbnail_url)
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
@@ -110,4 +110,6 @@ export default function PatternCard({ pattern, isFavorited = false, onToggleFavo
       </div>
     </Link>
   )
-}
+})
+
+export default PatternCard

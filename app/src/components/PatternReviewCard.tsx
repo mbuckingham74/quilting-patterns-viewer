@@ -126,7 +126,6 @@ export default function PatternReviewCard({
             fill
             className="object-contain"
             sizes="(max-width: 768px) 50vw, 25vw"
-            unoptimized
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-stone-400">

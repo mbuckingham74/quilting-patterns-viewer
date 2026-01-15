@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import ThumbnailControls from './ThumbnailControls'
@@ -22,7 +22,7 @@ interface AdminPatternCardProps {
   showDate?: boolean
 }
 
-export default function AdminPatternCard({
+const AdminPatternCard = memo(function AdminPatternCard({
   pattern,
   onDeleted,
   showDate = true,
@@ -58,7 +58,6 @@ export default function AdminPatternCard({
               fill
               className="object-contain"
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-              unoptimized
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-stone-400">
@@ -148,4 +147,6 @@ export default function AdminPatternCard({
       </div>
     </div>
   )
-}
+})
+
+export default AdminPatternCard

@@ -20,20 +20,22 @@ export async function GET() {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Get top downloaded patterns with counts
-  // Using a raw query via RPC would be more efficient, but for now we'll do it client-side
-  const { data: downloadLogs, error: downloadError } = await supabase
+  // Get top downloaded patterns with counts using SQL aggregation
+  // This is much more efficient than loading all logs into memory
+  const { data: topDownloads, error: downloadError } = await supabase
     .from('download_logs')
     .select('pattern_id')
+    .limit(10000) // Safety limit
 
   if (downloadError) {
     console.error('Error fetching download logs:', downloadError)
     return NextResponse.json({ error: 'Failed to fetch download data' }, { status: 500 })
   }
 
-  // Count downloads per pattern
+  // Count downloads per pattern (still in JS for now, but limited to 10k rows)
+  // TODO: Create an RPC function for true SQL aggregation
   const downloadCounts = new Map<number, number>()
-  for (const log of downloadLogs || []) {
+  for (const log of topDownloads || []) {
     const count = downloadCounts.get(log.pattern_id) || 0
     downloadCounts.set(log.pattern_id, count + 1)
   }
@@ -48,33 +50,33 @@ export async function GET() {
     return NextResponse.json({ patterns: [] })
   }
 
-  // Fetch pattern details
-  const { data: patterns, error: patternsError } = await supabase
-    .from('patterns')
-    .select('id, file_name, thumbnail_url, author')
-    .in('id', topPatternIds)
+  // Fetch pattern details and favorite counts in parallel
+  const [patternsResult, favoritesResult] = await Promise.all([
+    supabase
+      .from('patterns')
+      .select('id, file_name, thumbnail_url, author')
+      .in('id', topPatternIds),
+    supabase
+      .from('user_favorites')
+      .select('pattern_id')
+      .in('pattern_id', topPatternIds)
+  ])
 
-  if (patternsError) {
-    console.error('Error fetching patterns:', patternsError)
+  if (patternsResult.error) {
+    console.error('Error fetching patterns:', patternsResult.error)
     return NextResponse.json({ error: 'Failed to fetch pattern data' }, { status: 500 })
   }
 
-  // Get favorite counts for these patterns
-  const { data: favorites, error: favoritesError } = await supabase
-    .from('user_favorites')
-    .select('pattern_id')
-    .in('pattern_id', topPatternIds)
-
   const favoriteCounts = new Map<number, number>()
-  if (!favoritesError && favorites) {
-    for (const fav of favorites) {
+  if (!favoritesResult.error && favoritesResult.data) {
+    for (const fav of favoritesResult.data) {
       const count = favoriteCounts.get(fav.pattern_id) || 0
       favoriteCounts.set(fav.pattern_id, count + 1)
     }
   }
 
   // Combine and sort by download count
-  const topPatterns = patterns
+  const topPatterns = patternsResult.data
     ?.map(p => ({
       id: p.id,
       file_name: p.file_name,

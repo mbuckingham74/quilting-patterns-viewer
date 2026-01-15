@@ -551,7 +551,7 @@ export default function RotateReviewPage() {
                           width={300}
                           height={300}
                           className="w-full h-full object-contain"
-                          unoptimized
+                          sizes="(max-width: 640px) 50vw, 25vw"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-stone-400">
@@ -795,7 +795,7 @@ export default function RotateReviewPage() {
                   height={350}
                   className="w-full h-full object-contain transition-transform duration-200"
                   style={{ transform: `rotate(${rotationPreview.rotation}deg)` }}
-                  unoptimized
+                  sizes="350px"
                 />
               </div>
             </div>

@@ -51,7 +51,7 @@ export default function ShareBasket() {
                         alt={pattern.file_name}
                         fill
                         className="object-contain p-1"
-                        unoptimized
+                        sizes="48px"
                       />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-stone-300">

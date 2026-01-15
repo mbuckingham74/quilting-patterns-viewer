@@ -207,7 +207,7 @@ export default function PatternEditForm({
                   width={192}
                   height={192}
                   className="w-full h-full object-contain"
-                  unoptimized
+                  sizes="192px"
                 />
                 {isTransforming && (
                   <div className="absolute inset-0 bg-white/80 flex items-center justify-center">

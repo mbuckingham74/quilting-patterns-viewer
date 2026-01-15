@@ -91,7 +91,7 @@ function SortablePattern({ pattern, rank }: SortablePatternProps) {
             alt={pattern.file_name}
             fill
             className="object-contain p-1"
-            unoptimized
+            sizes="64px"
           />
         ) : (
           <div className="flex items-center justify-center h-full text-stone-400">

@@ -422,7 +422,7 @@ export default function DuplicateReview() {
                   alt={currentPair.pattern1.file_name}
                   fill
                   className="object-contain p-4"
-                  unoptimized
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-stone-400">
@@ -461,7 +461,7 @@ export default function DuplicateReview() {
                   alt={currentPair.pattern2.file_name}
                   fill
                   className="object-contain p-4"
-                  unoptimized
+                  sizes="(max-width: 768px) 100vw, 50vw"
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-stone-400">

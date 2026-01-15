@@ -1,9 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import Link from 'next/link'
-import PatternRanker from '@/components/PatternRanker'
+
+// Lazy-load PatternRanker to avoid loading @dnd-kit (61KB) until needed
+const PatternRanker = dynamic(() => import('@/components/PatternRanker'), {
+  loading: () => (
+    <div className="bg-white rounded-xl shadow-sm border border-purple-100 p-12 text-center">
+      <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-purple-500 border-t-transparent"></div>
+      <p className="mt-4 text-stone-600">Loading ranker...</p>
+    </div>
+  ),
+  ssr: false, // DnD doesn't work with SSR
+})
 
 interface Pattern {
   id: number
@@ -208,7 +219,7 @@ export default function SharePage({ params }: { params: Promise<{ token: string 
                     alt={pattern.file_name}
                     fill
                     className="object-contain p-2"
-                    unoptimized
+                    sizes="(max-width: 640px) 50vw, 25vw"
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-stone-400">
