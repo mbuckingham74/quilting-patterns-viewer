@@ -384,6 +384,53 @@ const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage)
 
 ---
 
+## Phase 7: Resource Hints (Completed)
+
+### Preconnect and DNS Prefetch
+
+**Problem**: First requests to external domains (Supabase, Matomo) incur DNS lookup + TLS handshake latency (~100-300ms).
+
+**Solution**: Added `preconnect` and `dns-prefetch` hints to start connections early.
+
+**File Modified**: `app/src/app/layout.tsx`
+
+```tsx
+// Supabase origin derived from env var (only emitted when configured)
+// URL must include scheme (e.g., https://base.tachyonfuture.com)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseOrigin = (() => {
+  if (!supabaseUrl) return null;
+  try {
+    return new URL(supabaseUrl).origin;
+  } catch {
+    return null; // Invalid URL format, skip preconnect
+  }
+})();
+
+// In head:
+{supabaseOrigin && (
+  <>
+    <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
+    <link rel="dns-prefetch" href={supabaseOrigin} />
+  </>
+)}
+<link rel="preconnect" href="https://matomo.tachyonfuture.com" crossOrigin="anonymous" />
+<link rel="dns-prefetch" href="https://matomo.tachyonfuture.com" />
+```
+
+**Domains Optimized**:
+- Supabase (from `NEXT_PUBLIC_SUPABASE_URL`) - API and storage (thumbnails, pattern files)
+- `matomo.tachyonfuture.com` - Analytics
+
+**Notes**:
+- Supabase origin is derived from env var so it works correctly in dev/staging
+- `crossOrigin="anonymous"` added for CORS compatibility (prevents duplicate connections)
+- Try-catch guards against malformed URLs (missing scheme) to prevent build failures
+
+**Impact**: Reduces time to first byte for API calls and image loads by eliminating connection setup from the critical path.
+
+---
+
 ## Future Optimization Opportunities
 
 ### Not Yet Implemented
