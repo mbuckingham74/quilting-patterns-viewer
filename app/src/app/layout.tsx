@@ -17,8 +17,16 @@ export const metadata: Metadata = {
 };
 
 // Extract origin from Supabase URL for preconnect hints
+// URL must include scheme (e.g., https://base.tachyonfuture.com)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : null;
+const supabaseOrigin = (() => {
+  if (!supabaseUrl) return null;
+  try {
+    return new URL(supabaseUrl).origin;
+  } catch {
+    return null; // Invalid URL format, skip preconnect
+  }
+})();
 
 export default function RootLayout({
   children,
