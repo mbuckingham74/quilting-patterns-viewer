@@ -107,6 +107,9 @@ export default async function AdminHelpPage() {
             <a href="#activity" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">10.</span> Audit Admin Activity
             </a>
+            <a href="#exceptions" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">11.</span> Fix Missing Thumbnails
+            </a>
           </div>
         </div>
 
@@ -911,6 +914,102 @@ export default async function AdminHelpPage() {
               <p className="font-medium text-blue-800">Tip: Use this for troubleshooting</p>
               <p className="text-blue-700 text-sm mt-1">
                 If something looks wrong (a pattern is missing, a user can&apos;t log in), check the activity log to see what happened and when. This helps you understand what changed and who made the change.
+              </p>
+            </div>
+          </section>
+
+          {/* Pattern Exceptions */}
+          <section id="exceptions" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">Fix Missing Thumbnails</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              Some patterns may be missing thumbnails or AI embeddings. Use the Pattern Exceptions page to find these issues and regenerate thumbnails from stored PDFs.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-teal-50 rounded-lg">
+                <div className="w-8 h-8 bg-teal-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-teal-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to Pattern Exceptions</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    From the <Link href="/admin" className="text-teal-700 underline">Admin Panel</Link>, click &quot;Pattern Exceptions&quot;
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-teal-50 rounded-lg">
+                <div className="w-8 h-8 bg-teal-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-teal-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">Filter by issue type</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Use the filter buttons at the top:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>All Exceptions</strong> — patterns missing either thumbnail or embedding</li>
+                    <li>&bull; <strong>No Thumbnail</strong> — patterns without a preview image</li>
+                    <li>&bull; <strong>No Embedding</strong> — patterns not searchable by AI</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-teal-50 rounded-lg">
+                <div className="w-8 h-8 bg-teal-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-teal-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Select patterns to fix</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    When viewing &quot;No Thumbnail&quot; or &quot;All Exceptions&quot;, you&apos;ll see checkboxes next to each pattern. Select the patterns you want to generate thumbnails for, or use the checkbox in the header to select all.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-teal-50 rounded-lg">
+                <div className="w-8 h-8 bg-teal-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-teal-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Click &quot;Generate Thumbnails&quot;</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    The teal button will generate thumbnails from stored PDFs. You&apos;ll see a results summary showing:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <span className="text-green-600">Successfully generated</span> — thumbnails created</li>
+                    <li>&bull; <span className="text-amber-600">No stored PDF</span> — pattern was uploaded without a PDF file</li>
+                    <li>&bull; <span className="text-red-600">Failed</span> — error during processing</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-teal-50 rounded-lg">
+                <div className="w-8 h-8 bg-teal-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-teal-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Handle patterns without PDFs</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    If patterns don&apos;t have stored PDFs, you have two options:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Delete the pattern</strong> — click the trash icon if the pattern isn&apos;t needed</li>
+                    <li>&bull; <strong>Keep it</strong> — patterns without thumbnails won&apos;t appear in browse/search but the file can still be downloaded if you share the direct link</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-teal-50 border border-teal-200 rounded-lg">
+              <p className="font-medium text-teal-800">Why do thumbnails go missing?</p>
+              <p className="text-teal-700 text-sm mt-1">
+                Thumbnails are generated from PDF files when patterns are uploaded. If the PDF wasn&apos;t included in the upload ZIP, or if there was a server error during processing, the thumbnail won&apos;t be created. This page helps you identify and fix these issues.
+              </p>
+            </div>
+
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="font-medium text-amber-800">About AI embeddings</p>
+              <p className="text-amber-700 text-sm mt-1">
+                Patterns need both a thumbnail AND an AI embedding to appear in search results. Embeddings are automatically generated when you commit a batch of patterns. Patterns without thumbnails cannot have embeddings generated — fix the thumbnail first!
               </p>
             </div>
           </section>
