@@ -24,6 +24,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Preconnect to external domains for faster resource loading */}
+        <link rel="preconnect" href="https://base.tachyonfuture.com" />
+        <link rel="dns-prefetch" href="https://base.tachyonfuture.com" />
+        <link rel="preconnect" href="https://matomo.tachyonfuture.com" />
+        <link rel="dns-prefetch" href="https://matomo.tachyonfuture.com" />
         <Script id="matomo-analytics" strategy="afterInteractive">
           {`
             var _paq = window._paq = window._paq || [];
