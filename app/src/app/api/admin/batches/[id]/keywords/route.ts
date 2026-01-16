@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 interface BulkKeywordRequest {
   keyword_ids: number[]
@@ -108,6 +109,20 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to add keywords' }, { status: 500 })
     }
 
+    // Log the activity
+    await logAdminActivity({
+      adminId: user.id,
+      action: ActivityAction.BATCH_KEYWORDS,
+      targetType: 'batch',
+      targetId: batchId,
+      description: `Added ${validKeywordIds.length} keyword(s) to ${patternIds.length} patterns in batch`,
+      details: {
+        action: 'add',
+        keyword_ids: validKeywordIds,
+        patterns_affected: patternIds.length,
+      },
+    })
+
     return NextResponse.json({
       success: true,
       action: 'add',
@@ -127,6 +142,20 @@ export async function POST(
       console.error('Error removing keywords:', deleteError)
       return NextResponse.json({ error: 'Failed to remove keywords' }, { status: 500 })
     }
+
+    // Log the activity
+    await logAdminActivity({
+      adminId: user.id,
+      action: ActivityAction.BATCH_KEYWORDS,
+      targetType: 'batch',
+      targetId: batchId,
+      description: `Removed ${keyword_ids.length} keyword(s) from ${patternIds.length} patterns in batch`,
+      details: {
+        action: 'remove',
+        keyword_ids,
+        patterns_affected: patternIds.length,
+      },
+    })
 
     return NextResponse.json({
       success: true,

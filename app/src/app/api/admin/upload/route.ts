@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 import JSZip from 'jszip'
 
 // Supported file extensions
@@ -335,6 +336,23 @@ export async function POST(request: NextRequest) {
         console.error('Failed to save upload log:', logError)
       }
     }
+
+    // Log the upload activity
+    await logAdminActivity({
+      adminId: user.id,
+      action: ActivityAction.BATCH_UPLOAD,
+      targetType: 'batch',
+      targetId: batchId ?? undefined,
+      description: `Uploaded ${uploaded.length} patterns from ${file.name}${isStaged ? ' (staged)' : ''}`,
+      details: {
+        zip_filename: file.name,
+        total: validPatterns.length,
+        uploaded: uploaded.length,
+        skipped: duplicates.length,
+        errors: errors.length,
+        is_staged: isStaged,
+      },
+    })
 
     return NextResponse.json({
       success: true,

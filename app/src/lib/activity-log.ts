@@ -7,11 +7,19 @@ export const ActivityAction = {
   PATTERN_DELETE: 'pattern.delete',
   PATTERN_UPDATE: 'pattern.update',
   PATTERN_TRANSFORM: 'pattern.transform',
+  PATTERN_KEYWORD_ADD: 'pattern.keyword_add',
+  PATTERN_KEYWORD_REMOVE: 'pattern.keyword_remove',
   KEYWORD_CREATE: 'keyword.create',
   KEYWORD_UPDATE: 'keyword.update',
   KEYWORD_DELETE: 'keyword.delete',
   KEYWORD_MERGE: 'keyword.merge',
   ORIENTATION_REVIEW: 'orientation.review',
+  BATCH_UPLOAD: 'batch.upload',
+  BATCH_COMMIT: 'batch.commit',
+  BATCH_CANCEL: 'batch.cancel',
+  BATCH_KEYWORDS: 'batch.keywords',
+  DUPLICATE_REVIEW: 'duplicate.review',
+  THUMBNAILS_REPROCESS: 'thumbnails.reprocess',
 } as const
 
 export type ActivityActionType = (typeof ActivityAction)[keyof typeof ActivityAction]

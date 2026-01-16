@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // Helper to check admin status
 async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -142,6 +143,19 @@ export async function POST(
     )
   }
 
+  // Log the activity
+  await logAdminActivity({
+    adminId: authResult.user.id,
+    action: ActivityAction.PATTERN_KEYWORD_ADD,
+    targetType: 'pattern',
+    targetId: patternId,
+    description: `Added keyword "${keyword.value}" to pattern ${patternId}`,
+    details: {
+      keyword_id: keyword.id,
+      keyword_value: keyword.value,
+    },
+  })
+
   return NextResponse.json({
     success: true,
     keyword,
@@ -181,6 +195,13 @@ export async function DELETE(
     return NextResponse.json({ error: 'Missing or invalid keyword_id' }, { status: 400 })
   }
 
+  // Get keyword info for logging
+  const { data: keyword } = await supabase
+    .from('keywords')
+    .select('id, value')
+    .eq('id', keyword_id)
+    .single()
+
   // Remove the keyword association
   const { error: deleteError, count } = await supabase
     .from('pattern_keywords')
@@ -199,6 +220,19 @@ export async function DELETE(
   if (count === 0) {
     return NextResponse.json({ error: 'Keyword association not found' }, { status: 404 })
   }
+
+  // Log the activity
+  await logAdminActivity({
+    adminId: authResult.user.id,
+    action: ActivityAction.PATTERN_KEYWORD_REMOVE,
+    targetType: 'pattern',
+    targetId: patternId,
+    description: `Removed keyword "${keyword?.value || keyword_id}" from pattern ${patternId}`,
+    details: {
+      keyword_id,
+      keyword_value: keyword?.value,
+    },
+  })
 
   return NextResponse.json({
     success: true,

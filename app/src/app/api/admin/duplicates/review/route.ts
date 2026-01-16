@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 type ReviewDecision = 'keep_both' | 'deleted_first' | 'deleted_second'
 
@@ -100,6 +101,25 @@ export async function POST(request: Request) {
     console.error('Error recording review:', insertError)
     return NextResponse.json({ error: 'Failed to record review', details: insertError.message }, { status: 500 })
   }
+
+  // Log the duplicate review activity
+  const decisionDescription = decision === 'keep_both'
+    ? `Kept both patterns ${pattern_id_1} and ${pattern_id_2}`
+    : `Deleted pattern ${patternToDelete} (duplicate of ${patternToDelete === pattern_id_1 ? pattern_id_2 : pattern_id_1})`
+
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.DUPLICATE_REVIEW,
+    targetType: 'pattern',
+    targetId: patternToDelete ?? pattern_id_1,
+    description: decisionDescription,
+    details: {
+      pattern_id_1,
+      pattern_id_2,
+      decision,
+      deleted_pattern_id: patternToDelete,
+    },
+  })
 
   return NextResponse.json({
     success: true,

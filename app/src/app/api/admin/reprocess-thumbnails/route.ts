@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 import JSZip from 'jszip'
 
 // POST /api/admin/reprocess-thumbnails
@@ -140,6 +141,21 @@ export async function POST(request: NextRequest) {
         })
       }
     }
+
+    // Log the activity
+    await logAdminActivity({
+      adminId: user.id,
+      action: ActivityAction.THUMBNAILS_REPROCESS,
+      targetType: 'batch',
+      description: `Reprocessed thumbnails from ${file.name}: ${results.processed.length} processed, ${results.notFound.length} not found, ${results.errors.length} errors`,
+      details: {
+        zip_filename: file.name,
+        processed: results.processed.length,
+        not_found: results.notFound.length,
+        errors: results.errors.length,
+        processed_ids: results.processed.map(p => p.id),
+      },
+    })
 
     return NextResponse.json({
       success: true,

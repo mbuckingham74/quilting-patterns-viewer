@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateEmbeddingsForBatch } from '@/lib/embeddings'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // POST /api/admin/batches/[id]/commit - Commit batch (make patterns visible in browse)
 export async function POST(
@@ -79,6 +80,18 @@ export async function POST(
   // This runs in the background so users don't have to wait
   generateEmbeddingsForBatch(batchId).catch((error) => {
     console.error(`Error generating embeddings for batch ${batchId}:`, error)
+  })
+
+  // Log the commit activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.BATCH_COMMIT,
+    targetType: 'batch',
+    targetId: batchId,
+    description: `Committed batch with ${patternsCount || 0} patterns`,
+    details: {
+      patterns_count: patternsCount || 0,
+    },
   })
 
   return NextResponse.json({

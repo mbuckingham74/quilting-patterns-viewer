@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
 
 // POST /api/admin/batches/[id]/cancel - Cancel batch (delete all patterns)
 export async function POST(
@@ -108,6 +109,18 @@ export async function POST(
   if (deleteLogError) {
     console.error('Error deleting upload log:', deleteLogError)
   }
+
+  // Log the cancel activity
+  await logAdminActivity({
+    adminId: user.id,
+    action: ActivityAction.BATCH_CANCEL,
+    targetType: 'batch',
+    targetId: batchId,
+    description: `Cancelled batch and deleted ${deletedCount || 0} patterns`,
+    details: {
+      patterns_deleted: deletedCount || 0,
+    },
+  })
 
   return NextResponse.json({
     success: true,
