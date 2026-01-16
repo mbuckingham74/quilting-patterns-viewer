@@ -18,6 +18,18 @@ interface PatternException {
 
 type FilterType = 'all' | 'no_thumbnail' | 'no_embedding'
 
+interface GenerateResult {
+  success: boolean
+  processed: number
+  noPdf: number
+  failed: number
+  details: {
+    processed: Array<{ id: number; name: string }>
+    noPdf: Array<{ id: number; name: string }>
+    failed: Array<{ id: number; name: string; error: string }>
+  }
+}
+
 export default function PatternExceptionsPage() {
   const [patterns, setPatterns] = useState<PatternException[]>([])
   const [loading, setLoading] = useState(true)
@@ -27,6 +39,9 @@ export default function PatternExceptionsPage() {
   const [total, setTotal] = useState(0)
   const [filter, setFilter] = useState<FilterType>('all')
   const [deleting, setDeleting] = useState<number | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [generating, setGenerating] = useState(false)
+  const [generateResult, setGenerateResult] = useState<GenerateResult | null>(null)
 
   const fetchExceptions = async () => {
     setLoading(true)
@@ -79,6 +94,62 @@ export default function PatternExceptionsPage() {
   const handleFilterChange = (newFilter: FilterType) => {
     setFilter(newFilter)
     setPage(1)
+    setSelectedIds(new Set())
+    setGenerateResult(null)
+  }
+
+  const toggleSelection = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === patterns.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(patterns.map(p => p.id)))
+    }
+  }
+
+  const handleGenerateThumbnails = async () => {
+    if (selectedIds.size === 0) return
+
+    setGenerating(true)
+    setGenerateResult(null)
+    try {
+      const response = await fetch('/api/admin/generate-thumbnails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pattern_ids: Array.from(selectedIds) })
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate thumbnails')
+      }
+      setGenerateResult(data)
+      // Remove successfully processed patterns from the list
+      if (data.details?.processed?.length > 0) {
+        const processedIds = new Set<number>(data.details.processed.map((p: { id: number }) => p.id))
+        setPatterns(prev => prev.filter(p => !processedIds.has(p.id)))
+        setTotal(prev => prev - data.details.processed.length)
+        setSelectedIds(prev => {
+          const next = new Set(prev)
+          processedIds.forEach(id => next.delete(id))
+          return next
+        })
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to generate thumbnails')
+    } finally {
+      setGenerating(false)
+    }
   }
 
   return (
@@ -165,10 +236,73 @@ export default function PatternExceptionsPage() {
               No Embedding
             </button>
           </div>
-          <p className="mt-3 text-sm text-stone-500">
-            {total} pattern{total !== 1 ? 's' : ''} found
-          </p>
+          <div className="mt-3 flex items-center justify-between">
+            <p className="text-sm text-stone-500">
+              {total} pattern{total !== 1 ? 's' : ''} found
+            </p>
+            {/* Generate Thumbnails - only show for no_thumbnail filter */}
+            {(filter === 'no_thumbnail' || filter === 'all') && patterns.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-stone-500">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={handleGenerateThumbnails}
+                  disabled={selectedIds.size === 0 || generating}
+                  className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {generating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Generate Thumbnails
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Generate Result */}
+        {generateResult && (
+          <div className={`mb-6 rounded-xl border p-4 ${
+            generateResult.processed > 0 ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'
+          }`}>
+            <h4 className={`font-medium ${generateResult.processed > 0 ? 'text-green-800' : 'text-amber-800'}`}>
+              Thumbnail Generation Results
+            </h4>
+            <ul className="mt-2 text-sm space-y-1">
+              {generateResult.processed > 0 && (
+                <li className="text-green-700">
+                  {generateResult.processed} thumbnail{generateResult.processed !== 1 ? 's' : ''} generated successfully
+                </li>
+              )}
+              {generateResult.noPdf > 0 && (
+                <li className="text-amber-700">
+                  {generateResult.noPdf} pattern{generateResult.noPdf !== 1 ? 's' : ''} had no stored PDF
+                </li>
+              )}
+              {generateResult.failed > 0 && (
+                <li className="text-red-700">
+                  {generateResult.failed} pattern{generateResult.failed !== 1 ? 's' : ''} failed to generate
+                </li>
+              )}
+            </ul>
+            <button
+              onClick={() => setGenerateResult(null)}
+              className="mt-2 text-sm text-stone-500 hover:text-stone-700"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {/* Content */}
         {loading ? (
@@ -201,6 +335,17 @@ export default function PatternExceptionsPage() {
               <table className="w-full">
                 <thead className="bg-stone-50 border-b border-stone-200">
                   <tr>
+                    {(filter === 'no_thumbnail' || filter === 'all') && (
+                      <th className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={patterns.length > 0 && selectedIds.size === patterns.length}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-stone-300 text-purple-600 focus:ring-purple-500"
+                          title="Select all"
+                        />
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-left text-sm font-medium text-stone-600">Pattern</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-stone-600">Type</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-stone-600">Status</th>
@@ -209,7 +354,17 @@ export default function PatternExceptionsPage() {
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {patterns.map(pattern => (
-                    <tr key={pattern.id} className="hover:bg-stone-50">
+                    <tr key={pattern.id} className={`hover:bg-stone-50 ${selectedIds.has(pattern.id) ? 'bg-purple-50' : ''}`}>
+                      {(filter === 'no_thumbnail' || filter === 'all') && (
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(pattern.id)}
+                            onChange={() => toggleSelection(pattern.id)}
+                            className="w-4 h-4 rounded border-stone-300 text-purple-600 focus:ring-purple-500"
+                          />
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-stone-100 rounded-lg overflow-hidden flex-shrink-0">
