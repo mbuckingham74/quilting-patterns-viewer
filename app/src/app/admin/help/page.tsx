@@ -875,15 +875,22 @@ export default async function AdminHelpPage() {
             <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
               <p className="font-medium text-slate-800">What gets logged?</p>
               <p className="text-slate-700 text-sm mt-1">
-                The activity log tracks:
+                The activity log tracks all admin actions:
               </p>
               <ul className="mt-2 text-sm text-slate-700 space-y-1">
-                <li>&bull; User approvals and rejections</li>
-                <li>&bull; Pattern deletions and updates</li>
-                <li>&bull; Thumbnail rotations and flips</li>
-                <li>&bull; Keyword creation, edits, deletes, and merges</li>
-                <li>&bull; Orientation review markings</li>
+                <li>&bull; <strong>User management</strong> — approvals, rejections</li>
+                <li>&bull; <strong>Pattern changes</strong> — deletions, updates, thumbnail rotations and flips</li>
+                <li>&bull; <strong>Batch operations</strong> — uploads, commits, cancellations</li>
+                <li>&bull; <strong>Keyword management</strong> — creation, edits, deletes, merges</li>
+                <li>&bull; <strong>Pattern keywords</strong> — adding/removing keywords from individual patterns</li>
+                <li>&bull; <strong>Batch keywords</strong> — bulk adding/removing keywords across entire batches</li>
+                <li>&bull; <strong>Duplicate review</strong> — decisions on duplicate patterns (keep both, delete one)</li>
+                <li>&bull; <strong>Thumbnail reprocessing</strong> — bulk thumbnail regeneration from ZIP uploads</li>
+                <li>&bull; <strong>Orientation review</strong> — marking rotation/mirror issues as reviewed</li>
               </ul>
+              <p className="text-slate-600 text-xs mt-3">
+                Click any log entry to expand and see full details of what changed.
+              </p>
             </div>
 
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
