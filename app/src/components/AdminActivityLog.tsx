@@ -45,6 +45,9 @@ export default function AdminActivityLog({
   // Available filter options (fetched from API)
   const [actionTypes, setActionTypes] = useState<string[]>([])
 
+  // Expanded details
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
   // Undo state
   const [undoingId, setUndoingId] = useState<number | null>(null)
   const [undoError, setUndoError] = useState<string | null>(null)
@@ -90,18 +93,25 @@ export default function AdminActivityLog({
   }
 
   const getActionBadgeColor = (action: string) => {
-    if (action.includes('delete') || action.includes('reject'))
+    // Destructive actions - red
+    if (action.includes('delete') || action.includes('reject') || action.includes('cancel'))
       return 'bg-red-100 text-red-700'
-    if (
-      action.includes('approve') ||
-      action.includes('create') ||
-      action.includes('commit')
-    )
+    // Creative/approval actions - green
+    if (action.includes('approve') || action.includes('create') || action.includes('commit'))
       return 'bg-green-100 text-green-700'
+    // Upload actions - teal
+    if (action.includes('upload') || action.includes('reprocess'))
+      return 'bg-teal-100 text-teal-700'
+    // Update/transform actions - blue
     if (action.includes('update') || action.includes('transform'))
       return 'bg-blue-100 text-blue-700'
+    // Merge actions - purple
     if (action.includes('merge')) return 'bg-purple-100 text-purple-700'
+    // Review actions - amber
     if (action.includes('review')) return 'bg-amber-100 text-amber-700'
+    // Keyword add/remove on patterns - indigo
+    if (action.includes('keyword_add') || action.includes('keyword_remove') || action === 'batch.keywords')
+      return 'bg-indigo-100 text-indigo-700'
     return 'bg-stone-100 text-stone-700'
   }
 
@@ -191,11 +201,87 @@ export default function AdminActivityLog({
   }
 
   const formatActionLabel = (action: string) => {
-    // Convert 'user.approve' to 'User Approve'
+    // Human-readable labels for specific actions
+    const labels: Record<string, string> = {
+      'user.approve': 'User Approved',
+      'user.reject': 'User Rejected',
+      'pattern.delete': 'Pattern Deleted',
+      'pattern.update': 'Pattern Updated',
+      'pattern.transform': 'Thumbnail Transform',
+      'pattern.keyword_add': 'Keyword Added',
+      'pattern.keyword_remove': 'Keyword Removed',
+      'keyword.create': 'Keyword Created',
+      'keyword.update': 'Keyword Renamed',
+      'keyword.delete': 'Keyword Deleted',
+      'keyword.merge': 'Keywords Merged',
+      'orientation.review': 'Orientation Reviewed',
+      'batch.upload': 'Batch Upload',
+      'batch.commit': 'Batch Committed',
+      'batch.cancel': 'Batch Cancelled',
+      'batch.keywords': 'Batch Keywords',
+      'duplicate.review': 'Duplicate Reviewed',
+      'thumbnails.reprocess': 'Thumbnails Reprocessed',
+    }
+    if (labels[action]) return labels[action]
+    // Fallback: Convert 'user.approve' to 'User Approve'
     return action
       .split('.')
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).replace(/_/g, ' '))
       .join(' ')
+  }
+
+  // Check if this log has meaningful details to show
+  const hasDetails = (log: AdminActivityLogWithAdmin): boolean => {
+    const details = log.details as Record<string, unknown> | null
+    if (!details) return false
+    // Filter out empty objects and objects with only undone_activity_id
+    const keys = Object.keys(details).filter(k => k !== 'undone_activity_id')
+    return keys.length > 0
+  }
+
+  // Format details for display
+  const formatDetails = (details: Record<string, unknown>): Array<{ label: string; value: string }> => {
+    const result: Array<{ label: string; value: string }> = []
+    const labelMap: Record<string, string> = {
+      zip_filename: 'File',
+      total: 'Total Patterns',
+      uploaded: 'Uploaded',
+      skipped: 'Skipped',
+      errors: 'Errors',
+      is_staged: 'Staged',
+      patterns_count: 'Patterns',
+      patterns_deleted: 'Patterns Deleted',
+      patterns_affected: 'Patterns Affected',
+      keyword_ids: 'Keywords',
+      keyword_id: 'Keyword ID',
+      keyword_value: 'Keyword',
+      pattern_id_1: 'Pattern 1',
+      pattern_id_2: 'Pattern 2',
+      decision: 'Decision',
+      deleted_pattern_id: 'Deleted Pattern',
+      processed: 'Processed',
+      not_found: 'Not Found',
+      action: 'Action',
+    }
+
+    for (const [key, value] of Object.entries(details)) {
+      if (key === 'undone_activity_id' || key === 'processed_ids') continue
+      if (value === null || value === undefined) continue
+
+      const label = labelMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      let displayValue: string
+
+      if (typeof value === 'boolean') {
+        displayValue = value ? 'Yes' : 'No'
+      } else if (Array.isArray(value)) {
+        displayValue = value.length > 5 ? `${value.slice(0, 5).join(', ')}... (${value.length} total)` : value.join(', ')
+      } else {
+        displayValue = String(value)
+      }
+
+      result.push({ label, value: displayValue })
+    }
+    return result
   }
 
   const clearFilters = () => {
@@ -418,10 +504,41 @@ export default function AdminActivityLog({
                       </span>
                     </div>
                     <p className="mt-1 text-stone-800">{log.description}</p>
-                    {log.target_id && (
-                      <p className="text-xs text-stone-400 mt-1">
-                        ID: {log.target_id}
-                      </p>
+                    <div className="flex items-center gap-3 mt-1">
+                      {log.target_id && (
+                        <span className="text-xs text-stone-400">
+                          ID: {log.target_id}
+                        </span>
+                      )}
+                      {hasDetails(log) && (
+                        <button
+                          onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
+                          className="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                        >
+                          <svg
+                            className={`w-3 h-3 transition-transform ${expandedId === log.id ? 'rotate-90' : ''}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                          {expandedId === log.id ? 'Hide details' : 'Show details'}
+                        </button>
+                      )}
+                    </div>
+                    {/* Expandable details section */}
+                    {expandedId === log.id && hasDetails(log) && (
+                      <div className="mt-3 p-3 bg-stone-50 rounded-lg border border-stone-200">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2 text-xs">
+                          {formatDetails(log.details as Record<string, unknown>).map(({ label, value }) => (
+                            <div key={label}>
+                              <span className="text-stone-500">{label}:</span>{' '}
+                              <span className="text-stone-700 font-medium">{value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
