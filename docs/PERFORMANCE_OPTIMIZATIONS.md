@@ -394,16 +394,28 @@ const page = Math.max(1, Number.isNaN(parsedPage) ? 1 : parsedPage)
 
 **File Modified**: `app/src/app/layout.tsx`
 
-```html
-<link rel="preconnect" href="https://base.tachyonfuture.com" />
-<link rel="dns-prefetch" href="https://base.tachyonfuture.com" />
-<link rel="preconnect" href="https://matomo.tachyonfuture.com" />
+```tsx
+// Supabase origin derived from env var (only emitted when configured)
+const supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : null;
+
+// In head:
+{supabaseOrigin && (
+  <>
+    <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
+    <link rel="dns-prefetch" href={supabaseOrigin} />
+  </>
+)}
+<link rel="preconnect" href="https://matomo.tachyonfuture.com" crossOrigin="anonymous" />
 <link rel="dns-prefetch" href="https://matomo.tachyonfuture.com" />
 ```
 
 **Domains Optimized**:
-- `base.tachyonfuture.com` - Supabase API and storage (thumbnails, pattern files)
+- Supabase (from `NEXT_PUBLIC_SUPABASE_URL`) - API and storage (thumbnails, pattern files)
 - `matomo.tachyonfuture.com` - Analytics
+
+**Notes**:
+- Supabase origin is derived from env var so it works correctly in dev/staging
+- `crossOrigin="anonymous"` added for CORS compatibility (prevents duplicate connections)
 
 **Impact**: Reduces time to first byte for API calls and image loads by eliminating connection setup from the critical path.
 

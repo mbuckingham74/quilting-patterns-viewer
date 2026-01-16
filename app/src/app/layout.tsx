@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   description: "Browse and download quilting patterns",
 };
 
+// Extract origin from Supabase URL for preconnect hints
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseOrigin = supabaseUrl ? new URL(supabaseUrl).origin : null;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,9 +29,13 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {/* Preconnect to external domains for faster resource loading */}
-        <link rel="preconnect" href="https://base.tachyonfuture.com" />
-        <link rel="dns-prefetch" href="https://base.tachyonfuture.com" />
-        <link rel="preconnect" href="https://matomo.tachyonfuture.com" />
+        {supabaseOrigin && (
+          <>
+            <link rel="preconnect" href={supabaseOrigin} crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href={supabaseOrigin} />
+          </>
+        )}
+        <link rel="preconnect" href="https://matomo.tachyonfuture.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://matomo.tachyonfuture.com" />
         <Script id="matomo-analytics" strategy="afterInteractive">
           {`
