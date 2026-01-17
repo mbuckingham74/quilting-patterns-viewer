@@ -518,6 +518,16 @@ export default async function AdminHelpPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Revoke access if needed</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    To remove access from an approved user, go to <Link href="/admin/approved-users" className="text-purple-700 underline">Approved Users</Link> and click the <span className="text-red-600 font-medium">&quot;Revoke&quot;</span> button next to their name. They&apos;ll need to be re-approved to access the site again.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -690,7 +700,11 @@ export default async function AdminHelpPage() {
                 <div>
                   <p className="font-medium text-stone-800">See what&apos;s popular</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    At the bottom, you&apos;ll find the top downloaded patterns and most popular search queries.
+                    At the bottom, you&apos;ll find the top downloaded patterns and most popular search queries. Hover over any pattern in the lists to reveal a pencil icon <span className="inline-flex items-center justify-center w-5 h-5 bg-stone-100 text-stone-600 rounded text-xs">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </span> — click it to quickly edit that pattern&apos;s details.
                   </p>
                 </div>
               </div>
@@ -700,6 +714,13 @@ export default async function AdminHelpPage() {
               <p className="font-medium text-indigo-800">Note about historical data</p>
               <p className="text-indigo-700 text-sm mt-1">
                 Analytics tracking starts from when this feature was added. Downloads and searches from before that time aren&apos;t counted.
+              </p>
+            </div>
+
+            <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <p className="font-medium text-purple-800">Quick access from the dashboard</p>
+              <p className="text-purple-700 text-sm mt-1">
+                The <Link href="/admin" className="underline">Admin Panel</Link> dashboard shows a &quot;QA Issues&quot; section with counts of patterns that need attention (missing thumbnails, missing AI embeddings, rotation issues, mirror issues). Click any issue type to jump directly to the page where you can fix it.
               </p>
             </div>
           </section>
@@ -881,7 +902,7 @@ export default async function AdminHelpPage() {
                 The activity log tracks all admin actions:
               </p>
               <ul className="mt-2 text-sm text-slate-700 space-y-1">
-                <li>&bull; <strong>User management</strong> — approvals, rejections</li>
+                <li>&bull; <strong>User management</strong> — approvals, rejections, and access revocations</li>
                 <li>&bull; <strong>Pattern changes</strong> — deletions, updates, thumbnail rotations and flips</li>
                 <li>&bull; <strong>Batch operations</strong> — uploads, commits, cancellations</li>
                 <li>&bull; <strong>Keyword management</strong> — creation, edits, deletes, merges</li>
@@ -906,7 +927,7 @@ export default async function AdminHelpPage() {
                 <li>&bull; <strong>User approvals</strong> — click &quot;Unapprove&quot; to revoke access</li>
               </ul>
               <p className="text-amber-600 text-xs mt-2">
-                Note: Deletions and merges cannot be undone.
+                Note: Deletions, merges, and user revocations cannot be undone from the activity log. To restore a revoked user&apos;s access, go to <Link href="/admin/users" className="underline">Manage Users</Link> and approve them again.
               </p>
             </div>
 
