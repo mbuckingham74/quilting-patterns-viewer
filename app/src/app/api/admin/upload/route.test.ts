@@ -63,8 +63,9 @@ describe('POST /api/admin/upload', () => {
     authenticated?: boolean
     isAdmin?: boolean
     userId?: string
+    profileError?: { code?: string; message: string } | null
   } = {}) {
-    const { authenticated = true, isAdmin = true, userId = 'admin-user-id' } = options
+    const { authenticated = true, isAdmin = true, userId = 'admin-user-id', profileError = null } = options
 
     return {
       auth: {
@@ -81,8 +82,8 @@ describe('POST /api/admin/upload', () => {
             select: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
-                  data: isAdmin ? { is_admin: true } : { is_admin: false },
-                  error: null,
+                  data: profileError ? null : (isAdmin ? { is_admin: true } : { is_admin: false }),
+                  error: profileError,
                 }),
               }),
             }),
@@ -98,12 +99,14 @@ describe('POST /api/admin/upload', () => {
     insertResult?: { data: { id: number } | null; error: Error | null }
     uploadError?: Error | null
     updateError?: Error | null
+    uploadLogError?: Error | null
   } = {}) {
     const {
       existingPatterns = [],
       insertResult = { data: { id: 1 }, error: null },
       uploadError = null,
       updateError = null,
+      uploadLogError = null,
     } = options
 
     const mockStorage = {
@@ -115,6 +118,8 @@ describe('POST /api/admin/upload', () => {
         }),
       })),
     }
+
+    let uploadLogId = 100
 
     return {
       from: vi.fn().mockImplementation((table: string) => {
@@ -139,6 +144,21 @@ describe('POST /api/admin/upload', () => {
             }),
           }
         }
+        if (table === 'upload_logs') {
+          return {
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: uploadLogError ? null : { id: uploadLogId++ },
+                  error: uploadLogError,
+                }),
+              }),
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          }
+        }
         return {}
       }),
       storage: mockStorage,
@@ -158,7 +178,8 @@ describe('POST /api/admin/upload', () => {
 
       expect(response.status).toBe(401)
       const json = await response.json()
-      expect(json.error).toBe('Not authenticated')
+      expect(json.error).toBe('Authentication required')
+      expect(json.code).toBe('AUTH_REQUIRED')
     })
 
     it('returns 403 when user is not admin', async () => {
@@ -173,7 +194,45 @@ describe('POST /api/admin/upload', () => {
 
       expect(response.status).toBe(403)
       const json = await response.json()
-      expect(json.error).toBe('Not authorized')
+      expect(json.error).toBe('Admin access required')
+      expect(json.code).toBe('AUTH_FORBIDDEN')
+    })
+
+    it('returns 403 when profile row does not exist (PGRST116)', async () => {
+      const mockSupabase = createMockSupabase({
+        authenticated: true,
+        profileError: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' }
+      })
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+
+      const zip = await createZipFile({ 'pattern.qli': 'test content' })
+      const formData = createFormData(zip)
+      const request = await createRequest(formData)
+
+      const response = await POST(request)
+
+      expect(response.status).toBe(403)
+      const json = await response.json()
+      expect(json.error).toBe('Admin access required')
+      expect(json.code).toBe('AUTH_FORBIDDEN')
+    })
+
+    it('returns 500 when profile lookup fails with database error', async () => {
+      const mockSupabase = createMockSupabase({
+        authenticated: true,
+        profileError: { code: '42P01', message: 'relation "profiles" does not exist' }
+      })
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+
+      const zip = await createZipFile({ 'pattern.qli': 'test content' })
+      const formData = createFormData(zip)
+      const request = await createRequest(formData)
+
+      const response = await POST(request)
+
+      expect(response.status).toBe(500)
+      const json = await response.json()
+      expect(json.code).toBe('INTERNAL_ERROR')
     })
 
     it('allows admin users', async () => {
@@ -243,7 +302,8 @@ describe('POST /api/admin/upload', () => {
 
       expect(response.status).toBe(400)
       const json = await response.json()
-      expect(json.error).toBe('No QLI pattern files found in ZIP')
+      expect(json.error).toBe('No QLI pattern files found in ZIP. ZIP must contain .qli files.')
+      expect(json.code).toBe('VALIDATION_FAILED')
     })
   })
 
@@ -324,7 +384,7 @@ describe('POST /api/admin/upload', () => {
       const json = await response.json()
       expect(json.success).toBe(true)
       expect(json.uploaded).toHaveLength(1)
-      expect(json.uploaded[0]).toEqual({
+      expect(json.uploaded[0]).toMatchObject({
         id: 42,
         name: 'my-pattern',
         hasThumbnail: false,
@@ -402,7 +462,27 @@ describe('POST /api/admin/upload', () => {
 
       expect(response.status).toBe(500)
       const json = await response.json()
-      expect(json.error).toBe('Server configuration error')
+      expect(json.error).toBe('An unexpected error occurred. Please try again.')
+      expect(json.code).toBe('INTERNAL_ERROR')
+    })
+
+    it('returns 500 when upload log creation fails', async () => {
+      const mockSupabase = createMockSupabase()
+      const mockService = createMockServiceClient({
+        uploadLogError: new Error('Database connection failed'),
+      })
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+      mockCreateServiceClient.mockReturnValue(mockService as unknown as ReturnType<typeof createServiceClient>)
+
+      const zip = await createZipFile({ 'pattern.qli': 'content' })
+      const formData = createFormData(zip)
+      const request = await createRequest(formData)
+
+      const response = await POST(request)
+
+      expect(response.status).toBe(500)
+      const json = await response.json()
+      expect(json.code).toBe('INTERNAL_ERROR')
     })
 
     it('handles database insert errors', async () => {
@@ -539,7 +619,7 @@ More pattern data
     it('returns accurate summary with mixed results', async () => {
       const mockSupabase = createMockSupabase()
 
-      let insertCount = 0
+      let patternInsertCount = 0
       const mockService = {
         from: vi.fn().mockImplementation((table: string) => {
           if (table === 'patterns') {
@@ -553,9 +633,9 @@ More pattern data
               insert: vi.fn().mockReturnValue({
                 select: vi.fn().mockReturnValue({
                   single: vi.fn().mockImplementation(() => {
-                    insertCount++
+                    patternInsertCount++
                     // First insert succeeds, second fails
-                    if (insertCount === 1) {
+                    if (patternInsertCount === 1) {
                       return Promise.resolve({ data: { id: 1 }, error: null })
                     }
                     return Promise.resolve({ data: null, error: new Error('Insert failed') })
@@ -566,6 +646,18 @@ More pattern data
                 eq: vi.fn().mockResolvedValue({ error: null }),
               }),
               delete: vi.fn().mockReturnValue({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              }),
+            }
+          }
+          if (table === 'upload_logs') {
+            return {
+              insert: vi.fn().mockReturnValue({
+                select: vi.fn().mockReturnValue({
+                  single: vi.fn().mockResolvedValue({ data: { id: 100 }, error: null }),
+                }),
+              }),
+              update: vi.fn().mockReturnValue({
                 eq: vi.fn().mockResolvedValue({ error: null }),
               }),
             }

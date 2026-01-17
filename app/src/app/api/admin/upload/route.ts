@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  internalError
+} from '@/lib/api-response'
+import { logError } from '@/lib/errors'
 import JSZip from 'jszip'
 
 // Supported file extensions
@@ -16,46 +23,74 @@ export async function POST(request: NextRequest) {
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  // Supabase returns PGRST116 when .single() finds no rows - treat as forbidden
+  // Other errors (permissions, outage) should be logged and return 500
+  if (profileError) {
+    const isNoRowError = profileError.code === 'PGRST116'
+    if (!isNoRowError) {
+      return internalError(profileError, {
+        component: 'admin/upload',
+        action: 'check_admin_profile',
+        userId: user.id
+      })
+    }
+    return forbidden('Admin access required')
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden('Admin access required')
   }
 
   // Use service-role client for storage/DB operations (bypasses RLS)
   let serviceClient: ReturnType<typeof createServiceClient>
   try {
     serviceClient = createServiceClient()
-  } catch {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+  } catch (error) {
+    // internalError() logs automatically via logError()
+    return internalError(error, { component: 'admin/upload', action: 'create_service_client' })
+  }
+
+  // Parse form data with error handling
+  let formData: FormData
+  try {
+    formData = await request.formData()
+  } catch (error) {
+    logError(error, { component: 'admin/upload', action: 'parse_form_data' })
+    return badRequest('Failed to parse form data')
+  }
+
+  const file = formData.get('file') as File | null
+  const stagedParam = formData.get('staged')
+  // Default to staged mode (true) unless explicitly set to 'false'
+  const isStaged = stagedParam !== 'false'
+
+  if (!file) {
+    return badRequest('No file provided')
+  }
+
+  if (!file.name.toLowerCase().endsWith('.zip')) {
+    return badRequest('File must be a ZIP archive')
   }
 
   try {
-    // Get the uploaded file and staging option
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-    const stagedParam = formData.get('staged')
-    // Default to staged mode (true) unless explicitly set to 'false'
-    const isStaged = stagedParam !== 'false'
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    }
-
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-      return NextResponse.json({ error: 'File must be a ZIP archive' }, { status: 400 })
-    }
-
     // Read ZIP file
     const arrayBuffer = await file.arrayBuffer()
-    const zip = await JSZip.loadAsync(arrayBuffer)
+    let zip: JSZip
+    try {
+      zip = await JSZip.loadAsync(arrayBuffer)
+    } catch (zipError) {
+      logError(zipError, { component: 'admin/upload', action: 'parse_zip', filename: file.name })
+      return badRequest('Failed to parse ZIP file. The file may be corrupted.')
+    }
 
     // Save the raw ZIP file to storage for backup/recovery
     const zipTimestamp = new Date().toISOString().replace(/[:.]/g, '-')
@@ -68,7 +103,13 @@ export async function POST(request: NextRequest) {
       })
 
     if (zipUploadError) {
-      console.warn(`Could not save raw ZIP file: ${zipUploadError.message}`)
+      // Non-fatal: log warning but continue processing
+      logError(zipUploadError, {
+        component: 'admin/upload',
+        action: 'backup_zip',
+        filename: file.name,
+        path: zipStoragePath
+      })
     }
 
     // Catalog files by normalized pattern name
@@ -98,10 +139,7 @@ export async function POST(request: NextRequest) {
       .map(([name, files]) => ({ name, ...files }))
 
     if (validPatterns.length === 0) {
-      return NextResponse.json({
-        error: 'No QLI pattern files found in ZIP',
-        details: 'ZIP must contain .qli files'
-      }, { status: 400 })
+      return badRequest('No QLI pattern files found in ZIP. ZIP must contain .qli files.')
     }
 
     // Get existing pattern names for duplicate detection (use service client for full access)
@@ -112,6 +150,7 @@ export async function POST(request: NextRequest) {
     const duplicates = validPatterns.filter(p => existingNames.has(p.name))
 
     if (newPatterns.length === 0) {
+      // All patterns are duplicates - return success with empty uploaded list
       return NextResponse.json({
         success: true,
         uploaded: [],
@@ -128,7 +167,7 @@ export async function POST(request: NextRequest) {
     // Create upload log first to get batch ID (for staged uploads)
     let batchId: number | null = null
     if (isStaged && newPatterns.length > 0) {
-      const { data: uploadLog, error: logError } = await serviceClient
+      const { data: uploadLog, error: uploadLogError } = await serviceClient
         .from('upload_logs')
         .insert({
           zip_filename: file.name,
@@ -146,9 +185,15 @@ export async function POST(request: NextRequest) {
         .select('id')
         .single()
 
-      if (logError || !uploadLog) {
-        console.error('Failed to create upload log:', logError)
-        return NextResponse.json({ error: 'Failed to initialize upload batch' }, { status: 500 })
+      if (uploadLogError || !uploadLog) {
+        // internalError() logs automatically via logError()
+        // Pass fallback error if uploadLog is null but no error (unexpected state)
+        return internalError(uploadLogError ?? new Error('Upload log insert returned no data'), {
+          component: 'admin/upload',
+          action: 'create_upload_log',
+          userId: user.id,
+          filename: file.name
+        })
       }
       batchId = uploadLog.id
     }
@@ -241,7 +286,12 @@ export async function POST(request: NextRequest) {
               })
 
             if (pdfUploadError) {
-              console.warn(`Could not save PDF for ${pattern.name}:`, pdfUploadError.message)
+              // Non-fatal: log but continue - we can still generate thumbnail
+              logError(pdfUploadError, {
+                component: 'admin/upload',
+                action: 'save_pdf',
+                patternName: pattern.name
+              })
             }
 
             // Render PDF to thumbnail
@@ -261,8 +311,13 @@ export async function POST(request: NextRequest) {
                 thumbnailUrl = serviceClient.storage.from('thumbnails').getPublicUrl(thumbPath).data.publicUrl
               }
             }
-          } catch (e) {
-            console.warn(`Could not generate thumbnail for ${pattern.name}:`, e)
+          } catch (thumbnailError) {
+            // Non-fatal: pattern is usable without thumbnail
+            logError(thumbnailError, {
+              component: 'admin/upload',
+              action: 'generate_thumbnail',
+              patternName: pattern.name
+            })
           }
         }
 
@@ -292,11 +347,17 @@ export async function POST(request: NextRequest) {
           author: authorInfo.author
         })
 
-      } catch (e) {
-        console.error(`Error processing ${pattern.name}:`, e)
+      } catch (patternError) {
+        // Log individual pattern processing errors
+        logError(patternError, {
+          component: 'admin/upload',
+          action: 'process_pattern',
+          patternName: pattern.name,
+          batchId
+        })
         errors.push({
           name: pattern.name,
-          error: e instanceof Error ? e.message : 'Unknown error'
+          error: patternError instanceof Error ? patternError.message : 'Unknown error'
         })
       }
     }
@@ -306,34 +367,44 @@ export async function POST(request: NextRequest) {
 
     if (isStaged && batchId) {
       // Update the existing staged upload log with results
-      try {
-        await serviceClient.from('upload_logs').update({
-          uploaded_count: uploaded.length,
-          error_count: errors.length,
-          uploaded_patterns: uploaded,
-          error_patterns: errors,
-        }).eq('id', batchId)
-      } catch (logError) {
-        console.error('Failed to update upload log:', logError)
+      const { error: updateLogError } = await serviceClient.from('upload_logs').update({
+        uploaded_count: uploaded.length,
+        error_count: errors.length,
+        uploaded_patterns: uploaded,
+        error_patterns: errors,
+      }).eq('id', batchId)
+
+      if (updateLogError) {
+        // Non-fatal: patterns were uploaded, just log update failed
+        logError(updateLogError, {
+          component: 'admin/upload',
+          action: 'update_upload_log',
+          batchId
+        })
       }
     } else {
       // Create a committed upload log (non-staged mode)
-      try {
-        await serviceClient.from('upload_logs').insert({
-          zip_filename: file.name,
-          zip_storage_path: zipUploadError ? null : zipStoragePath,
-          uploaded_by: user.id,
-          total_patterns: validPatterns.length,
-          uploaded_count: uploaded.length,
-          skipped_count: duplicates.length,
-          error_count: errors.length,
-          uploaded_patterns: uploaded,
-          skipped_patterns: skippedPatterns,
-          error_patterns: errors,
-          status: 'committed',
+      const { error: insertLogError } = await serviceClient.from('upload_logs').insert({
+        zip_filename: file.name,
+        zip_storage_path: zipUploadError ? null : zipStoragePath,
+        uploaded_by: user.id,
+        total_patterns: validPatterns.length,
+        uploaded_count: uploaded.length,
+        skipped_count: duplicates.length,
+        error_count: errors.length,
+        uploaded_patterns: uploaded,
+        skipped_patterns: skippedPatterns,
+        error_patterns: errors,
+        status: 'committed',
+      })
+
+      if (insertLogError) {
+        // Non-fatal: patterns were uploaded, just logging failed
+        logError(insertLogError, {
+          component: 'admin/upload',
+          action: 'insert_upload_log',
+          filename: file.name
         })
-      } catch (logError) {
-        console.error('Failed to save upload log:', logError)
       }
     }
 
@@ -370,12 +441,13 @@ export async function POST(request: NextRequest) {
       is_staged: isStaged,
     })
 
-  } catch (e) {
-    console.error('Upload error:', e)
-    return NextResponse.json({
-      error: 'Failed to process upload',
-      details: e instanceof Error ? e.message : 'Unknown error'
-    }, { status: 500 })
+  } catch (error) {
+    // internalError() logs automatically via logError()
+    return internalError(error, {
+      component: 'admin/upload',
+      action: 'process_upload',
+      userId: user.id
+    })
   }
 }
 
