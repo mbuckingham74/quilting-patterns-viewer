@@ -39,10 +39,15 @@ The app uses a centralized error handling system that provides:
 │  API Routes                                                      │
 │  └── lib/api-response.ts                                        │
 │      ├── unauthorized() → 401 responses                         │
+│      ├── forbidden() → 403 responses                            │
 │      ├── badRequest() → 400 responses                           │
 │      ├── notFound() → 404 responses                             │
 │      ├── conflict() → 409 responses                             │
+│      ├── expired() → 410 responses                              │
 │      ├── rateLimited() → 429 responses                          │
+│      ├── invalidState() → 400 responses (state errors)          │
+│      ├── notReversible() → 400 responses (undo errors)          │
+│      ├── resourceDeleted() → 400 responses (deleted items)      │
 │      ├── internalError() → 500 responses + logging              │
 │      └── serviceUnavailable() → 503 responses                   │
 ├─────────────────────────────────────────────────────────────────┤
@@ -68,6 +73,11 @@ All errors use standardized codes defined in `lib/errors.ts`:
 | `NOT_FOUND` | 404 | Resource doesn't exist |
 | `ALREADY_EXISTS` | 409 | Duplicate resource |
 | `CONFLICT` | 409 | Operation conflict |
+| `EXPIRED` | 410 | Link or resource has expired |
+| `RESOURCE_DELETED` | 400 | Item has been deleted |
+| `INVALID_STATE` | 400 | Operation not valid in current state |
+| `NOT_REVERSIBLE` | 400 | Action cannot be undone |
+| `UPLOAD_FAILED` | 400 | File upload/processing failed |
 | `RATE_LIMITED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Server error |
 | `SERVICE_UNAVAILABLE` | 503 | External service down |
@@ -200,12 +210,18 @@ Use the helper functions from `lib/api-response.ts`:
 ```typescript
 import {
   unauthorized,
+  forbidden,
   badRequest,
   notFound,
   conflict,
+  expired,
   rateLimited,
+  invalidState,
+  notReversible,
+  resourceDeleted,
   internalError,
-  serviceUnavailable
+  serviceUnavailable,
+  successResponse
 } from '@/lib/api-response'
 
 export async function POST(request: Request) {
@@ -216,8 +232,20 @@ export async function POST(request: Request) {
       return unauthorized()
     }
 
-    // Validation
-    const { email } = await request.json()
+    // Admin check
+    if (!user.isAdmin) {
+      return forbidden()
+    }
+
+    // Parse body with try-catch for safe JSON parsing
+    let body: { email: string }
+    try {
+      body = await request.json()
+    } catch {
+      return badRequest('Invalid JSON in request body')
+    }
+
+    const { email } = body
     if (!email) {
       return badRequest('Email is required')
     }
@@ -227,13 +255,31 @@ export async function POST(request: Request) {
       return rateLimited(60) // Retry after 60 seconds
     }
 
-    // Business logic
-    const result = await doSomething(email)
-    if (!result) {
-      return notFound('User not found')
+    // Check resource state
+    const resource = await getResource(id)
+    if (!resource) {
+      return notFound('Resource not found')
+    }
+    if (resource.deleted_at) {
+      return resourceDeleted('This item has been deleted')
+    }
+    if (resource.status !== 'pending') {
+      return invalidState('Resource must be in pending state')
     }
 
-    return NextResponse.json({ data: result })
+    // Check for expired links
+    if (resource.expires_at && new Date(resource.expires_at) < new Date()) {
+      return expired('This link has expired')
+    }
+
+    // Check if action can be undone
+    if (action === 'undo' && !resource.reversible) {
+      return notReversible('This action cannot be undone')
+    }
+
+    // Business logic
+    const result = await doSomething(email)
+    return successResponse({ data: result })
 
   } catch (error) {
     // Logs error and returns 500
@@ -244,6 +290,24 @@ export async function POST(request: Request) {
   }
 }
 ```
+
+### Helper Functions Reference
+
+| Helper | HTTP Status | Error Code | Use Case |
+|--------|-------------|------------|----------|
+| `unauthorized()` | 401 | `AUTH_REQUIRED` | User not logged in |
+| `forbidden()` | 403 | `AUTH_FORBIDDEN` | User lacks permission (e.g., not admin) |
+| `badRequest(msg)` | 400 | `INVALID_INPUT` | Invalid request data |
+| `notFound(msg)` | 404 | `NOT_FOUND` | Resource doesn't exist |
+| `conflict(msg)` | 409 | `CONFLICT` | Operation conflicts (e.g., duplicate) |
+| `expired(msg)` | 410 | `EXPIRED` | Share links, tokens past expiration |
+| `invalidState(msg)` | 400 | `INVALID_STATE` | Operation not valid in current state |
+| `notReversible(msg)` | 400 | `NOT_REVERSIBLE` | Undo not supported for this action |
+| `resourceDeleted(msg)` | 400 | `RESOURCE_DELETED` | Item was deleted, no longer available |
+| `rateLimited(retryAfter)` | 429 | `RATE_LIMITED` | Too many requests |
+| `internalError(err, ctx)` | 500 | `INTERNAL_ERROR` | Unexpected server error |
+| `serviceUnavailable()` | 503 | `SERVICE_UNAVAILABLE` | External service down |
+| `successResponse(data)` | 200 | - | Successful operation |
 
 ### Response Format
 
@@ -313,6 +377,11 @@ In development, logs go to console. In production, errors are automatically sent
 | `VALIDATION_FAILED` | No | Bad input won't change |
 | `NOT_FOUND` | No | Resource doesn't exist |
 | `CONFLICT` | No | Requires conflict resolution |
+| `EXPIRED` | No | Resource permanently expired |
+| `RESOURCE_DELETED` | No | Resource permanently deleted |
+| `INVALID_STATE` | No | State issue, requires user action |
+| `NOT_REVERSIBLE` | No | Action cannot be undone |
+| `UPLOAD_FAILED` | Yes | May succeed on retry |
 | `INTERNAL_ERROR` | No | Server bug, needs fix |
 
 ### Backoff Strategy
@@ -378,6 +447,8 @@ export default function GlobalError({ error, reset }) {
 4. **Use retry** for network operations
 5. **Wrap risky components** in error boundaries
 6. **Handle auth errors specially** - prompt re-login
+7. **Wrap JSON parsing in try-catch** - prevents unhandled exceptions
+8. **Use `logError()` instead of `console.error`** - enables Sentry tracking
 
 ### DON'T:
 
@@ -386,6 +457,26 @@ export default function GlobalError({ error, reset }) {
 3. **Retry non-retryable errors** - wastes resources
 4. **Block UI on errors** - show fallback content
 5. **Expose internal details** in API error messages
+6. **Use raw `request.json()`** - always wrap in try-catch
+
+### Safe JSON Parsing Pattern
+
+Always wrap `request.json()` in a try-catch to handle malformed JSON gracefully:
+
+```typescript
+// ❌ Bad - unhandled exception if JSON is malformed
+const body = await request.json()
+
+// ✅ Good - returns structured error response
+let body: MyRequestType
+try {
+  body = await request.json()
+} catch {
+  return badRequest('Invalid JSON in request body')
+}
+```
+
+This pattern is used across all API routes to ensure consistent error handling.
 
 ## File Reference
 
@@ -411,6 +502,28 @@ export default function GlobalError({ error, reset }) {
 2. Add user message to `ErrorMessages`
 3. Update `isRetryableError()` if needed
 4. Update `httpStatusToErrorCode()` if HTTP-related
+5. Add helper function in `lib/api-response.ts` if commonly used
+6. Update the Error Codes table in this document
+
+Example: Adding the `EXPIRED` error code
+
+```typescript
+// lib/errors.ts
+export const ErrorCode = {
+  // ... existing codes
+  EXPIRED: 'EXPIRED',
+} as const
+
+export const ErrorMessages: Record<string, string> = {
+  // ... existing messages
+  [ErrorCode.EXPIRED]: 'This link or resource has expired',
+}
+
+// lib/api-response.ts
+export function expired(message = 'This link or resource has expired') {
+  return errorResponse(410, { code: ErrorCode.EXPIRED, message })
+}
+```
 
 ### Sentry Integration
 
