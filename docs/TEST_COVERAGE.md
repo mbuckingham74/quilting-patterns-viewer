@@ -1,6 +1,6 @@
 # Test Coverage Documentation
 
-Last updated: January 11, 2026
+Last updated: January 17, 2026
 
 ## Summary
 
@@ -11,7 +11,7 @@ Last updated: January 11, 2026
 | Functions  | ~51%     |
 | Lines      | ~54%     |
 
-**Total Tests:** 767 across 53 test files
+**Total Tests:** 770 across 53 test files
 
 ## Running Tests
 
@@ -46,7 +46,7 @@ cd app && npm test
 - `src/app/api/search/rateLimit.test.ts` - 8 tests
 - `src/app/auth/callback/route.test.ts` - 18 tests
 - `src/app/auth/signin/route.test.ts` - 14 tests
-- `src/app/api/admin/upload/route.test.ts` - 18 tests
+- `src/app/api/admin/upload/route.test.ts` - 21 tests
 - `src/hooks/useFetch.test.ts` - 25 tests
 
 ### Contexts (src/contexts/) - 100% statements
@@ -104,11 +104,11 @@ cd app && npm test
 | /auth/signin                   | 14    | OAuth initiation, cookie handling |
 | /api/search                    | 20    | Auth, rate limiting, semantic/text search paths |
 
-#### Admin Upload (NEW - fully covered)
+#### Admin Upload (fully covered)
 
 | Route                          | Tests | Notes                         |
 |--------------------------------|-------|-------------------------------|
-| /api/admin/upload              | 18    | File upload, ZIP processing, storage, auth |
+| /api/admin/upload              | 21    | File upload, ZIP processing, storage, auth, error handling |
 
 ## What's NOT Covered
 
@@ -214,6 +214,24 @@ Components still at 0% coverage:
    - AuthButtonClient.tsx / AuthButtonServer.tsx
 
 ## Recent Progress
+
+### January 17, 2026
+
+Refactored admin upload route error handling and added 3 new tests (total: 21 tests):
+
+**Error Handling Refactor** (`/api/admin/upload`)
+
+- Replaced manual `NextResponse.json` calls with standardized helpers (`unauthorized`, `forbidden`, `badRequest`, `internalError`)
+- Added structured error logging with `logError()` context
+- Wrapped form data and ZIP parsing in try-catch blocks
+- Distinguished PGRST116 (no profile row) from real database errors
+- Added fallback error for null upload log without error object
+
+**New Tests:**
+
+- `returns 403 when profile row does not exist (PGRST116)` - Verifies that missing profile returns 403 with AUTH_FORBIDDEN code
+- `returns 500 when profile lookup fails with database error` - Verifies real DB errors return 500 with INTERNAL_ERROR code
+- `returns 500 when upload log creation fails` - Verifies upload log insert failure returns 500
 
 ### January 11, 2026
 
@@ -613,15 +631,16 @@ Added comprehensive tests for:
   - Error handling for OAuth failures
   - Cookie handling for PKCE flow
 
-- **Admin Upload** (`/api/admin/upload`) - 18 tests
+- **Admin Upload** (`/api/admin/upload`) - 21 tests
   - Authentication (401 unauthenticated)
-  - Authorization (403 non-admin)
+  - Authorization (403 non-admin, 403 PGRST116 no profile, 500 DB error)
   - File validation (ZIP required, must contain .qli files)
   - Duplicate detection and skipping
   - Successful upload with pattern processing
   - Nested folder structure in ZIP files
   - Storage upload error handling with cleanup
   - Database error handling with cleanup
+  - Upload log creation failure handling
   - Summary reporting with mixed results
 
 ## Test Patterns Used
