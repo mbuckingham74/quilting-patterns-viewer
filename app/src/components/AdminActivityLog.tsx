@@ -94,7 +94,7 @@ export default function AdminActivityLog({
 
   const getActionBadgeColor = (action: string) => {
     // Destructive actions - red
-    if (action.includes('delete') || action.includes('reject') || action.includes('cancel'))
+    if (action.includes('delete') || action.includes('reject') || action.includes('cancel') || action.includes('revoke'))
       return 'bg-red-100 text-red-700'
     // Creative/approval actions - green
     if (action.includes('approve') || action.includes('create') || action.includes('commit'))
@@ -205,6 +205,7 @@ export default function AdminActivityLog({
     const labels: Record<string, string> = {
       'user.approve': 'User Approved',
       'user.reject': 'User Rejected',
+      'user.revoke': 'User Revoked',
       'pattern.delete': 'Pattern Deleted',
       'pattern.update': 'Pattern Updated',
       'pattern.transform': 'Thumbnail Transform',
