@@ -1,44 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, notFound, internalError, withErrorHandler } from '@/lib/api-response'
 
 // POST /api/admin/generate-thumbnails
 // Generate thumbnails from stored PDFs for patterns that have PDFs but no thumbnails
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   let serviceClient: ReturnType<typeof createServiceClient>
   try {
     serviceClient = createServiceClient()
-  } catch {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+  } catch (error) {
+    return internalError(error, { action: 'create_service_client' })
   }
 
   try {
-    const body = await request.json()
-    const { pattern_ids } = body as { pattern_ids: number[] }
+    let body: { pattern_ids?: number[] }
+    try {
+      body = await request.json()
+    } catch {
+      return badRequest('Invalid JSON in request body')
+    }
+
+    const { pattern_ids } = body
 
     if (!Array.isArray(pattern_ids) || pattern_ids.length === 0) {
-      return NextResponse.json({ error: 'pattern_ids must be a non-empty array' }, { status: 400 })
+      return badRequest('pattern_ids must be a non-empty array')
     }
 
     if (pattern_ids.length > 50) {
-      return NextResponse.json({ error: 'Maximum 50 patterns per request' }, { status: 400 })
+      return badRequest('Maximum 50 patterns per request')
     }
 
     const results = {
@@ -54,11 +66,11 @@ export async function POST(request: NextRequest) {
       .in('id', pattern_ids)
 
     if (fetchError) {
-      throw fetchError
+      return internalError(fetchError, { action: 'fetch_patterns_for_thumbnails', patternIds: pattern_ids })
     }
 
     if (!patterns || patterns.length === 0) {
-      return NextResponse.json({ error: 'No patterns found' }, { status: 404 })
+      return notFound('No patterns found')
     }
 
     for (const pattern of patterns) {
@@ -149,13 +161,9 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (e) {
-    console.error('Generate thumbnails error:', e)
-    return NextResponse.json({
-      error: 'Failed to generate thumbnails',
-      details: e instanceof Error ? e.message : 'Unknown error'
-    }, { status: 500 })
+    return internalError(e, { action: 'generate_thumbnails' })
   }
-}
+})
 
 // PDF to thumbnail rendering (same as upload route)
 async function renderPdfToThumbnail(pdfData: Uint8Array): Promise<Uint8Array | null> {

@@ -1,29 +1,40 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/admin/patterns - List patterns with pagination
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1', 10)
   const limit = Math.min(parseInt(searchParams.get('limit') || '25', 10), 100)
   const hasThumb = searchParams.get('hasThumb') === 'true'
+
+  if (page < 1 || limit < 1) {
+    return badRequest('Invalid pagination params')
+  }
 
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Build query
@@ -36,7 +47,11 @@ export async function GET(request: Request) {
   }
 
   // Get total count
-  const { count } = await query
+  const { count, error: countError } = await query
+
+  if (countError) {
+    return internalError(countError, { action: 'count_patterns', hasThumb })
+  }
 
   // Get paginated results
   const offset = (page - 1) * limit
@@ -53,8 +68,7 @@ export async function GET(request: Request) {
   const { data: patterns, error } = await dataQuery
 
   if (error) {
-    console.error('Error fetching patterns:', error)
-    return NextResponse.json({ error: 'Failed to fetch patterns' }, { status: 500 })
+    return internalError(error, { action: 'fetch_patterns', page, limit, hasThumb })
   }
 
   const total = count || 0
@@ -67,4 +81,4 @@ export async function GET(request: Request) {
     total,
     totalPages,
   })
-}
+})

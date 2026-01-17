@@ -7,7 +7,9 @@ import {
   notFound,
   internalError,
   successResponse,
+  withErrorHandler,
 } from '@/lib/api-response'
+import { isSupabaseNoRowError } from '@/lib/errors'
 
 interface BulkKeywordRequest {
   keyword_ids: number[]
@@ -15,10 +17,10 @@ interface BulkKeywordRequest {
 }
 
 // POST /api/admin/batches/[id]/keywords - Bulk add/remove keywords for all patterns in batch
-export async function POST(
+export const POST = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const batchId = parseInt(id, 10)
 
@@ -34,11 +36,15 @@ export async function POST(
     return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!adminProfile?.is_admin) {
     return forbidden()
@@ -166,4 +172,4 @@ export async function POST(
       keywords_removed: keyword_ids.length,
     })
   }
-}
+})

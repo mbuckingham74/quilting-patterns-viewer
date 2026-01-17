@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 export interface PatternException {
   id: number
@@ -13,23 +15,28 @@ export interface PatternException {
 }
 
 // GET /api/admin/exceptions - Get patterns with missing data (admin only)
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Get query params
@@ -40,7 +47,7 @@ export async function GET(request: Request) {
 
   // Validate params
   if (page < 1 || limit < 1 || limit > 100) {
-    return NextResponse.json({ error: 'Invalid pagination params' }, { status: 400 })
+    return badRequest('Invalid pagination params')
   }
 
   const offset = (page - 1) * limit
@@ -64,8 +71,7 @@ export async function GET(request: Request) {
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('Error fetching exceptions:', error)
-    return NextResponse.json({ error: 'Failed to fetch patterns' }, { status: 500 })
+    return internalError(error, { action: 'fetch_exceptions', page, limit, filter })
   }
 
   // Transform to include boolean flags
@@ -87,6 +93,6 @@ export async function GET(request: Request) {
     limit,
     totalPages: Math.ceil((count || 0) / limit),
   })
-}
+})
 
 // DELETE /api/admin/exceptions/[id] - Delete a pattern (handled by existing endpoint)

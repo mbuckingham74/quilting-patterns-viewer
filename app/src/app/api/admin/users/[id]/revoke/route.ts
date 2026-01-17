@@ -1,51 +1,65 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, notFound, internalError, withErrorHandler } from '@/lib/api-response'
 
 // POST /api/admin/users/[id]/revoke - Revoke a user's access
-export async function POST(
+export const POST = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   const { id: userId } = await params
 
   // Prevent admin from revoking their own access
   if (userId === user.id) {
-    return NextResponse.json({ error: 'Cannot revoke your own access' }, { status: 400 })
+    return badRequest('Cannot revoke your own access')
   }
 
   // Get the user's current info before revoking
-  const { data: targetUser } = await supabase
+  const { data: targetUser, error: targetUserError } = await supabase
     .from('profiles')
     .select('email, is_admin')
     .eq('id', userId)
     .single()
 
+  if (targetUserError) {
+    if (isSupabaseNoRowError(targetUserError)) {
+      return notFound('User not found')
+    }
+    return internalError(targetUserError, { action: 'fetch_target_user', userId })
+  }
+
   if (!targetUser) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    return notFound('User not found')
   }
 
   // Prevent revoking other admin's access
   if (targetUser.is_admin) {
-    return NextResponse.json({ error: 'Cannot revoke access for admin users' }, { status: 400 })
+    return badRequest('Cannot revoke access for admin users')
   }
 
   // Update user to revoke access
@@ -59,8 +73,7 @@ export async function POST(
     .eq('id', userId)
 
   if (error) {
-    console.error('Error revoking user access:', error)
-    return NextResponse.json({ error: 'Failed to revoke user access' }, { status: 500 })
+    return internalError(error, { action: 'revoke_user_access', userId })
   }
 
   // Log the activity
@@ -74,4 +87,4 @@ export async function POST(
   })
 
   return NextResponse.json({ success: true })
-}
+})

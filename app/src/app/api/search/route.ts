@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, badRequest, rateLimited, internalError } from '@/lib/api-response'
+import { unauthorized, badRequest, rateLimited, internalError, withErrorHandler } from '@/lib/api-response'
 import { logError, addErrorBreadcrumb } from '@/lib/errors'
 
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY
@@ -207,7 +207,7 @@ async function semanticSearch(
 // Main POST handler
 // ============================================================================
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   try {
     // Require authentication
     const supabase = await createClient()
@@ -223,7 +223,14 @@ export async function POST(request: NextRequest) {
       return rateLimited(rateLimitResult.retryAfter || 60)
     }
 
-    const { query, limit = 50 } = await request.json()
+    let body: { query?: string; limit?: number }
+    try {
+      body = await request.json()
+    } catch {
+      return badRequest('Invalid JSON in request body')
+    }
+
+    const { query, limit = 50 } = body
 
     if (!query || typeof query !== 'string') {
       return badRequest('Query is required')
@@ -272,4 +279,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return internalError(error, { action: 'search' })
   }
-}
+})

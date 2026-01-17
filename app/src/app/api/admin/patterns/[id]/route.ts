@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError } from '@/lib/errors'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  internalError,
+  withErrorHandler,
+} from '@/lib/api-response'
 
 interface UpdatePatternRequest {
   file_name?: string
@@ -11,15 +20,15 @@ interface UpdatePatternRequest {
 }
 
 // GET /api/admin/patterns/[id] - Get pattern with keywords for editing
-export async function GET(
+export const GET = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
@@ -27,17 +36,21 @@ export async function GET(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Fetch pattern
@@ -47,15 +60,26 @@ export async function GET(
     .eq('id', patternId)
     .single()
 
-  if (patternError || !pattern) {
-    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+  if (patternError) {
+    if (isSupabaseNoRowError(patternError)) {
+      return notFound('Pattern not found')
+    }
+    return internalError(patternError, { action: 'fetch_pattern', patternId })
+  }
+
+  if (!pattern) {
+    return notFound('Pattern not found')
   }
 
   // Fetch keywords for this pattern
-  const { data: patternKeywords } = await supabase
+  const { data: patternKeywords, error: patternKeywordsError } = await supabase
     .from('pattern_keywords')
     .select('keyword_id, keywords(id, value)')
     .eq('pattern_id', patternId)
+
+  if (patternKeywordsError) {
+    return internalError(patternKeywordsError, { action: 'fetch_pattern_keywords', patternId })
+  }
 
   const keywords = patternKeywords?.map(pk => pk.keywords).filter(Boolean) || []
 
@@ -63,18 +87,18 @@ export async function GET(
     pattern,
     keywords,
   })
-}
+})
 
 // DELETE /api/admin/patterns/[id] - Delete a pattern
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
@@ -82,28 +106,39 @@ export async function DELETE(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Check if pattern exists
-  const { data: existingPattern } = await supabase
+  const { data: existingPattern, error: existingPatternError } = await supabase
     .from('patterns')
     .select('id, file_name')
     .eq('id', patternId)
     .single()
 
+  if (existingPatternError) {
+    if (isSupabaseNoRowError(existingPatternError)) {
+      return notFound('Pattern not found')
+    }
+    return internalError(existingPatternError, { action: 'fetch_pattern', patternId })
+  }
+
   if (!existingPattern) {
-    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+    return notFound('Pattern not found')
   }
 
   // Delete the pattern (storage files are kept for potential recovery)
@@ -113,11 +148,7 @@ export async function DELETE(
     .eq('id', patternId)
 
   if (deleteError) {
-    console.error('Error deleting pattern:', deleteError)
-    return NextResponse.json(
-      { error: 'Failed to delete pattern', details: deleteError.message },
-      { status: 500 }
-    )
+    return internalError(deleteError, { action: 'delete_pattern', patternId })
   }
 
   // Log the activity
@@ -134,18 +165,18 @@ export async function DELETE(
     success: true,
     deleted_pattern_id: patternId,
   })
-}
+})
 
 // PATCH /api/admin/patterns/[id] - Update pattern metadata
-export async function PATCH(
+export const PATCH = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
@@ -153,17 +184,21 @@ export async function PATCH(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Parse request body
@@ -171,18 +206,25 @@ export async function PATCH(
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON body')
   }
 
   // Validate that pattern exists
-  const { data: existingPattern } = await supabase
+  const { data: existingPattern, error: existingPatternError } = await supabase
     .from('patterns')
     .select('id')
     .eq('id', patternId)
     .single()
 
+  if (existingPatternError) {
+    if (isSupabaseNoRowError(existingPatternError)) {
+      return notFound('Pattern not found')
+    }
+    return internalError(existingPatternError, { action: 'fetch_pattern', patternId })
+  }
+
   if (!existingPattern) {
-    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+    return notFound('Pattern not found')
   }
 
   // Build update object with only allowed fields
@@ -198,7 +240,7 @@ export async function PATCH(
   }
 
   if (Object.keys(updateData).length === 0) {
-    return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 })
+    return badRequest('No valid fields to update')
   }
 
   // Validate author_url if provided
@@ -206,7 +248,7 @@ export async function PATCH(
     try {
       new URL(updateData.author_url)
     } catch {
-      return NextResponse.json({ error: 'Invalid author URL format' }, { status: 400 })
+      return badRequest('Invalid author URL format')
     }
   }
 
@@ -219,11 +261,7 @@ export async function PATCH(
     .single()
 
   if (updateError) {
-    console.error('Error updating pattern:', updateError)
-    return NextResponse.json(
-      { error: 'Failed to update pattern', details: updateError.message },
-      { status: 500 }
-    )
+    return internalError(updateError, { action: 'update_pattern', patternId })
   }
 
   // Log the activity
@@ -240,4 +278,4 @@ export async function PATCH(
     success: true,
     pattern: updatedPattern,
   })
-}
+})

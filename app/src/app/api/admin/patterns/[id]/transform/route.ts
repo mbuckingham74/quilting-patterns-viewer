@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchThumbnailSafe } from '@/lib/safe-fetch'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, notFound, internalError, withErrorHandler } from '@/lib/api-response'
 import sharp from 'sharp'
 
 type TransformOperation = 'rotate_cw' | 'rotate_ccw' | 'rotate_180' | 'flip_h' | 'flip_v'
@@ -11,15 +13,15 @@ interface TransformRequest {
 }
 
 // POST /api/admin/patterns/[id]/transform - Transform pattern thumbnail
-export async function POST(
+export const POST = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
@@ -27,17 +29,22 @@ export async function POST(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Parse request body
@@ -45,13 +52,13 @@ export async function POST(
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { operation } = body
   const validOperations: TransformOperation[] = ['rotate_cw', 'rotate_ccw', 'rotate_180', 'flip_h', 'flip_v']
   if (!validOperations.includes(operation)) {
-    return NextResponse.json({ error: 'Invalid operation' }, { status: 400 })
+    return badRequest('Invalid operation')
   }
 
   // Get pattern info
@@ -61,12 +68,19 @@ export async function POST(
     .eq('id', patternId)
     .single()
 
-  if (patternError || !pattern) {
-    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+  if (patternError) {
+    if (isSupabaseNoRowError(patternError)) {
+      return notFound('Pattern not found')
+    }
+    return internalError(patternError, { action: 'fetch_pattern', patternId })
+  }
+
+  if (!pattern) {
+    return notFound('Pattern not found')
   }
 
   if (!pattern.thumbnail_url) {
-    return NextResponse.json({ error: 'Pattern has no thumbnail' }, { status: 400 })
+    return badRequest('Pattern has no thumbnail')
   }
 
   try {
@@ -110,8 +124,7 @@ export async function POST(
       })
 
     if (uploadError) {
-      console.error('Upload error:', uploadError)
-      throw new Error('Failed to upload transformed thumbnail')
+      return internalError(uploadError, { action: 'upload_transformed_thumbnail', patternId })
     }
 
     // Get the new public URL (with cache buster)
@@ -132,8 +145,7 @@ export async function POST(
       .eq('id', patternId)
 
     if (updateError) {
-      console.error('Update error:', updateError)
-      throw new Error('Failed to update pattern')
+      return internalError(updateError, { action: 'update_pattern_thumbnail', patternId })
     }
 
     // Log the activity
@@ -153,10 +165,6 @@ export async function POST(
       embedding_cleared: true,
     })
   } catch (error) {
-    console.error('Transform error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to transform thumbnail' },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'transform_thumbnail', patternId })
   }
-}
+})

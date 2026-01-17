@@ -1,43 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 // POST /api/admin/users/[id]/reject - Reject (delete) a user
-export async function POST(
+export const POST = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   const { id: userId } = await params
 
   // Don't allow rejecting yourself
   if (userId === user.id) {
-    return NextResponse.json({ error: 'Cannot reject yourself' }, { status: 400 })
+    return badRequest('Cannot reject yourself')
   }
 
   // Get the user's email before deleting for the activity log
-  const { data: rejectedUser } = await supabase
+  const { data: rejectedUser, error: rejectedUserError } = await supabase
     .from('profiles')
     .select('email')
     .eq('id', userId)
     .single()
+
+  if (rejectedUserError && !isSupabaseNoRowError(rejectedUserError)) {
+    logError(rejectedUserError, { action: 'fetch_rejected_user', userId })
+  }
 
   // Delete the profile (user will need to sign up again)
   const { error } = await supabase
@@ -46,8 +57,7 @@ export async function POST(
     .eq('id', userId)
 
   if (error) {
-    console.error('Error rejecting user:', error)
-    return NextResponse.json({ error: 'Failed to reject user' }, { status: 500 })
+    return internalError(error, { action: 'reject_user', userId })
   }
 
   // Log the activity
@@ -61,4 +71,4 @@ export async function POST(
   })
 
   return NextResponse.json({ success: true })
-}
+})

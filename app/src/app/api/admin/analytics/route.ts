@@ -1,25 +1,32 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   // Check if user is authenticated and admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   const now = new Date()
@@ -62,11 +69,32 @@ export async function GET() {
     supabase.from('shared_collection_feedback').select('*', { count: 'exact', head: true }),
   ])
 
+  const resultErrors = [
+    { result: totalUsersResult, action: 'fetch_total_users' },
+    { result: pendingUsersResult, action: 'fetch_pending_users' },
+    { result: newUsersResult, action: 'fetch_new_users' },
+    { result: activeUsersResult, action: 'fetch_active_users' },
+    { result: totalPatternsResult, action: 'fetch_total_patterns' },
+    { result: totalDownloadsResult, action: 'fetch_total_downloads' },
+    { result: downloadsLast7DaysResult, action: 'fetch_recent_downloads' },
+    { result: totalSearchesResult, action: 'fetch_total_searches' },
+    { result: searchesLast7DaysResult, action: 'fetch_recent_searches' },
+    { result: semanticSearchesResult, action: 'fetch_semantic_searches' },
+    { result: totalSharesResult, action: 'fetch_total_shares' },
+    { result: sharesWithFeedbackResult, action: 'fetch_share_feedback' },
+  ]
+
+  for (const { result, action } of resultErrors) {
+    if (result.error) {
+      return internalError(result.error, { action })
+    }
+  }
+
   const totalUsers = totalUsersResult.count || 0
   const pendingUsers = pendingUsersResult.count || 0
   const newUsersLast7Days = newUsersResult.count || 0
   // RPC returns the count directly as data (number), handle potential error
-  const activeUsersLast30Days = activeUsersResult.error ? 0 : (activeUsersResult.data ?? 0)
+  const activeUsersLast30Days = activeUsersResult.data ?? 0
 
   const totalPatterns = totalPatternsResult.count || 0
   const totalDownloads = totalDownloadsResult.count || 0
@@ -106,4 +134,4 @@ export async function GET() {
       feedbackRate,
     },
   })
-}
+})

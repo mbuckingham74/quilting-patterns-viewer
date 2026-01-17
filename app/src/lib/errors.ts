@@ -149,6 +149,14 @@ export function isAuthError(code: ErrorCode): boolean {
   return AUTH_ERROR_CODES.includes(code)
 }
 
+export function isSupabaseNoRowError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false
+  }
+
+  return (error as { code?: string | null }).code === 'PGRST116'
+}
+
 // ============================================================================
 // HTTP Status to ErrorCode mapping
 // ============================================================================
@@ -193,22 +201,25 @@ export interface ParsedError {
  * Parse an error from a fetch Response
  */
 export async function parseResponseError(response: Response): Promise<ParsedError> {
-  const code = httpStatusToErrorCode(response.status)
-  let message = ErrorMessages[code]
+  let bodyCode: ErrorCode | undefined
+  let bodyMessage: string | undefined
   let retryAfter: number | undefined
 
   // Try to extract error details from response body
   try {
     const body = await response.json()
     if (body.error) {
-      message = typeof body.error === 'string' ? body.error : body.error.message || message
+      bodyMessage = typeof body.error === 'string' ? body.error : body.error.message
     }
     if (body.code && Object.values(ErrorCode).includes(body.code)) {
-      message = ErrorMessages[body.code as ErrorCode] || message
+      bodyCode = body.code as ErrorCode
     }
   } catch {
     // Response body is not JSON, use default message
   }
+
+  const code = bodyCode || httpStatusToErrorCode(response.status)
+  const message = bodyMessage || ErrorMessages[code]
 
   // Check for Retry-After header (rate limiting)
   const retryAfterHeader = response.headers.get('Retry-After')

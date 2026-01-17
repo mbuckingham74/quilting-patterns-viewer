@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,24 +16,29 @@ interface CreateShareRequest {
 }
 
 // POST /api/shares - Create a new share
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const supabase = await createClient()
 
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   // Check if user is approved
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_approved, display_name, email')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_approved) {
-    return NextResponse.json({ error: 'Account not approved' }, { status: 403 })
+    return forbidden('Account not approved')
   }
 
   // Parse request body
@@ -39,24 +46,24 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { recipientEmail, recipientName, message, patternIds } = body
 
   // Validate input
   if (!recipientEmail || !patternIds || !Array.isArray(patternIds)) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    return badRequest('Missing required fields')
   }
 
   if (patternIds.length === 0 || patternIds.length > 10) {
-    return NextResponse.json({ error: 'Must share between 1 and 10 patterns' }, { status: 400 })
+    return badRequest('Must share between 1 and 10 patterns')
   }
 
   // Email validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(recipientEmail)) {
-    return NextResponse.json({ error: 'Invalid email address' }, { status: 400 })
+    return badRequest('Invalid email address')
   }
 
   // Verify all pattern IDs exist
@@ -66,12 +73,12 @@ export async function POST(request: Request) {
     .in('id', patternIds)
 
   if (patternsError || !patterns || patterns.length !== patternIds.length) {
-    return NextResponse.json({ error: 'One or more patterns not found' }, { status: 400 })
+    return badRequest('One or more patterns not found')
   }
 
   // Create the share using service role (to bypass RLS for insert)
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    return internalError(new Error('Missing SUPABASE_SERVICE_ROLE_KEY'), { action: 'create_service_client' })
   }
 
   const serviceClient = createServiceClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -89,8 +96,10 @@ export async function POST(request: Request) {
     .single()
 
   if (shareError || !share) {
-    console.error('Error creating share:', shareError)
-    return NextResponse.json({ error: 'Failed to create share' }, { status: 500 })
+    return internalError(shareError ?? new Error('Share insert returned no data'), {
+      action: 'create_share',
+      userId: user.id,
+    })
   }
 
   // Add patterns to the share
@@ -105,10 +114,10 @@ export async function POST(request: Request) {
     .insert(patternInserts)
 
   if (patternError) {
-    console.error('Error adding patterns to share:', patternError)
+    logError(patternError, { action: 'add_share_patterns', shareId: share.id })
     // Clean up the share
     await serviceClient.from('shared_collections').delete().eq('id', share.id)
-    return NextResponse.json({ error: 'Failed to add patterns to share' }, { status: 500 })
+    return internalError(patternError, { action: 'add_share_patterns', shareId: share.id })
   }
 
   const shareUrl = `https://patterns.tachyonfuture.com/share/${share.token}`
@@ -159,7 +168,7 @@ export async function POST(request: Request) {
         }),
       })
     } catch (emailError) {
-      console.error('Failed to send share email:', emailError)
+      logError(emailError, { action: 'send_share_email', shareId: share.id })
       // Don't fail the request if email fails
     }
   }
@@ -170,16 +179,16 @@ export async function POST(request: Request) {
     shareUrl,
     expiresAt: share.expires_at,
   })
-}
+})
 
 // GET /api/shares - List user's shares
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   // Check authentication
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   // Get user's shares with pattern count and feedback status
@@ -200,8 +209,7 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching shares:', error)
-    return NextResponse.json({ error: 'Failed to fetch shares' }, { status: 500 })
+    return internalError(error, { action: 'fetch_shares', userId: user.id })
   }
 
   // Transform the data
@@ -219,4 +227,4 @@ export async function GET() {
   })) || []
 
   return NextResponse.json({ shares: transformedShares })
-}
+})

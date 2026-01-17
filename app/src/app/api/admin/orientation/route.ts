@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/admin/orientation - Get patterns flagged for rotation or mirroring
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const { searchParams } = new URL(request.url)
 
   // Parse and validate pagination params with NaN handling
@@ -20,17 +22,21 @@ export async function GET(request: Request) {
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   const offset = (page - 1) * limit
@@ -38,11 +44,15 @@ export async function GET(request: Request) {
   // Handle mirrored filter separately - queries mirror_analysis table
   if (filter === 'mirrored') {
     // Count mirrored patterns
-    const { count: mirrorCount } = await supabase
+    const { count: mirrorCount, error: mirrorCountError } = await supabase
       .from('mirror_analysis')
       .select('*', { count: 'exact', head: true })
       .eq('is_mirrored', true)
       .eq('reviewed', false)
+
+    if (mirrorCountError) {
+      return internalError(mirrorCountError, { action: 'fetch_mirror_count' })
+    }
 
     // Get mirrored pattern data
     const { data: mirrorResults, error: mirrorError } = await supabase
@@ -66,14 +76,17 @@ export async function GET(request: Request) {
       .range(offset, offset + limit - 1)
 
     if (mirrorError) {
-      console.error('Error fetching mirror analysis:', mirrorError)
-      return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
+      return internalError(mirrorError, { action: 'fetch_mirror_analysis' })
     }
 
     // Get mirror stats
-    const { data: mirrorStats } = await supabase
+    const { data: mirrorStats, error: mirrorStatsError } = await supabase
       .from('mirror_analysis')
       .select('is_mirrored, confidence, reviewed')
+
+    if (mirrorStatsError) {
+      return internalError(mirrorStatsError, { action: 'fetch_mirror_stats' })
+    }
 
     const mirrorStatsBreakdown = {
       total: mirrorStats?.length || 0,
@@ -123,7 +136,11 @@ export async function GET(request: Request) {
     countQuery = countQuery.eq('confidence', confidence)
   }
 
-  const { count } = await countQuery
+  const { count, error: countError } = await countQuery
+
+  if (countError) {
+    return internalError(countError, { action: 'fetch_orientation_count' })
+  }
 
   // Build query for data
   let dataQuery = supabase
@@ -157,19 +174,26 @@ export async function GET(request: Request) {
   const { data: results, error } = await dataQuery
 
   if (error) {
-    console.error('Error fetching orientation analysis:', error)
-    return NextResponse.json({ error: 'Failed to fetch data' }, { status: 500 })
+    return internalError(error, { action: 'fetch_orientation_analysis' })
   }
 
   // Get rotation stats (include reviewed field for proper counting)
-  const { data: stats } = await supabase
+  const { data: stats, error: statsError } = await supabase
     .from('orientation_analysis')
     .select('orientation, confidence, reviewed')
 
+  if (statsError) {
+    return internalError(statsError, { action: 'fetch_orientation_stats' })
+  }
+
   // Get mirror stats for combined display
-  const { data: mirrorStats } = await supabase
+  const { data: mirrorStats, error: mirrorStatsError } = await supabase
     .from('mirror_analysis')
     .select('is_mirrored, reviewed')
+
+  if (mirrorStatsError) {
+    return internalError(mirrorStatsError, { action: 'fetch_mirror_stats_summary' })
+  }
 
   const statsBreakdown = {
     total: stats?.length || 0,
@@ -203,31 +227,42 @@ export async function GET(request: Request) {
     stats: statsBreakdown,
     source: 'orientation_analysis'
   })
-}
+})
 
 // PATCH /api/admin/orientation - Mark patterns as reviewed
-export async function PATCH(request: Request) {
+export const PATCH = withErrorHandler(async (request: Request) => {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
-  if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
   }
 
-  const { pattern_ids, reviewed, source } = await request.json()
+  if (!adminProfile?.is_admin) {
+    return forbidden()
+  }
+
+  let body: { pattern_ids?: number[]; reviewed?: boolean; source?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
+
+  const { pattern_ids, reviewed, source } = body
 
   if (!Array.isArray(pattern_ids)) {
-    return NextResponse.json({ error: 'pattern_ids must be an array' }, { status: 400 })
+    return badRequest('pattern_ids must be an array')
   }
 
   // Use service client for update (bypasses RLS)
@@ -242,8 +277,7 @@ export async function PATCH(request: Request) {
     .in('pattern_id', pattern_ids)
 
   if (error) {
-    console.error(`Error updating ${tableName}:`, error)
-    return NextResponse.json({ error: 'Failed to update' }, { status: 500 })
+    return internalError(error, { action: 'update_orientation_review', tableName })
   }
 
   // Log the activity
@@ -261,4 +295,4 @@ export async function PATCH(request: Request) {
   })
 
   return NextResponse.json({ success: true })
-}
+})

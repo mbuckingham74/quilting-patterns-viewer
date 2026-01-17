@@ -1,23 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   // Check if user is authenticated and admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   // Get view logs
@@ -26,8 +33,7 @@ export async function GET() {
     .select('pattern_id')
 
   if (viewError) {
-    console.error('Error fetching view logs:', viewError)
-    return NextResponse.json({ error: 'Failed to fetch view data' }, { status: 500 })
+    return internalError(viewError, { action: 'fetch_view_logs' })
   }
 
   // Count views per pattern
@@ -54,8 +60,7 @@ export async function GET() {
     .in('id', topPatternIds)
 
   if (patternsError) {
-    console.error('Error fetching patterns:', patternsError)
-    return NextResponse.json({ error: 'Failed to fetch pattern data' }, { status: 500 })
+    return internalError(patternsError, { action: 'fetch_top_view_patterns' })
   }
 
   // Get download counts for these patterns (to show alongside views)
@@ -85,4 +90,4 @@ export async function GET() {
     .sort((a, b) => b.view_count - a.view_count) || []
 
   return NextResponse.json({ patterns: topPatterns })
-}
+})

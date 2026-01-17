@@ -7,7 +7,9 @@ import {
   conflict,
   internalError,
   successResponse,
+  withErrorHandler,
 } from '@/lib/api-response'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 
 type ReviewDecision = 'keep_both' | 'deleted_first' | 'deleted_second'
 
@@ -18,7 +20,7 @@ interface ReviewRequest {
 }
 
 // POST /api/admin/duplicates/review - Record a duplicate review decision
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const supabase = await createClient()
 
   // Check if current user is admin
@@ -27,11 +29,16 @@ export async function POST(request: Request) {
     return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!adminProfile?.is_admin) {
     return forbidden()
@@ -133,4 +140,4 @@ export async function POST(request: Request) {
   return successResponse({
     deleted_pattern_id: patternToDelete,
   })
-}
+})

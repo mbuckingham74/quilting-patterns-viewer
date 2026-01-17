@@ -65,7 +65,7 @@ describe('/api/admin/patterns/[id]/keywords', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: pattern,
-                  error: pattern ? null : { message: 'Not found' },
+                  error: pattern ? null : { code: 'PGRST116' },
                 }),
               }),
             }),
@@ -78,7 +78,7 @@ describe('/api/admin/patterns/[id]/keywords', () => {
               eq: vi.fn().mockReturnValue({
                 single: vi.fn().mockResolvedValue({
                   data: keyword,
-                  error: keyword ? null : { message: 'Not found' },
+                  error: keyword ? null : { code: 'PGRST116' },
                 }),
               }),
             }),

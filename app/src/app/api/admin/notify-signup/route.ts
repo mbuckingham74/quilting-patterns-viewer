@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createClient as createServerClient } from '@/lib/supabase/server'
+import { logError } from '@/lib/errors'
+import { unauthorized, badRequest, withErrorHandler } from '@/lib/api-response'
 
 // Dedicated internal API secret - separate from service role key to reduce blast radius
 // Falls back to service role key for backwards compatibility during transition
@@ -8,7 +10,7 @@ const INTERNAL_API_SECRET = process.env.INTERNAL_API_SECRET || process.env.SUPAB
 
 // POST /api/admin/notify-signup - Send email notification to admins
 // Called by OAuth callback (server-side with secret) or client-side signup (with session)
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   try {
     // Check for internal secret header (server-to-server calls like OAuth callback)
     const authHeader = request.headers.get('x-internal-secret')
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return unauthorized('Unauthorized')
       }
 
       const userCreatedAt = new Date(user.created_at).getTime()
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
 
       if (userCreatedAt < fiveMinutesAgo) {
         // User account is too old - this isn't a new signup notification
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        return unauthorized('Unauthorized')
       }
 
       // SECURITY: Use the authenticated user's email, not request body
@@ -40,12 +42,17 @@ export async function POST(request: NextRequest) {
       email = user.email
     } else {
       // Internal calls (OAuth callback) can specify email in body
-      const body = await request.json()
+      let body: { email?: string }
+      try {
+        body = await request.json()
+      } catch {
+        return badRequest('Invalid JSON in request body')
+      }
       email = body.email
     }
 
     if (!email) {
-      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+      return badRequest('Email is required')
     }
 
     // Skip if Resend API key is not configured
@@ -59,7 +66,7 @@ export async function POST(request: NextRequest) {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!supabaseUrl || !serviceRoleKey) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY not configured, cannot fetch admin emails')
+      logError(new Error('SUPABASE_SERVICE_ROLE_KEY not configured'), { action: 'fetch_admin_emails' })
       return NextResponse.json({ success: true, skipped: true, reason: 'missing_service_key' })
     }
 
@@ -108,15 +115,15 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.text()
-      console.error('Failed to send email:', errorData)
+      logError(new Error(`Resend API error: ${errorData}`), { action: 'send_admin_email' })
       // Don't fail the request, just log the error
       return NextResponse.json({ success: true, emailSent: false })
     }
 
     return NextResponse.json({ success: true, emailSent: true })
   } catch (error) {
-    console.error('Error in notify-signup:', error)
+    logError(error, { action: 'notify_signup' })
     // Don't fail - email is optional
     return NextResponse.json({ success: true, error: 'Email failed but continuing' })
   }
-}
+})

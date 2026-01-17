@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { fetchThumbnailAsBase64 } from '@/lib/safe-fetch'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  internalError,
+  serviceUnavailable,
+  withErrorHandler,
+} from '@/lib/api-response'
 
 interface VerifyRequest {
   pattern_id_1: number
@@ -26,32 +36,34 @@ interface AnthropicMessage {
 }
 
 // POST /api/admin/duplicates/ai-verify - Use AI to verify if patterns are duplicates
-export async function POST(request: Request) {
+export const POST = withErrorHandler(async (request: Request) => {
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Check for API key
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY
   if (!anthropicApiKey) {
-    return NextResponse.json({
-      error: 'AI verification not available',
-      details: 'ANTHROPIC_API_KEY not configured'
-    }, { status: 503 })
+    logError(new Error('ANTHROPIC_API_KEY not configured'), { action: 'ai_verify_config' })
+    return serviceUnavailable('AI verification not available')
   }
 
   // Parse request body
@@ -59,13 +71,13 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON body')
   }
 
   const { pattern_id_1, pattern_id_2 } = body
 
   if (!pattern_id_1 || !pattern_id_2) {
-    return NextResponse.json({ error: 'Missing pattern IDs' }, { status: 400 })
+    return badRequest('Missing pattern IDs')
   }
 
   // Fetch pattern data including thumbnails
@@ -74,11 +86,12 @@ export async function POST(request: Request) {
     .select('id, file_name, file_extension, author, author_notes, notes, thumbnail_url')
     .in('id', [pattern_id_1, pattern_id_2])
 
-  if (fetchError || !patterns || patterns.length !== 2) {
-    return NextResponse.json({
-      error: 'Failed to fetch patterns',
-      details: fetchError?.message || 'Patterns not found'
-    }, { status: 404 })
+  if (fetchError) {
+    return internalError(fetchError, { action: 'fetch_patterns_for_ai_verify', pattern_id_1, pattern_id_2 })
+  }
+
+  if (!patterns || patterns.length !== 2) {
+    return notFound('Patterns not found')
   }
 
   const pattern1 = patterns.find(p => p.id === pattern_id_1)!
@@ -91,10 +104,7 @@ export async function POST(request: Request) {
   ])
 
   if (!thumbnail1 || !thumbnail2) {
-    return NextResponse.json({
-      error: 'Failed to download thumbnails',
-      details: 'One or both patterns have missing thumbnails'
-    }, { status: 400 })
+    return badRequest('Failed to download thumbnails')
   }
 
   // Call Claude Vision API using native fetch
@@ -183,11 +193,11 @@ Respond with ONLY a JSON object (no markdown, no explanation):
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Claude API error:', response.status, errorText)
-      return NextResponse.json({
-        error: 'AI verification failed',
-        details: `API returned ${response.status}`
-      }, { status: 500 })
+      return internalError(new Error(`Claude API error: ${response.status}`), {
+        action: 'ai_verify_request',
+        status: response.status,
+        response: errorText,
+      })
     }
 
     const aiResponse: AnthropicMessage = await response.json()
@@ -209,11 +219,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
       }
       result = JSON.parse(text.trim())
     } catch (parseError) {
-      console.error('Failed to parse AI response:', textContent.text)
-      return NextResponse.json({
-        error: 'Failed to parse AI response',
-        raw_response: textContent.text
-      }, { status: 500 })
+      return internalError(parseError, { action: 'ai_verify_parse_response', raw: textContent.text })
     }
 
     return NextResponse.json({
@@ -237,11 +243,6 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     })
 
   } catch (aiError) {
-    console.error('AI API error:', aiError)
-    return NextResponse.json({
-      error: 'AI verification failed',
-      details: aiError instanceof Error ? aiError.message : 'Unknown error'
-    }, { status: 500 })
+    return internalError(aiError, { action: 'ai_verify' })
   }
-}
-
+})

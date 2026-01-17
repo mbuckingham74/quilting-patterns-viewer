@@ -20,8 +20,8 @@ describe('/api/admin/patterns/[id]', () => {
     user?: { id: string } | null
     adminProfile?: { is_admin: boolean } | null
     pattern?: { id: number; file_name: string } | null
-    patternError?: { message: string } | null
-    updateError?: { message: string } | null
+    patternError?: { message?: string; code?: string } | null
+    updateError?: { message?: string; code?: string } | null
     keywords?: Array<{ keyword_id: number; keywords: { id: number; value: string } }> | null
   }) {
     const {
@@ -120,7 +120,7 @@ describe('/api/admin/patterns/[id]', () => {
     it('returns 404 when pattern not found', async () => {
       const mockSupabase = createMockSupabase({
         pattern: null,
-        patternError: { message: 'Not found' },
+        patternError: { code: 'PGRST116' },
       })
       mockCreateClient.mockResolvedValue(mockSupabase as any)
 

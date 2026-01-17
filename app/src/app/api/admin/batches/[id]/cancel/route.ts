@@ -8,14 +8,15 @@ import {
   invalidState,
   internalError,
   successResponse,
+  withErrorHandler,
 } from '@/lib/api-response'
-import { logError } from '@/lib/errors'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 
 // POST /api/admin/batches/[id]/cancel - Cancel batch (delete all patterns)
-export async function POST(
+export const POST = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const batchId = parseInt(id, 10)
 
@@ -31,11 +32,16 @@ export async function POST(
     return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!adminProfile?.is_admin) {
     return forbidden()
@@ -50,7 +56,14 @@ export async function POST(
     .eq('id', batchId)
     .single()
 
-  if (batchError || !batch) {
+  if (batchError) {
+    if (isSupabaseNoRowError(batchError)) {
+      return notFound('Batch not found')
+    }
+    return internalError(batchError, { action: 'fetch_batch', batchId })
+  }
+
+  if (!batch) {
     return notFound('Batch not found')
   }
 
@@ -59,10 +72,14 @@ export async function POST(
   }
 
   // Get all patterns in batch to delete their storage files
-  const { data: patterns } = await serviceClient
+  const { data: patterns, error: patternsError } = await serviceClient
     .from('patterns')
     .select('id, thumbnail_url, pattern_file_url')
     .eq('upload_batch_id', batchId)
+
+  if (patternsError) {
+    return internalError(patternsError, { action: 'fetch_batch_patterns', batchId })
+  }
 
   // Delete storage files
   if (patterns && patterns.length > 0) {
@@ -131,4 +148,4 @@ export async function POST(
     message: `Cancelled batch and deleted ${deletedCount || 0} patterns`,
     batch_id: batchId,
   })
-}
+})

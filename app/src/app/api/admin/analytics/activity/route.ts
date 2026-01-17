@@ -1,23 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   // Check if user is authenticated and admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   // Get data for the last 30 days
@@ -39,6 +46,18 @@ export async function GET() {
       .select('created_at')
       .gte('created_at', thirtyDaysAgo),
   ])
+
+  const resultErrors = [
+    { result: downloadsResult, action: 'fetch_download_activity' },
+    { result: searchesResult, action: 'fetch_search_activity' },
+    { result: signupsResult, action: 'fetch_signup_activity' },
+  ]
+
+  for (const { result, action } of resultErrors) {
+    if (result.error) {
+      return internalError(result.error, { action })
+    }
+  }
 
   // Helper function to group by date
   function groupByDate(items: { [key: string]: string }[] | null, dateField: string): { date: string; count: number }[] {
@@ -74,4 +93,4 @@ export async function GET() {
     searches,
     signups,
   })
-}
+})

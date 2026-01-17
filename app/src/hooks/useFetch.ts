@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { fetchWithRetry, type RetryOptions, type FetchWithRetryResult } from '@/lib/fetch-with-retry'
-import { type ParsedError } from '@/lib/errors'
+import { logError, type ParsedError } from '@/lib/errors'
 import { useToast } from '@/components/Toast'
 
 // ============================================================================
@@ -122,6 +122,7 @@ export function useFetch<T>(
         data = transform(data)
       } catch (e) {
         console.error('Transform error:', e)
+        logError(e, { action: 'use_fetch_transform', url })
       }
     }
 

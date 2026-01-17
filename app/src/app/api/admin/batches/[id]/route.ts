@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, notFound, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/admin/batches/[id] - Get batch details with all patterns
-export async function GET(
+export const GET = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const batchId = parseInt(id, 10)
 
   if (isNaN(batchId)) {
-    return NextResponse.json({ error: 'Invalid batch ID' }, { status: 400 })
+    return badRequest('Invalid batch ID')
   }
 
   const supabase = await createClient()
@@ -18,17 +20,22 @@ export async function GET(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Use service client to bypass RLS and get all patterns including staged
@@ -41,8 +48,15 @@ export async function GET(
     .eq('id', batchId)
     .single()
 
-  if (batchError || !batch) {
-    return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+  if (batchError) {
+    if (isSupabaseNoRowError(batchError)) {
+      return notFound('Batch not found')
+    }
+    return internalError(batchError, { action: 'fetch_batch', batchId })
+  }
+
+  if (!batch) {
+    return notFound('Batch not found')
   }
 
   // Get all patterns in this batch
@@ -66,8 +80,7 @@ export async function GET(
     .order('file_name', { ascending: true })
 
   if (patternsError) {
-    console.error('Error fetching patterns:', patternsError)
-    return NextResponse.json({ error: 'Failed to fetch patterns' }, { status: 500 })
+    return internalError(patternsError, { action: 'fetch_batch_patterns', batchId })
   }
 
   // Get keywords for each pattern
@@ -75,10 +88,14 @@ export async function GET(
   let patternKeywords: Record<number, Array<{ id: number; value: string }>> = {}
 
   if (patternIds.length > 0) {
-    const { data: keywords } = await serviceClient
+    const { data: keywords, error: keywordsError } = await serviceClient
       .from('pattern_keywords')
       .select('pattern_id, keywords(id, value)')
       .in('pattern_id', patternIds)
+
+    if (keywordsError) {
+      return internalError(keywordsError, { action: 'fetch_batch_keywords', batchId })
+    }
 
     if (keywords) {
       for (const pk of keywords) {
@@ -104,7 +121,7 @@ export async function GET(
     batch,
     patterns: patternsWithKeywords,
   })
-}
+})
 
 // POST /api/admin/batches/[id]/commit - Commit batch (make patterns visible)
 // POST /api/admin/batches/[id]/cancel - Cancel batch (delete all patterns)

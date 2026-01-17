@@ -9,14 +9,15 @@ import {
   invalidState,
   internalError,
   successResponse,
+  withErrorHandler,
 } from '@/lib/api-response'
-import { logError } from '@/lib/errors'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 
 // POST /api/admin/batches/[id]/commit - Commit batch (make patterns visible in browse)
-export async function POST(
+export const POST = withErrorHandler(async (
   request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const batchId = parseInt(id, 10)
 
@@ -32,11 +33,16 @@ export async function POST(
     return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!adminProfile?.is_admin) {
     return forbidden()
@@ -51,7 +57,14 @@ export async function POST(
     .eq('id', batchId)
     .single()
 
-  if (batchError || !batch) {
+  if (batchError) {
+    if (isSupabaseNoRowError(batchError)) {
+      return notFound('Batch not found')
+    }
+    return internalError(batchError, { action: 'fetch_batch', batchId })
+  }
+
+  if (!batch) {
     return notFound('Batch not found')
   }
 
@@ -103,4 +116,4 @@ export async function POST(
     message: `Committed ${patternsCount || 0} patterns. Embeddings will be generated in the background.`,
     batch_id: batchId,
   })
-}
+})

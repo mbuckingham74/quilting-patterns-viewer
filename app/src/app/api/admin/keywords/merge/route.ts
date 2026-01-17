@@ -1,48 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, notFound, internalError, withErrorHandler } from '@/lib/api-response'
 
 // POST /api/admin/keywords/merge - Merge one keyword into another
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
   }
 
-  const { source_id, target_id } = await request.json()
+  if (!profile?.is_admin) {
+    return forbidden()
+  }
+
+  let body: { source_id?: number | string; target_id?: number | string }
+  try {
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
+
+  const { source_id, target_id } = body
 
   if (!source_id || !target_id) {
-    return NextResponse.json(
-      { error: 'Both source_id and target_id are required' },
-      { status: 400 }
-    )
+    return badRequest('Both source_id and target_id are required')
   }
 
   const sourceId = parseInt(source_id, 10)
   const targetId = parseInt(target_id, 10)
 
   if (isNaN(sourceId) || isNaN(targetId)) {
-    return NextResponse.json({ error: 'Invalid keyword IDs' }, { status: 400 })
+    return badRequest('Invalid keyword IDs')
   }
 
   if (sourceId === targetId) {
-    return NextResponse.json(
-      { error: 'Source and target keywords must be different' },
-      { status: 400 }
-    )
+    return badRequest('Source and target keywords must be different')
   }
 
   const serviceClient = createServiceClient()
@@ -55,16 +62,15 @@ export async function POST(request: NextRequest) {
     })
 
   if (mergeError) {
-    console.error('Error merging keywords:', mergeError)
-
     // Parse error message for user-friendly response
     const errorMessage = mergeError.message || 'Failed to merge keywords'
-    const status = errorMessage.includes('not found') ? 404 : 500
+    const isNotFound = errorMessage.toLowerCase().includes('not found')
 
-    return NextResponse.json(
-      { error: errorMessage },
-      { status }
-    )
+    if (isNotFound) {
+      return notFound('Keyword not found')
+    }
+
+    return internalError(mergeError, { action: 'merge_keywords', sourceId, targetId })
   }
 
   // Log the activity
@@ -92,4 +98,4 @@ export async function POST(request: NextRequest) {
     patterns_moved: result?.patterns_moved ?? 0,
     patterns_already_had_target: result?.patterns_already_had_target ?? 0,
   })
-}
+})

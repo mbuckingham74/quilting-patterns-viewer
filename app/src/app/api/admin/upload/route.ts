@@ -5,9 +5,10 @@ import {
   unauthorized,
   forbidden,
   badRequest,
-  internalError
+  internalError,
+  withErrorHandler
 } from '@/lib/api-response'
-import { logError } from '@/lib/errors'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 import JSZip from 'jszip'
 
 // Supported file extensions
@@ -16,7 +17,7 @@ const PDF_EXTENSION = '.pdf'
 
 // POST /api/admin/upload - Upload patterns from ZIP file
 // Supports staged mode: patterns go to review before being visible in browse
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   // Use anon client for auth check (respects user session)
   const supabase = await createClient()
 
@@ -35,8 +36,7 @@ export async function POST(request: NextRequest) {
   // Supabase returns PGRST116 when .single() finds no rows - treat as forbidden
   // Other errors (permissions, outage) should be logged and return 500
   if (profileError) {
-    const isNoRowError = profileError.code === 'PGRST116'
-    if (!isNoRowError) {
+    if (!isSupabaseNoRowError(profileError)) {
       return internalError(profileError, {
         component: 'admin/upload',
         action: 'check_admin_profile',
@@ -449,7 +449,7 @@ export async function POST(request: NextRequest) {
       userId: user.id
     })
   }
-}
+})
 
 // Helper: Get existing pattern names for duplicate detection
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

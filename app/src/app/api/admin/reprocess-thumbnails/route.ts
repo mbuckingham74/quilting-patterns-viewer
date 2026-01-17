@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
-import { unauthorized, forbidden, badRequest, internalError } from '@/lib/api-response'
-import { logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 import JSZip from 'jszip'
 
 // POST /api/admin/reprocess-thumbnails
 // Upload a ZIP to match PDFs to existing patterns (by filename) and generate thumbnails
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -15,11 +15,16 @@ export async function POST(request: NextRequest) {
     return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!adminProfile?.is_admin) {
     return forbidden()
@@ -171,7 +176,7 @@ export async function POST(request: NextRequest) {
     logError(error, { action: 'reprocess_thumbnails' })
     return internalError(error, { action: 'reprocess_thumbnails' })
   }
-}
+})
 
 // Same thumbnail generation function as upload route
 async function renderPdfToThumbnail(pdfData: Uint8Array): Promise<Uint8Array | null> {

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { badRequest, notFound, expired, conflict, internalError, withErrorHandler } from '@/lib/api-response'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -43,15 +45,15 @@ interface SharePattern {
 }
 
 // POST /api/shares/[token]/feedback - Submit ranking feedback (public, no auth required)
-export async function POST(request: Request, { params }: RouteParams) {
+export const POST = withErrorHandler(async (request: Request, { params }: RouteParams) => {
   const { token } = await params
 
   if (!token || token.length !== 32) {
-    return NextResponse.json({ error: 'Invalid share link' }, { status: 400 })
+    return badRequest('Invalid share link')
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    return internalError(new Error('Missing Supabase configuration'), { action: 'submit_share_feedback' })
   }
 
   // Parse request body
@@ -59,20 +61,20 @@ export async function POST(request: Request, { params }: RouteParams) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { rankings, customerName, notes } = body
 
   // Validate rankings
   if (!rankings || !Array.isArray(rankings) || rankings.length === 0) {
-    return NextResponse.json({ error: 'Rankings are required' }, { status: 400 })
+    return badRequest('Rankings are required')
   }
 
   // Validate each ranking has pattern_id and rank
   for (const r of rankings) {
     if (typeof r.pattern_id !== 'number' || typeof r.rank !== 'number') {
-      return NextResponse.json({ error: 'Invalid ranking format' }, { status: 400 })
+      return badRequest('Invalid ranking format')
     }
   }
 
@@ -85,29 +87,42 @@ export async function POST(request: Request, { params }: RouteParams) {
 
   const share = shareData as ShareData | null
 
-  if (shareError || !share) {
-    return NextResponse.json({ error: 'Share not found or expired' }, { status: 404 })
+  if (shareError) {
+    logError(shareError, { action: 'get_share_by_token', token: token.substring(0, 8) + '...' })
+    return internalError(shareError, { action: 'get_share_by_token' })
+  }
+
+  if (!share) {
+    return notFound('Share not found or expired')
   }
 
   // Check if expired
   if (new Date(share.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'This share link has expired' }, { status: 410 })
+    return expired('This share link has expired')
   }
 
   // Check if feedback already submitted
-  const { data: existingFeedback } = await supabase
+  const { data: existingFeedback, error: existingFeedbackError } = await supabase
     .from('shared_collection_feedback')
     .select('id')
     .eq('collection_id', share.id)
     .single()
 
+  if (existingFeedbackError && !isSupabaseNoRowError(existingFeedbackError)) {
+    return internalError(existingFeedbackError, { action: 'check_share_feedback', shareId: share.id })
+  }
+
   if (existingFeedback) {
-    return NextResponse.json({ error: 'Feedback has already been submitted for this share' }, { status: 409 })
+    return conflict('Feedback has already been submitted for this share')
   }
 
   // Get the patterns in this share to validate rankings
-  const { data: sharePatternsData } = await supabase
+  const { data: sharePatternsData, error: sharePatternsError } = await supabase
     .rpc('get_share_patterns_by_token', { share_token: token })
+
+  if (sharePatternsError) {
+    return internalError(sharePatternsError, { action: 'get_share_patterns' })
+  }
 
   const sharePatterns = (sharePatternsData || []) as SharePattern[]
   const validPatternIds = new Set(sharePatterns.map(p => p.pattern_id))
@@ -115,7 +130,7 @@ export async function POST(request: Request, { params }: RouteParams) {
   // Verify all ranked patterns are in the share
   for (const r of rankings) {
     if (!validPatternIds.has(r.pattern_id)) {
-      return NextResponse.json({ error: 'Invalid pattern in rankings' }, { status: 400 })
+      return badRequest('Invalid pattern in rankings')
     }
   }
 
@@ -129,8 +144,7 @@ export async function POST(request: Request, { params }: RouteParams) {
     })
 
   if (feedbackError) {
-    console.error('Error submitting feedback:', feedbackError)
-    return NextResponse.json({ error: 'Failed to submit feedback' }, { status: 500 })
+    return internalError(feedbackError, { action: 'submit_share_feedback', shareId: share.id })
   }
 
   // Send notification email to the share creator
@@ -192,7 +206,7 @@ export async function POST(request: Request, { params }: RouteParams) {
         }),
       })
     } catch (emailError) {
-      console.error('Failed to send feedback notification email:', emailError)
+      logError(emailError, { action: 'send_share_feedback_email', shareId: share.id })
       // Don't fail the request if email fails
     }
   }
@@ -201,4 +215,4 @@ export async function POST(request: Request, { params }: RouteParams) {
     success: true,
     message: 'Thank you! Your rankings have been submitted.',
   })
-}
+})

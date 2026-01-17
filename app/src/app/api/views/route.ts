@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logError } from '@/lib/errors'
+import { badRequest, withErrorHandler } from '@/lib/api-response'
 
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
+  let body: { pattern_id?: number }
   try {
-    const { pattern_id } = await request.json()
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
 
+  const { pattern_id } = body
+  try {
     if (!pattern_id || typeof pattern_id !== 'number') {
-      return NextResponse.json({ error: 'Invalid pattern_id' }, { status: 400 })
+      return badRequest('Invalid pattern_id')
     }
 
     const supabase = await createClient()
@@ -25,13 +33,14 @@ export async function POST(request: NextRequest) {
       .insert({ user_id: user.id, pattern_id })
 
     if (error) {
-      console.error('Failed to log view:', error)
+      logError(error, { action: 'log_view', patternId: pattern_id, userId: user.id })
       // Don't expose error to client, just indicate it wasn't logged
       return NextResponse.json({ success: true, logged: false })
     }
 
     return NextResponse.json({ success: true, logged: true })
-  } catch {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  } catch (error) {
+    logError(error, { action: 'log_view', patternId: pattern_id })
+    return NextResponse.json({ success: true, logged: false })
   }
-}
+})

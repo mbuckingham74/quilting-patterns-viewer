@@ -1,23 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   // Check if user is authenticated and admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   // Get all search logs
@@ -27,8 +34,7 @@ export async function GET() {
     .order('searched_at', { ascending: false })
 
   if (searchError) {
-    console.error('Error fetching search logs:', searchError)
-    return NextResponse.json({ error: 'Failed to fetch search data' }, { status: 500 })
+    return internalError(searchError, { action: 'fetch_search_logs' })
   }
 
   // Group by normalized query (lowercase, trimmed)
@@ -61,4 +67,4 @@ export async function GET() {
     .slice(0, 10)
 
   return NextResponse.json({ searches: topSearches })
-}
+})

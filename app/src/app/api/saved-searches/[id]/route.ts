@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, badRequest, internalError, successResponse } from '@/lib/api-response'
+import { unauthorized, badRequest, internalError, successResponse, withErrorHandler } from '@/lib/api-response'
 
 // DELETE /api/saved-searches/[id] - Delete a saved search
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -32,4 +32,4 @@ export async function DELETE(
   }
 
   return successResponse({ deleted: true })
-}
+})

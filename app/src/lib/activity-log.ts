@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
+import { logError } from '@/lib/errors'
 
 // Action type constants for type safety
 export const ActivityAction = {
@@ -61,10 +62,6 @@ export async function logAdminActivity({
     })
   } catch (error) {
     // Log error but don't throw - activity logging should never break main flow
-    console.error('Failed to log admin activity:', error, {
-      action,
-      targetType,
-      targetId,
-    })
+    logError(error, { action, targetType, targetId })
   }
 }

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, badRequest, internalError } from '@/lib/api-response'
+import { unauthorized, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/saved-searches - Get all saved searches for current user
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -22,10 +22,10 @@ export async function GET() {
   }
 
   return NextResponse.json({ searches })
-}
+})
 
 // POST /api/saved-searches - Save a search query
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -62,4 +62,4 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json({ search }, { status: 201 })
-}
+})

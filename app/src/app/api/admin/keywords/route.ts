@@ -1,25 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, conflict, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/admin/keywords - Get all keywords with usage counts
-export async function GET(request: NextRequest) {
+export const GET = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   const searchParams = request.nextUrl.searchParams
@@ -38,11 +44,7 @@ export async function GET(request: NextRequest) {
     })
 
   if (keywordsError) {
-    console.error('Error fetching keywords:', keywordsError)
-    return NextResponse.json(
-      { error: 'Failed to fetch keywords', details: keywordsError.message },
-      { status: 500 }
-    )
+    return internalError(keywordsError, { action: 'fetch_keywords', userId: user.id })
   }
 
   // Get count of patterns without keywords using RPC (efficient NOT EXISTS query)
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest) {
     .rpc('count_patterns_without_keywords')
 
   if (countError) {
-    console.error('Error fetching patterns without keywords count:', countError)
+    logError(countError, { action: 'fetch_patterns_without_keywords', userId: user.id })
     // Non-fatal - return 0 if count fails
   }
 
@@ -59,47 +61,59 @@ export async function GET(request: NextRequest) {
     total: keywords?.length || 0,
     patterns_without_keywords: patternsWithoutKeywordsCount || 0,
   })
-}
+})
 
 // POST /api/admin/keywords - Create a new keyword
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   // Check if user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
-  if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
   }
 
-  const { value } = await request.json()
+  if (!profile?.is_admin) {
+    return forbidden()
+  }
+
+  let body: { value?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
+
+  const { value } = body
   if (!value || typeof value !== 'string' || !value.trim()) {
-    return NextResponse.json({ error: 'Keyword value is required' }, { status: 400 })
+    return badRequest('Keyword value is required')
   }
 
   const serviceClient = createServiceClient()
 
   // Check if keyword already exists (case-insensitive)
-  const { data: existing } = await serviceClient
+  const { data: existing, error: existingError } = await serviceClient
     .from('keywords')
     .select('id, value')
     .ilike('value', value.trim())
     .single()
 
+  if (existingError && !isSupabaseNoRowError(existingError)) {
+    return internalError(existingError, { action: 'check_keyword_exists', value: value.trim() })
+  }
+
   if (existing) {
-    return NextResponse.json(
-      { error: 'Keyword already exists', existing },
-      { status: 409 }
-    )
+    return conflict('Keyword already exists')
   }
 
   // Create new keyword
@@ -110,11 +124,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    console.error('Error creating keyword:', error)
-    return NextResponse.json(
-      { error: 'Failed to create keyword', details: error.message },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'create_keyword', value: value.trim() })
   }
 
   // Log the activity
@@ -128,4 +138,4 @@ export async function POST(request: NextRequest) {
   })
 
   return NextResponse.json({ keyword }, { status: 201 })
-}
+})

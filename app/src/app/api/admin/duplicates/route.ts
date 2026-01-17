@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, badRequest, internalError, withErrorHandler } from '@/lib/api-response'
 
 export interface DuplicatePair {
   pattern1: {
@@ -20,23 +22,28 @@ export interface DuplicatePair {
 }
 
 // GET /api/admin/duplicates - Find duplicate patterns (admin only)
-export async function GET(request: Request) {
+export const GET = withErrorHandler(async (request: Request) => {
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Get threshold from query params (default 0.95)
@@ -46,10 +53,10 @@ export async function GET(request: Request) {
 
   // Validate params
   if (isNaN(threshold) || threshold < 0 || threshold > 1) {
-    return NextResponse.json({ error: 'Invalid threshold (must be 0-1)' }, { status: 400 })
+    return badRequest('Invalid threshold (must be 0-1)')
   }
   if (isNaN(limit) || limit < 1 || limit > 200) {
-    return NextResponse.json({ error: 'Invalid limit (must be 1-200)' }, { status: 400 })
+    return badRequest('Invalid limit (must be 1-200)')
   }
 
   // Call RPC function to find duplicates
@@ -59,8 +66,8 @@ export async function GET(request: Request) {
   })
 
   if (rpcError) {
-    console.error('Error finding duplicates:', rpcError)
-    return NextResponse.json({ error: 'Failed to find duplicates', details: rpcError.message }, { status: 500 })
+    logError(rpcError, { action: 'find_duplicates', threshold, limit })
+    return internalError(rpcError, { action: 'find_duplicates', threshold, limit })
   }
 
   if (!duplicatePairs || duplicatePairs.length === 0) {
@@ -81,8 +88,8 @@ export async function GET(request: Request) {
     .in('id', Array.from(patternIds))
 
   if (patternsError) {
-    console.error('Error fetching pattern metadata:', patternsError)
-    return NextResponse.json({ error: 'Failed to fetch pattern details' }, { status: 500 })
+    logError(patternsError, { action: 'fetch_duplicate_patterns', threshold, limit })
+    return internalError(patternsError, { action: 'fetch_duplicate_patterns', threshold, limit })
   }
 
   // Create a map for quick lookup
@@ -112,4 +119,4 @@ export async function GET(request: Request) {
     count: duplicates.length,
     threshold,
   })
-}
+})

@@ -1,24 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/admin/upload-logs - Fetch recent upload logs
-export async function GET(request: NextRequest) {
+export const GET = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: adminProfile } = await supabase
+  const { data: adminProfile, error: adminProfileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (adminProfileError && !isSupabaseNoRowError(adminProfileError)) {
+    logError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(adminProfileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Get query params
@@ -47,8 +54,7 @@ export async function GET(request: NextRequest) {
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('Error fetching upload logs:', error)
-    return NextResponse.json({ error: 'Failed to fetch upload logs' }, { status: 500 })
+    return internalError(error, { action: 'fetch_upload_logs', limit, offset })
   }
 
   // Get uploader names
@@ -56,10 +62,14 @@ export async function GET(request: NextRequest) {
   let uploaderNames: Record<string, string> = {}
 
   if (uploaderIds.length > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('id, email, display_name')
       .in('id', uploaderIds)
+
+    if (profilesError) {
+      logError(profilesError, { action: 'fetch_uploader_profiles' })
+    }
 
     if (profiles) {
       uploaderNames = Object.fromEntries(
@@ -80,4 +90,4 @@ export async function GET(request: NextRequest) {
     limit,
     offset
   })
-}
+})

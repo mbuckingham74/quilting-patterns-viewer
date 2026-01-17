@@ -1,23 +1,30 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, serviceUnavailable, withErrorHandler } from '@/lib/api-response'
 
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
   // Check if user is authenticated and admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
 
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
+
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    return forbidden()
   }
 
   // Use RPC function for efficient SQL-based aggregation
@@ -26,15 +33,12 @@ export async function GET() {
     .rpc('get_top_downloaded_patterns', { p_limit: 10 })
 
   if (error) {
-    console.error('Error fetching top patterns:', error)
+    logError(error, { action: 'fetch_top_patterns' })
     // PGRST202 = RPC function doesn't exist - migration needs to be run
     if (error.code === 'PGRST202') {
-      return NextResponse.json(
-        { error: 'Analytics RPC function not found. Run migration 027_performance_indexes.sql and 028_secure_analytics_rpcs.sql.' },
-        { status: 503 }
-      )
+      return serviceUnavailable('Analytics RPC function not found. Run migration 027_performance_indexes.sql and 028_secure_analytics_rpcs.sql.')
     }
-    return NextResponse.json({ error: 'Failed to fetch pattern data' }, { status: 500 })
+    return internalError(error, { action: 'fetch_top_patterns' })
   }
 
   // Map RPC result to expected format
@@ -55,4 +59,4 @@ export async function GET() {
   }))
 
   return NextResponse.json({ patterns })
-}
+})

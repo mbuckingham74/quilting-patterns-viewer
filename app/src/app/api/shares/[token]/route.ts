@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { badRequest, notFound, expired, internalError } from '@/lib/api-response'
-import { logError } from '@/lib/errors'
+import { badRequest, notFound, expired, internalError, withErrorHandler } from '@/lib/api-response'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -33,7 +33,7 @@ interface SharePattern {
 }
 
 // GET /api/shares/[token] - Get a share by token (public, no auth required)
-export async function GET(request: Request, { params }: RouteParams) {
+export const GET = withErrorHandler(async (request: Request, { params }: RouteParams) => {
   const { token } = await params
 
   if (!token || token.length !== 32) {
@@ -54,10 +54,12 @@ export async function GET(request: Request, { params }: RouteParams) {
 
   const share = shareData as ShareData | null
 
-  if (shareError || !share) {
-    if (shareError) {
-      logError(shareError, { action: 'get_share_by_token', token: token.substring(0, 8) + '...' })
-    }
+  if (shareError) {
+    logError(shareError, { action: 'get_share_by_token', token: token.substring(0, 8) + '...' })
+    return internalError(shareError, { action: 'get_share_by_token' })
+  }
+
+  if (!share) {
     return notFound('Share not found or expired')
   }
 
@@ -85,11 +87,15 @@ export async function GET(request: Request, { params }: RouteParams) {
   }))
 
   // Check if feedback already submitted
-  const { data: feedback } = await supabase
+  const { data: feedback, error: feedbackError } = await supabase
     .from('shared_collection_feedback')
     .select('id, submitted_at')
     .eq('collection_id', share.id)
     .single()
+
+  if (feedbackError && !isSupabaseNoRowError(feedbackError)) {
+    return internalError(feedbackError, { action: 'fetch_share_feedback', shareId: share.id })
+  }
 
   return NextResponse.json({
     share: {
@@ -104,4 +110,4 @@ export async function GET(request: Request, { params }: RouteParams) {
     feedbackSubmitted: !!feedback,
     feedbackDate: feedback?.submitted_at || null,
   })
-}
+})

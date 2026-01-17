@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-import { unauthorized, forbidden, internalError } from '@/lib/api-response'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/admin/activity - Get admin activity logs with filters
-export async function GET(request: NextRequest) {
+export const GET = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   // Check if user is admin
@@ -14,11 +15,16 @@ export async function GET(request: NextRequest) {
     return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!profile?.is_admin) {
     return forbidden()
@@ -80,18 +86,26 @@ export async function GET(request: NextRequest) {
   }
 
   // Get unique action types for filter dropdown
-  const { data: actionTypes } = await serviceClient
+  const { data: actionTypes, error: actionTypesError } = await serviceClient
     .from('admin_activity_log')
     .select('action_type')
+
+  if (actionTypesError) {
+    return internalError(actionTypesError, { action: 'fetch_activity_action_types' })
+  }
 
   const uniqueActionTypes = [
     ...new Set(actionTypes?.map((a) => a.action_type) || []),
   ].sort()
 
   // Get admins who have activity for filter dropdown
-  const { data: adminsWithActivity } = await serviceClient
+  const { data: adminsWithActivity, error: adminsWithActivityError } = await serviceClient
     .from('admin_activity_log')
     .select('admin_id, profiles!admin_id(email)')
+
+  if (adminsWithActivityError) {
+    return internalError(adminsWithActivityError, { action: 'fetch_activity_admins' })
+  }
 
   const adminMap = new Map<string, { id: string; email: string }>()
   adminsWithActivity?.forEach((a) => {
@@ -117,4 +131,4 @@ export async function GET(request: NextRequest) {
       admins: uniqueAdmins,
     },
   })
-}
+})

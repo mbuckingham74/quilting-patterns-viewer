@@ -230,7 +230,8 @@ describe('parseResponseError', () => {
 
     const result = await parseResponseError(response)
 
-    expect(result.message).toBe(ErrorMessages[ErrorCode.AUTH_EXPIRED])
+    expect(result.code).toBe(ErrorCode.AUTH_EXPIRED)
+    expect(result.message).toBe('Custom')
   })
 })
 

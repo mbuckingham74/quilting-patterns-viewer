@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { unauthorized, badRequest, conflict, internalError } from '@/lib/api-response'
+import { unauthorized, badRequest, conflict, internalError, withErrorHandler } from '@/lib/api-response'
 
 // GET /api/favorites - Get all favorites for current user
-export async function GET() {
+export const GET = withErrorHandler(async () => {
   try {
     const supabase = await createClient()
 
@@ -37,10 +37,10 @@ export async function GET() {
   } catch (error) {
     return internalError(error, { action: 'fetch_favorites' })
   }
-}
+})
 
 // POST /api/favorites - Add a pattern to favorites
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   try {
     const supabase = await createClient()
 
@@ -49,7 +49,13 @@ export async function POST(request: NextRequest) {
       return unauthorized()
     }
 
-    const body = await request.json()
+    let body: { pattern_id?: number }
+    try {
+      body = await request.json()
+    } catch {
+      return badRequest('Invalid JSON in request body')
+    }
+
     const { pattern_id } = body
 
     if (!pattern_id || typeof pattern_id !== 'number') {
@@ -77,4 +83,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return internalError(error, { action: 'add_favorite' })
   }
-}
+})

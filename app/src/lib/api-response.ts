@@ -183,7 +183,7 @@ export function serviceUnavailable(message = 'Service temporarily unavailable. P
 type RouteHandler = (
   request: Request,
   context?: { params: Record<string, string> }
-) => Promise<NextResponse>
+) => Promise<Response>
 
 /**
  * Wraps an API route handler with automatic error handling

@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sanitizeFilenameForHeader } from '@/lib/filename'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
+import { unauthorized, badRequest, notFound, internalError, withErrorHandler } from '@/lib/api-response'
 
-export async function GET(
+export const GET = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
-) {
+) => {
   const { id } = await params
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
@@ -19,10 +21,7 @@ export async function GET(
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required to download patterns' },
-      { status: 401 }
-    )
+    return unauthorized('Authentication required to download patterns')
   }
 
   // Get pattern info
@@ -32,12 +31,19 @@ export async function GET(
     .eq('id', patternId)
     .single()
 
-  if (patternError || !pattern) {
-    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+  if (patternError) {
+    if (isSupabaseNoRowError(patternError)) {
+      return notFound('Pattern not found')
+    }
+    return internalError(patternError, { action: 'fetch_pattern', patternId })
+  }
+
+  if (!pattern) {
+    return notFound('Pattern not found')
   }
 
   if (!pattern.pattern_file_url) {
-    return NextResponse.json({ error: 'Pattern file not available' }, { status: 404 })
+    return notFound('Pattern file not available')
   }
 
   // Download from Supabase storage
@@ -47,8 +53,7 @@ export async function GET(
     .download(pattern.pattern_file_url)
 
   if (downloadError || !fileData) {
-    console.error('Download error:', downloadError)
-    return NextResponse.json({ error: 'Failed to download pattern file' }, { status: 500 })
+    return internalError(downloadError ?? new Error('Download returned no data'), { action: 'download_pattern', patternId })
   }
 
   // Determine filename and sanitize for Content-Disposition header
@@ -60,7 +65,7 @@ export async function GET(
     .from('download_logs')
     .insert({ user_id: user.id, pattern_id: patternId })
     .then(({ error }) => {
-      if (error) console.error('Failed to log download:', error)
+      if (error) logError(error, { action: 'log_download', patternId, userId: user.id })
     })
 
   // Return file with appropriate headers
@@ -70,4 +75,4 @@ export async function GET(
       'Content-Disposition': contentDisposition,
     },
   })
-}
+})

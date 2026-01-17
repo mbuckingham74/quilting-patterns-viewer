@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { isSupabaseNoRowError, logError } from '@/lib/errors'
 import {
   unauthorized,
   forbidden,
@@ -11,6 +12,7 @@ import {
   resourceDeleted,
   internalError,
   successResponse,
+  withErrorHandler,
 } from '@/lib/api-response'
 
 // Reversible action types
@@ -22,7 +24,7 @@ function isReversible(action: string): action is ReversibleAction {
 }
 
 // POST /api/admin/activity/undo - Undo a specific activity log entry
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const supabase = await createClient()
 
   // Check if user is admin
@@ -33,11 +35,16 @@ export async function POST(request: NextRequest) {
     return unauthorized()
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('is_admin')
     .eq('id', user.id)
     .single()
+
+  if (profileError && !isSupabaseNoRowError(profileError)) {
+    logError(profileError, { action: 'fetch_profile', userId: user.id })
+    return internalError(profileError, { action: 'fetch_profile', userId: user.id })
+  }
 
   if (!profile?.is_admin) {
     return forbidden()
@@ -66,7 +73,14 @@ export async function POST(request: NextRequest) {
     .eq('id', activity_id)
     .single()
 
-  if (fetchError || !activity) {
+  if (fetchError) {
+    if (isSupabaseNoRowError(fetchError)) {
+      return notFound('Activity not found')
+    }
+    return internalError(fetchError, { action: 'fetch_activity', activityId: activity_id })
+  }
+
+  if (!activity) {
     return notFound('Activity not found')
   }
 
@@ -95,17 +109,28 @@ export async function POST(request: NextRequest) {
           .eq('id', parseInt(keywordId, 10))
           .single()
 
-        if (keywordCheckError || !keyword) {
+        if (keywordCheckError) {
+          if (isSupabaseNoRowError(keywordCheckError)) {
+            return resourceDeleted('Keyword no longer exists - cannot undo')
+          }
+          return internalError(keywordCheckError, { action: 'fetch_keyword', keywordId })
+        }
+
+        if (!keyword) {
           return resourceDeleted('Keyword no longer exists - cannot undo')
         }
 
         // Check if old value is already taken by another keyword
-        const { data: existingKeyword } = await serviceClient
+        const { data: existingKeyword, error: existingKeywordError } = await serviceClient
           .from('keywords')
           .select('id, value')
           .ilike('value', oldValue)
           .neq('id', parseInt(keywordId, 10))
           .single()
+
+        if (existingKeywordError && !isSupabaseNoRowError(existingKeywordError)) {
+          return internalError(existingKeywordError, { action: 'check_keyword_duplicate', keywordId })
+        }
 
         if (existingKeyword) {
           return conflict(`Cannot undo: a keyword "${existingKeyword.value}" already exists`)
@@ -157,7 +182,14 @@ export async function POST(request: NextRequest) {
           .eq('id', userId)
           .single()
 
-        if (userCheckError || !targetUser) {
+        if (userCheckError) {
+          if (isSupabaseNoRowError(userCheckError)) {
+            return resourceDeleted('User no longer exists - cannot undo')
+          }
+          return internalError(userCheckError, { action: 'fetch_user', userId })
+        }
+
+        if (!targetUser) {
           return resourceDeleted('User no longer exists - cannot undo')
         }
 
@@ -209,4 +241,4 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     return internalError(error, { action: 'undo_activity', activityId: activity_id })
   }
-}
+})
