@@ -3,14 +3,24 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import AuthButton from '@/components/AuthButton'
+import ApprovedUserRow from '@/components/ApprovedUserRow'
 
-interface ApprovedUser {
+interface ApprovedUserRaw {
   id: string
   email: string
   display_name: string | null
   created_at: string
   approved_at: string | null
   last_sign_in_at: string | null
+}
+
+function formatDate(dateString: string | null): string {
+  if (!dateString) return '—'
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 export default async function ApprovedUsersPage() {
@@ -36,16 +46,17 @@ export default async function ApprovedUsersPage() {
   const { data: users } = await supabase
     .rpc('get_approved_users_with_login')
 
-  const approvedUsers = (users || []) as ApprovedUser[]
+  const rawUsers = (users || []) as ApprovedUserRaw[]
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '—'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-  }
+  // Pre-format dates on server to avoid hydration mismatch
+  const approvedUsers = rawUsers.map(u => ({
+    id: u.id,
+    email: u.email,
+    display_name: u.display_name,
+    created_at_formatted: formatDate(u.created_at),
+    approved_at_formatted: formatDate(u.approved_at),
+    last_sign_in_at_formatted: formatDate(u.last_sign_in_at),
+  }))
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
@@ -135,36 +146,14 @@ export default async function ApprovedUsersPage() {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-stone-500 uppercase tracking-wider">
                       Last Login
                     </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-stone-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-stone-200">
                   {approvedUsers.map((approvedUser) => (
-                    <tr key={approvedUser.id} className="hover:bg-stone-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-green-700 font-medium text-sm">
-                              {(approvedUser.display_name || approvedUser.email || '?')[0].toUpperCase()}
-                            </span>
-                          </div>
-                          <span className="text-sm font-medium text-stone-900">
-                            {approvedUser.display_name || '—'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-stone-600">{approvedUser.email}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-stone-500">{formatDate(approvedUser.created_at)}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-stone-500">{formatDate(approvedUser.approved_at)}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-stone-500">{formatDate(approvedUser.last_sign_in_at)}</span>
-                      </td>
-                    </tr>
+                    <ApprovedUserRow key={approvedUser.id} user={approvedUser} />
                   ))}
                 </tbody>
               </table>

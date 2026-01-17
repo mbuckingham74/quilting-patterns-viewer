@@ -41,6 +41,35 @@ export default async function AdminDashboardPage() {
     .order('uploaded_at', { ascending: false })
     .limit(5)
 
+  // Get QA issue counts
+  // Patterns missing thumbnails
+  const { count: missingThumbnails } = await serviceClient
+    .from('patterns')
+    .select('id', { count: 'exact', head: true })
+    .is('thumbnail_url', null)
+
+  // Patterns missing embeddings (not AI searchable)
+  const { count: missingEmbeddings } = await serviceClient
+    .from('patterns')
+    .select('id', { count: 'exact', head: true })
+    .is('embedding', null)
+
+  // Patterns needing rotation fix (unreviewed orientation issues)
+  const { count: needsRotation } = await serviceClient
+    .from('orientation_analysis')
+    .select('id', { count: 'exact', head: true })
+    .neq('orientation', 'correct')
+    .eq('reviewed', false)
+
+  // Patterns needing mirror fix (unreviewed mirrored)
+  const { count: needsMirrorFix } = await serviceClient
+    .from('mirror_analysis')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_mirrored', true)
+    .eq('reviewed', false)
+
+  const totalQaIssues = (missingThumbnails || 0) + (missingEmbeddings || 0) + (needsRotation || 0) + (needsMirrorFix || 0)
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
       {/* Header */}
@@ -121,6 +150,61 @@ export default async function AdminDashboardPage() {
             </div>
           </Link>
         </div>
+
+        {/* QA Issues Section */}
+        {totalQaIssues > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-6 mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-stone-800">QA Issues</h2>
+                <p className="text-sm text-stone-500">{totalQaIssues} pattern{totalQaIssues !== 1 ? 's' : ''} need attention</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {(missingThumbnails || 0) > 0 && (
+                <Link
+                  href="/admin/exceptions?filter=no_thumbnail"
+                  className="flex flex-col p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl font-bold text-orange-600">{missingThumbnails}</span>
+                  <span className="text-sm text-stone-600">Missing Thumbnails</span>
+                </Link>
+              )}
+              {(missingEmbeddings || 0) > 0 && (
+                <Link
+                  href="/admin/exceptions?filter=no_embedding"
+                  className="flex flex-col p-4 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl font-bold text-amber-600">{missingEmbeddings}</span>
+                  <span className="text-sm text-stone-600">Missing Embeddings</span>
+                </Link>
+              )}
+              {(needsRotation || 0) > 0 && (
+                <Link
+                  href="/admin/rotate-review?filter=needs_rotation"
+                  className="flex flex-col p-4 bg-cyan-50 hover:bg-cyan-100 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl font-bold text-cyan-600">{needsRotation}</span>
+                  <span className="text-sm text-stone-600">Need Rotation Fix</span>
+                </Link>
+              )}
+              {(needsMirrorFix || 0) > 0 && (
+                <Link
+                  href="/admin/rotate-review?filter=mirrored"
+                  className="flex flex-col p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                >
+                  <span className="text-2xl font-bold text-blue-600">{needsMirrorFix}</span>
+                  <span className="text-sm text-stone-600">Need Mirror Fix</span>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Pending Reviews Alert */}
         {stagedBatches && stagedBatches.length > 0 && (

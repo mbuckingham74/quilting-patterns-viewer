@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 export const ActivityAction = {
   USER_APPROVE: 'user.approve',
   USER_REJECT: 'user.reject',
+  USER_REVOKE: 'user.revoke',
   PATTERN_DELETE: 'pattern.delete',
   PATTERN_UPDATE: 'pattern.update',
   PATTERN_TRANSFORM: 'pattern.transform',
