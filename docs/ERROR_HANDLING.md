@@ -291,6 +291,54 @@ export async function POST(request: Request) {
 }
 ```
 
+### Supabase Error Handling
+
+When using Supabase's `.single()` method, distinguish between "no rows found" (user error) and database failures (server error):
+
+```typescript
+const { data: profile, error: profileError } = await supabase
+  .from('profiles')
+  .select('is_admin')
+  .eq('id', user.id)
+  .single()
+
+// PGRST116 = "JSON object requested, multiple (or no) rows returned"
+// This means no profile exists - a user/auth error, not a server error
+if (profileError) {
+  const isNoRowError = profileError.code === 'PGRST116'
+  if (!isNoRowError) {
+    // Real database error - log and return 500
+    return internalError(profileError, {
+      component: 'my-route',
+      action: 'check_profile',
+      userId: user.id
+    })
+  }
+  // No profile found - return 403
+  return forbidden('Admin access required')
+}
+```
+
+### Handling Null Data Without Errors
+
+When Supabase returns null data without an error object, provide a fallback error:
+
+```typescript
+const { data: record, error: insertError } = await supabase
+  .from('records')
+  .insert({ ... })
+  .select('id')
+  .single()
+
+if (insertError || !record) {
+  // Use nullish coalescing to ensure we always log something
+  return internalError(insertError ?? new Error('Insert returned no data'), {
+    component: 'my-route',
+    action: 'create_record'
+  })
+}
+```
+
 ### Helper Functions Reference
 
 | Helper | HTTP Status | Error Code | Use Case |
