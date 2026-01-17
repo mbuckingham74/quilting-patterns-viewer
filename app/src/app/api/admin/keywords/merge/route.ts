@@ -41,8 +41,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return badRequest('Both source_id and target_id are required')
   }
 
-  const sourceId = parseInt(source_id, 10)
-  const targetId = parseInt(target_id, 10)
+  const sourceId = Number(source_id)
+  const targetId = Number(target_id)
 
   if (isNaN(sourceId) || isNaN(targetId)) {
     return badRequest('Invalid keyword IDs')

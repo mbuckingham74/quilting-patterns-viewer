@@ -180,16 +180,27 @@ export function serviceUnavailable(message = 'Service temporarily unavailable. P
 // Error Handler Wrapper
 // ============================================================================
 
-type RouteHandler = (
-  request: Request,
-  context?: { params: Record<string, string> }
-) => Promise<Response>
+type RouteParams = Record<string, string> | {}
+
+type RouteContext<Params extends RouteParams = {}> = {
+  params: Promise<Params>
+}
+
+type RouteHandler<Params extends RouteParams = {}, Req extends Request = Request> = (
+  request: Req,
+  context: RouteContext<Params>
+) => Promise<Response> | Response
 
 /**
  * Wraps an API route handler with automatic error handling
  * Catches exceptions and returns standardized error responses
  */
-export function withErrorHandler(handler: RouteHandler): RouteHandler {
+export function withErrorHandler<
+  Params extends RouteParams = {},
+  Req extends Request = Request
+>(
+  handler: RouteHandler<Params, Req>
+): RouteHandler<Params, Req> {
   return async (request, context) => {
     try {
       return await handler(request, context)
