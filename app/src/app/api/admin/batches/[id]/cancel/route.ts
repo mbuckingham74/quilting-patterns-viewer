@@ -1,6 +1,15 @@
-import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  invalidState,
+  internalError,
+  successResponse,
+} from '@/lib/api-response'
+import { logError } from '@/lib/errors'
 
 // POST /api/admin/batches/[id]/cancel - Cancel batch (delete all patterns)
 export async function POST(
@@ -11,7 +20,7 @@ export async function POST(
   const batchId = parseInt(id, 10)
 
   if (isNaN(batchId)) {
-    return NextResponse.json({ error: 'Invalid batch ID' }, { status: 400 })
+    return badRequest('Invalid batch ID')
   }
 
   const supabase = await createClient()
@@ -19,7 +28,7 @@ export async function POST(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: adminProfile } = await supabase
@@ -29,7 +38,7 @@ export async function POST(
     .single()
 
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   const serviceClient = createServiceClient()
@@ -42,14 +51,11 @@ export async function POST(
     .single()
 
   if (batchError || !batch) {
-    return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+    return notFound('Batch not found')
   }
 
   if (batch.status !== 'staged') {
-    return NextResponse.json(
-      { error: `Cannot cancel batch that is already ${batch.status}` },
-      { status: 400 }
-    )
+    return invalidState(`Cannot cancel batch that is already ${batch.status}`)
   }
 
   // Get all patterns in batch to delete their storage files
@@ -74,7 +80,7 @@ export async function POST(
         .from('thumbnails')
         .remove(thumbnailPaths)
       if (thumbError) {
-        console.warn('Error deleting thumbnails:', thumbError)
+        logError(thumbError, { action: 'delete_thumbnails', batchId })
       }
     }
 
@@ -84,7 +90,7 @@ export async function POST(
         .from('patterns')
         .remove(patternPaths)
       if (patternError) {
-        console.warn('Error deleting pattern files:', patternError)
+        logError(patternError, { action: 'delete_pattern_files', batchId })
       }
     }
   }
@@ -96,8 +102,7 @@ export async function POST(
     .eq('upload_batch_id', batchId)
 
   if (deleteError) {
-    console.error('Error deleting patterns:', deleteError)
-    return NextResponse.json({ error: 'Failed to delete patterns' }, { status: 500 })
+    return internalError(deleteError, { action: 'delete_patterns', batchId })
   }
 
   // Delete the upload_log record entirely (cancelled uploads have no value to keep)
@@ -107,7 +112,7 @@ export async function POST(
     .eq('id', batchId)
 
   if (deleteLogError) {
-    console.error('Error deleting upload log:', deleteLogError)
+    logError(deleteLogError, { action: 'delete_upload_log', batchId })
   }
 
   // Log the cancel activity
@@ -122,8 +127,7 @@ export async function POST(
     },
   })
 
-  return NextResponse.json({
-    success: true,
+  return successResponse({
     message: `Cancelled batch and deleted ${deletedCount || 0} patterns`,
     batch_id: batchId,
   })

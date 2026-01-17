@@ -22,14 +22,19 @@ export const ErrorCode = {
   NOT_FOUND: 'NOT_FOUND',
   ALREADY_EXISTS: 'ALREADY_EXISTS',
   CONFLICT: 'CONFLICT',
+  EXPIRED: 'EXPIRED',
+  RESOURCE_DELETED: 'RESOURCE_DELETED',
 
-  // Rate limiting (4xx)
+  // State errors (4xx)
   RATE_LIMITED: 'RATE_LIMITED',
+  INVALID_STATE: 'INVALID_STATE',
+  NOT_REVERSIBLE: 'NOT_REVERSIBLE',
 
   // Server errors (5xx)
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
   EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  UPLOAD_FAILED: 'UPLOAD_FAILED',
 
   // Network errors
   NETWORK_ERROR: 'NETWORK_ERROR',
@@ -58,12 +63,17 @@ export const ErrorMessages: Record<ErrorCode, string> = {
   [ErrorCode.NOT_FOUND]: 'The requested item could not be found',
   [ErrorCode.ALREADY_EXISTS]: 'This item already exists',
   [ErrorCode.CONFLICT]: 'This action conflicts with another operation',
+  [ErrorCode.EXPIRED]: 'This link or resource has expired',
+  [ErrorCode.RESOURCE_DELETED]: 'This item has been deleted and is no longer available',
 
   [ErrorCode.RATE_LIMITED]: 'Too many requests. Please wait a moment and try again',
+  [ErrorCode.INVALID_STATE]: 'This operation cannot be performed in the current state',
+  [ErrorCode.NOT_REVERSIBLE]: 'This action cannot be undone',
 
   [ErrorCode.INTERNAL_ERROR]: 'Something went wrong. Please try again',
   [ErrorCode.SERVICE_UNAVAILABLE]: 'Service temporarily unavailable. Please try again later',
   [ErrorCode.EXTERNAL_SERVICE_ERROR]: 'An external service is not responding. Please try again',
+  [ErrorCode.UPLOAD_FAILED]: 'Failed to process the uploaded file. Please try again',
 
   [ErrorCode.NETWORK_ERROR]: 'Network error. Please check your connection',
   [ErrorCode.TIMEOUT]: 'Request timed out. Please try again',

@@ -1,6 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  conflict,
+  notReversible,
+  resourceDeleted,
+  internalError,
+  successResponse,
+} from '@/lib/api-response'
 
 // Reversible action types
 const REVERSIBLE_ACTIONS = ['keyword.update', 'user.approve'] as const
@@ -19,7 +30,7 @@ export async function POST(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: profile } = await supabase
@@ -29,13 +40,21 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
-  const { activity_id } = await request.json()
+  // Parse request body with error handling
+  let body: { activity_id?: number }
+  try {
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
+
+  const { activity_id } = body
 
   if (!activity_id) {
-    return NextResponse.json({ error: 'activity_id is required' }, { status: 400 })
+    return badRequest('activity_id is required')
   }
 
   const serviceClient = createServiceClient()
@@ -48,19 +67,12 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (fetchError || !activity) {
-    return NextResponse.json({ error: 'Activity not found' }, { status: 404 })
+    return notFound('Activity not found')
   }
 
   // Check if action is reversible
   if (!isReversible(activity.action_type)) {
-    return NextResponse.json(
-      {
-        error: 'This action cannot be undone',
-        action_type: activity.action_type,
-        reversible_actions: REVERSIBLE_ACTIONS,
-      },
-      { status: 400 }
-    )
+    return notReversible(`Action type "${activity.action_type}" cannot be undone. Reversible actions: ${REVERSIBLE_ACTIONS.join(', ')}`)
   }
 
   // Perform the undo based on action type
@@ -73,10 +85,7 @@ export async function POST(request: NextRequest) {
         const keywordId = activity.target_id
 
         if (!oldValue || !keywordId) {
-          return NextResponse.json(
-            { error: 'Missing old_value or target_id in activity details' },
-            { status: 400 }
-          )
+          return badRequest('Missing old_value or target_id in activity details')
         }
 
         // Check if keyword still exists
@@ -87,28 +96,19 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (keywordCheckError || !keyword) {
-          return NextResponse.json(
-            { error: 'Keyword no longer exists - cannot undo' },
-            { status: 400 }
-          )
+          return resourceDeleted('Keyword no longer exists - cannot undo')
         }
 
         // Check if old value is already taken by another keyword
-        const { data: conflict } = await serviceClient
+        const { data: existingKeyword } = await serviceClient
           .from('keywords')
           .select('id, value')
           .ilike('value', oldValue)
           .neq('id', parseInt(keywordId, 10))
           .single()
 
-        if (conflict) {
-          return NextResponse.json(
-            {
-              error: `Cannot undo: a keyword "${conflict.value}" already exists`,
-              conflict,
-            },
-            { status: 409 }
-          )
+        if (existingKeyword) {
+          return conflict(`Cannot undo: a keyword "${existingKeyword.value}" already exists`)
         }
 
         // Rename keyword back
@@ -135,8 +135,7 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        return NextResponse.json({
-          success: true,
+        return successResponse({
           undone_action: 'keyword.update',
           restored_value: oldValue,
         })
@@ -148,10 +147,7 @@ export async function POST(request: NextRequest) {
         const details = activity.details as { email?: string }
 
         if (!userId) {
-          return NextResponse.json(
-            { error: 'Missing target_id in activity' },
-            { status: 400 }
-          )
+          return badRequest('Missing target_id in activity')
         }
 
         // Check if user still exists
@@ -162,25 +158,16 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (userCheckError || !targetUser) {
-          return NextResponse.json(
-            { error: 'User no longer exists - cannot undo' },
-            { status: 400 }
-          )
+          return resourceDeleted('User no longer exists - cannot undo')
         }
 
         if (!targetUser.is_approved) {
-          return NextResponse.json(
-            { error: 'User is already unapproved' },
-            { status: 400 }
-          )
+          return badRequest('User is already unapproved')
         }
 
         // Don't allow unapproving the admin performing the action
         if (userId === user.id) {
-          return NextResponse.json(
-            { error: 'Cannot unapprove yourself' },
-            { status: 400 }
-          )
+          return forbidden('Cannot unapprove yourself')
         }
 
         // Unapprove the user
@@ -210,24 +197,16 @@ export async function POST(request: NextRequest) {
           },
         })
 
-        return NextResponse.json({
-          success: true,
+        return successResponse({
           undone_action: 'user.approve',
           unapproved_user: targetUser.email,
         })
       }
 
       default:
-        return NextResponse.json(
-          { error: 'Unknown reversible action' },
-          { status: 400 }
-        )
+        return badRequest('Unknown reversible action')
     }
   } catch (error) {
-    console.error('Error undoing activity:', error)
-    return NextResponse.json(
-      { error: 'Failed to undo action', details: String(error) },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'undo_activity', activityId: activity_id })
   }
 }

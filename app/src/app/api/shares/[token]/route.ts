@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { badRequest, notFound, expired, internalError } from '@/lib/api-response'
+import { logError } from '@/lib/errors'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -35,11 +37,11 @@ export async function GET(request: Request, { params }: RouteParams) {
   const { token } = await params
 
   if (!token || token.length !== 32) {
-    return NextResponse.json({ error: 'Invalid share link' }, { status: 400 })
+    return badRequest('Invalid share link')
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+    return internalError(new Error('Missing Supabase configuration'), { action: 'get_share' })
   }
 
   // Use service client to bypass RLS (this is a public endpoint)
@@ -53,13 +55,15 @@ export async function GET(request: Request, { params }: RouteParams) {
   const share = shareData as ShareData | null
 
   if (shareError || !share) {
-    console.error('Error fetching share:', shareError)
-    return NextResponse.json({ error: 'Share not found or expired' }, { status: 404 })
+    if (shareError) {
+      logError(shareError, { action: 'get_share_by_token', token: token.substring(0, 8) + '...' })
+    }
+    return notFound('Share not found or expired')
   }
 
   // Check if expired
   if (new Date(share.expires_at) < new Date()) {
-    return NextResponse.json({ error: 'This share link has expired' }, { status: 410 })
+    return expired('This share link has expired')
   }
 
   // Get the patterns using the SECURITY DEFINER function
@@ -67,8 +71,7 @@ export async function GET(request: Request, { params }: RouteParams) {
     .rpc('get_share_patterns_by_token', { share_token: token })
 
   if (patternsError) {
-    console.error('Error fetching patterns:', patternsError)
-    return NextResponse.json({ error: 'Failed to load patterns' }, { status: 500 })
+    return internalError(patternsError, { action: 'get_share_patterns' })
   }
 
   // Transform to include id field (function returns pattern_id)

@@ -1,6 +1,13 @@
-import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  conflict,
+  internalError,
+  successResponse,
+} from '@/lib/api-response'
 
 type ReviewDecision = 'keep_both' | 'deleted_first' | 'deleted_second'
 
@@ -17,7 +24,7 @@ export async function POST(request: Request) {
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: adminProfile } = await supabase
@@ -27,7 +34,7 @@ export async function POST(request: Request) {
     .single()
 
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Parse request body
@@ -35,18 +42,22 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { pattern_id_1, pattern_id_2, decision } = body
 
   // Validate input
-  if (!pattern_id_1 || !pattern_id_2 || !decision) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+  if (!pattern_id_1 || !pattern_id_2) {
+    return badRequest('pattern_id_1 and pattern_id_2 are required')
+  }
+
+  if (!decision) {
+    return badRequest('decision is required')
   }
 
   if (!['keep_both', 'deleted_first', 'deleted_second'].includes(decision)) {
-    return NextResponse.json({ error: 'Invalid decision value' }, { status: 400 })
+    return badRequest('Invalid decision value. Must be: keep_both, deleted_first, or deleted_second')
   }
 
   // Normalize the pair (smaller ID first) for consistent storage
@@ -71,8 +82,7 @@ export async function POST(request: Request) {
       .eq('id', patternToDelete)
 
     if (deleteError) {
-      console.error('Error deleting pattern:', deleteError)
-      return NextResponse.json({ error: 'Failed to delete pattern', details: deleteError.message }, { status: 500 })
+      return internalError(deleteError, { action: 'delete_duplicate_pattern', patternId: patternToDelete })
     }
   }
 
@@ -96,10 +106,9 @@ export async function POST(request: Request) {
   if (insertError) {
     // If it's a unique constraint violation, the pair was already reviewed
     if (insertError.code === '23505') {
-      return NextResponse.json({ error: 'This pair has already been reviewed' }, { status: 409 })
+      return conflict('This pair has already been reviewed')
     }
-    console.error('Error recording review:', insertError)
-    return NextResponse.json({ error: 'Failed to record review', details: insertError.message }, { status: 500 })
+    return internalError(insertError, { action: 'record_duplicate_review', pattern_id_1, pattern_id_2 })
   }
 
   // Log the duplicate review activity
@@ -121,8 +130,7 @@ export async function POST(request: Request) {
     },
   })
 
-  return NextResponse.json({
-    success: true,
+  return successResponse({
     deleted_pattern_id: patternToDelete,
   })
 }

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import { unauthorized, forbidden, badRequest, internalError } from '@/lib/api-response'
+import { logError } from '@/lib/errors'
 import JSZip from 'jszip'
 
 // POST /api/admin/reprocess-thumbnails
@@ -10,7 +12,7 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: adminProfile } = await supabase
@@ -20,14 +22,14 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   let serviceClient: ReturnType<typeof createServiceClient>
   try {
     serviceClient = createServiceClient()
-  } catch {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 })
+  } catch (error) {
+    return internalError(error, { action: 'create_service_client' })
   }
 
   try {
@@ -35,11 +37,11 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null
 
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+      return badRequest('No file provided')
     }
 
     if (!file.name.toLowerCase().endsWith('.zip')) {
-      return NextResponse.json({ error: 'File must be a ZIP archive' }, { status: 400 })
+      return badRequest('File must be a ZIP archive')
     }
 
     const arrayBuffer = await file.arrayBuffer()
@@ -58,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (pdfs.size === 0) {
-      return NextResponse.json({ error: 'No PDF files found in ZIP' }, { status: 400 })
+      return badRequest('No PDF files found in ZIP')
     }
 
     // Get patterns without thumbnails
@@ -68,7 +70,7 @@ export async function POST(request: NextRequest) {
       .is('thumbnail_url', null)
 
     if (fetchError) {
-      throw fetchError
+      return internalError(fetchError, { action: 'fetch_patterns_without_thumbnails' })
     }
 
     if (!patterns || patterns.length === 0) {
@@ -165,12 +167,9 @@ export async function POST(request: NextRequest) {
       details: results
     })
 
-  } catch (e) {
-    console.error('Reprocess error:', e)
-    return NextResponse.json({
-      error: 'Failed to process',
-      details: e instanceof Error ? e.message : 'Unknown error'
-    }, { status: 500 })
+  } catch (error) {
+    logError(error, { action: 'reprocess_thumbnails' })
+    return internalError(error, { action: 'reprocess_thumbnails' })
   }
 }
 

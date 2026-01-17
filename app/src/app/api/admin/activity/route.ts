@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { unauthorized, forbidden, internalError } from '@/lib/api-response'
 
 // GET /api/admin/activity - Get admin activity logs with filters
 export async function GET(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: profile } = await supabase
@@ -20,13 +21,13 @@ export async function GET(request: NextRequest) {
     .single()
 
   if (!profile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Parse query params
   const searchParams = request.nextUrl.searchParams
-  const page = parseInt(searchParams.get('page') || '1', 10)
-  const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100)
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1)
+  const limit = Math.min(Math.max(1, parseInt(searchParams.get('limit') || '50', 10) || 50), 100)
   const actionType = searchParams.get('action') || null
   const targetType = searchParams.get('target') || null
   const adminId = searchParams.get('admin_id') || null
@@ -63,8 +64,10 @@ export async function GET(request: NextRequest) {
   if (dateTo) {
     // Add one day to include the entire end date
     const endDate = new Date(dateTo)
-    endDate.setDate(endDate.getDate() + 1)
-    query = query.lt('created_at', endDate.toISOString())
+    if (!isNaN(endDate.getTime())) {
+      endDate.setDate(endDate.getDate() + 1)
+      query = query.lt('created_at', endDate.toISOString())
+    }
   }
 
   // Execute with pagination
@@ -73,11 +76,7 @@ export async function GET(request: NextRequest) {
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('Error fetching activity logs:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch activity logs', details: error.message },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'fetch_activity_logs' })
   }
 
   // Get unique action types for filter dropdown

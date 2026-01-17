@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, badRequest, internalError } from '@/lib/api-response'
 
 // GET /api/saved-searches - Get all saved searches for current user
 export async function GET() {
@@ -7,10 +8,7 @@ export async function GET() {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    )
+    return unauthorized()
   }
 
   const { data: searches, error } = await supabase
@@ -20,11 +18,7 @@ export async function GET() {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching saved searches:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch saved searches' },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'fetch_saved_searches', userId: user.id })
   }
 
   return NextResponse.json({ searches })
@@ -36,20 +30,21 @@ export async function POST(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    )
+    return unauthorized()
   }
 
-  const body = await request.json()
+  // Parse request body with error handling
+  let body: { query?: string; name?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
+
   const { query, name } = body
 
   if (!query || typeof query !== 'string' || query.trim() === '') {
-    return NextResponse.json(
-      { error: 'query is required and must be a non-empty string' },
-      { status: 400 }
-    )
+    return badRequest('query is required and must be a non-empty string')
   }
 
   const { data: search, error } = await supabase
@@ -63,11 +58,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
-    console.error('Error saving search:', error)
-    return NextResponse.json(
-      { error: 'Failed to save search' },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'save_search', userId: user.id })
   }
 
   return NextResponse.json({ search }, { status: 201 })

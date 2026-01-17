@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, badRequest, internalError, successResponse } from '@/lib/api-response'
 
 // DELETE /api/favorites/[id] - Remove a pattern from favorites
 export async function DELETE(
@@ -10,20 +11,14 @@ export async function DELETE(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    )
+    return unauthorized()
   }
 
   const { id } = await params
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json(
-      { error: 'Invalid pattern ID' },
-      { status: 400 }
-    )
+    return badRequest('Invalid pattern ID')
   }
 
   const { error } = await supabase
@@ -33,12 +28,8 @@ export async function DELETE(
     .eq('pattern_id', patternId)
 
   if (error) {
-    console.error('Error removing favorite:', error)
-    return NextResponse.json(
-      { error: 'Failed to remove favorite' },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'remove_favorite', patternId, userId: user.id })
   }
 
-  return NextResponse.json({ success: true })
+  return successResponse({ removed: true })
 }

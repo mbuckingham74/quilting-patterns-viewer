@@ -1,26 +1,15 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
-
-// Helper to check admin status
-async function checkAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { error: 'Not authenticated', status: 401 }
-  }
-
-  const { data: adminProfile } = await supabase
-    .from('profiles')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single()
-
-  if (!adminProfile?.is_admin) {
-    return { error: 'Not authorized', status: 403 }
-  }
-
-  return { user }
-}
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  conflict,
+  internalError,
+  successResponse,
+} from '@/lib/api-response'
 
 // GET /api/admin/patterns/[id]/keywords - Get all keywords for a pattern
 export async function GET(
@@ -31,14 +20,25 @@ export async function GET(
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
 
-  const authResult = await checkAdmin(supabase)
-  if ('error' in authResult) {
-    return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+  // Check if user is admin
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return unauthorized()
+  }
+
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  if (!adminProfile?.is_admin) {
+    return forbidden()
   }
 
   // Fetch keywords for this pattern
@@ -48,11 +48,7 @@ export async function GET(
     .eq('pattern_id', patternId)
 
   if (error) {
-    console.error('Error fetching pattern keywords:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch keywords', details: error.message },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'fetch_pattern_keywords', patternId })
   }
 
   const keywords = patternKeywords?.map(pk => pk.keywords).filter(Boolean) || []
@@ -69,14 +65,25 @@ export async function POST(
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
 
-  const authResult = await checkAdmin(supabase)
-  if ('error' in authResult) {
-    return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+  // Check if user is admin
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return unauthorized()
+  }
+
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  if (!adminProfile?.is_admin) {
+    return forbidden()
   }
 
   // Parse request body
@@ -84,13 +91,13 @@ export async function POST(
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { keyword_id } = body
 
   if (!keyword_id || typeof keyword_id !== 'number') {
-    return NextResponse.json({ error: 'Missing or invalid keyword_id' }, { status: 400 })
+    return badRequest('keyword_id is required and must be a number')
   }
 
   // Verify pattern exists
@@ -101,7 +108,7 @@ export async function POST(
     .single()
 
   if (!pattern) {
-    return NextResponse.json({ error: 'Pattern not found' }, { status: 404 })
+    return notFound('Pattern not found')
   }
 
   // Verify keyword exists
@@ -112,7 +119,7 @@ export async function POST(
     .single()
 
   if (!keyword) {
-    return NextResponse.json({ error: 'Keyword not found' }, { status: 404 })
+    return notFound('Keyword not found')
   }
 
   // Check if association already exists
@@ -124,7 +131,7 @@ export async function POST(
     .single()
 
   if (existing) {
-    return NextResponse.json({ error: 'Keyword already associated with this pattern' }, { status: 409 })
+    return conflict('Keyword already associated with this pattern')
   }
 
   // Add the keyword association
@@ -136,16 +143,12 @@ export async function POST(
     })
 
   if (insertError) {
-    console.error('Error adding keyword to pattern:', insertError)
-    return NextResponse.json(
-      { error: 'Failed to add keyword', details: insertError.message },
-      { status: 500 }
-    )
+    return internalError(insertError, { action: 'add_pattern_keyword', patternId, keyword_id })
   }
 
   // Log the activity
   await logAdminActivity({
-    adminId: authResult.user.id,
+    adminId: user.id,
     action: ActivityAction.PATTERN_KEYWORD_ADD,
     targetType: 'pattern',
     targetId: patternId,
@@ -156,10 +159,7 @@ export async function POST(
     },
   })
 
-  return NextResponse.json({
-    success: true,
-    keyword,
-  })
+  return successResponse({ keyword })
 }
 
 // DELETE /api/admin/patterns/[id]/keywords - Remove a keyword from a pattern
@@ -171,14 +171,25 @@ export async function DELETE(
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
-    return NextResponse.json({ error: 'Invalid pattern ID' }, { status: 400 })
+    return badRequest('Invalid pattern ID')
   }
 
   const supabase = await createClient()
 
-  const authResult = await checkAdmin(supabase)
-  if ('error' in authResult) {
-    return NextResponse.json({ error: authResult.error }, { status: authResult.status })
+  // Check if user is admin
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return unauthorized()
+  }
+
+  const { data: adminProfile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  if (!adminProfile?.is_admin) {
+    return forbidden()
   }
 
   // Parse request body
@@ -186,13 +197,13 @@ export async function DELETE(
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { keyword_id } = body
 
   if (!keyword_id || typeof keyword_id !== 'number') {
-    return NextResponse.json({ error: 'Missing or invalid keyword_id' }, { status: 400 })
+    return badRequest('keyword_id is required and must be a number')
   }
 
   // Get keyword info for logging
@@ -210,20 +221,16 @@ export async function DELETE(
     .eq('keyword_id', keyword_id)
 
   if (deleteError) {
-    console.error('Error removing keyword from pattern:', deleteError)
-    return NextResponse.json(
-      { error: 'Failed to remove keyword', details: deleteError.message },
-      { status: 500 }
-    )
+    return internalError(deleteError, { action: 'remove_pattern_keyword', patternId, keyword_id })
   }
 
   if (count === 0) {
-    return NextResponse.json({ error: 'Keyword association not found' }, { status: 404 })
+    return notFound('Keyword association not found')
   }
 
   // Log the activity
   await logAdminActivity({
-    adminId: authResult.user.id,
+    adminId: user.id,
     action: ActivityAction.PATTERN_KEYWORD_REMOVE,
     targetType: 'pattern',
     targetId: patternId,
@@ -234,7 +241,5 @@ export async function DELETE(
     },
   })
 
-  return NextResponse.json({
-    success: true,
-  })
+  return successResponse({ removed: true })
 }

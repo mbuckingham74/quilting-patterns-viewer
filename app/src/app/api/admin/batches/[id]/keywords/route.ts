@@ -1,6 +1,13 @@
-import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  internalError,
+  successResponse,
+} from '@/lib/api-response'
 
 interface BulkKeywordRequest {
   keyword_ids: number[]
@@ -16,7 +23,7 @@ export async function POST(
   const batchId = parseInt(id, 10)
 
   if (isNaN(batchId)) {
-    return NextResponse.json({ error: 'Invalid batch ID' }, { status: 400 })
+    return badRequest('Invalid batch ID')
   }
 
   const supabase = await createClient()
@@ -24,7 +31,7 @@ export async function POST(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: adminProfile } = await supabase
@@ -34,7 +41,7 @@ export async function POST(
     .single()
 
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   // Parse request body
@@ -42,17 +49,17 @@ export async function POST(
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    return badRequest('Invalid JSON in request body')
   }
 
   const { keyword_ids, action } = body
 
   if (!Array.isArray(keyword_ids) || keyword_ids.length === 0) {
-    return NextResponse.json({ error: 'keyword_ids must be a non-empty array' }, { status: 400 })
+    return badRequest('keyword_ids must be a non-empty array')
   }
 
   if (action !== 'add' && action !== 'remove') {
-    return NextResponse.json({ error: 'action must be "add" or "remove"' }, { status: 400 })
+    return badRequest('action must be "add" or "remove"')
   }
 
   const serviceClient = createServiceClient()
@@ -64,12 +71,11 @@ export async function POST(
     .eq('upload_batch_id', batchId)
 
   if (patternsError) {
-    console.error('Error fetching patterns:', patternsError)
-    return NextResponse.json({ error: 'Failed to fetch patterns' }, { status: 500 })
+    return internalError(patternsError, { action: 'fetch_batch_patterns', batchId })
   }
 
   if (!patterns || patterns.length === 0) {
-    return NextResponse.json({ error: 'No patterns in batch' }, { status: 404 })
+    return notFound('No patterns in batch')
   }
 
   const patternIds = patterns.map(p => p.id)
@@ -82,13 +88,13 @@ export async function POST(
       .in('id', keyword_ids)
 
     if (keywordError) {
-      return NextResponse.json({ error: 'Failed to verify keywords' }, { status: 500 })
+      return internalError(keywordError, { action: 'verify_keywords', batchId })
     }
 
     const validKeywordIds = validKeywords?.map(k => k.id) || []
 
     if (validKeywordIds.length === 0) {
-      return NextResponse.json({ error: 'No valid keyword IDs provided' }, { status: 400 })
+      return badRequest('No valid keyword IDs provided')
     }
 
     // Build insert records for all pattern-keyword combinations
@@ -105,8 +111,7 @@ export async function POST(
       .upsert(insertRecords, { onConflict: 'pattern_id,keyword_id', ignoreDuplicates: true })
 
     if (insertError) {
-      console.error('Error adding keywords:', insertError)
-      return NextResponse.json({ error: 'Failed to add keywords' }, { status: 500 })
+      return internalError(insertError, { action: 'add_batch_keywords', batchId })
     }
 
     // Log the activity
@@ -123,8 +128,7 @@ export async function POST(
       },
     })
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       action: 'add',
       patterns_affected: patternIds.length,
       keywords_added: validKeywordIds.length,
@@ -139,8 +143,7 @@ export async function POST(
       .in('keyword_id', keyword_ids)
 
     if (deleteError) {
-      console.error('Error removing keywords:', deleteError)
-      return NextResponse.json({ error: 'Failed to remove keywords' }, { status: 500 })
+      return internalError(deleteError, { action: 'remove_batch_keywords', batchId })
     }
 
     // Log the activity
@@ -157,8 +160,7 @@ export async function POST(
       },
     })
 
-    return NextResponse.json({
-      success: true,
+    return successResponse({
       action: 'remove',
       patterns_affected: patternIds.length,
       keywords_removed: keyword_ids.length,

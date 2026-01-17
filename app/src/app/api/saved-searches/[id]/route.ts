@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { unauthorized, badRequest, internalError, successResponse } from '@/lib/api-response'
 
 // DELETE /api/saved-searches/[id] - Delete a saved search
 export async function DELETE(
@@ -10,20 +11,14 @@ export async function DELETE(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json(
-      { error: 'Authentication required' },
-      { status: 401 }
-    )
+    return unauthorized()
   }
 
   const { id } = await params
   const searchId = parseInt(id, 10)
 
   if (isNaN(searchId)) {
-    return NextResponse.json(
-      { error: 'Invalid search ID' },
-      { status: 400 }
-    )
+    return badRequest('Invalid search ID')
   }
 
   const { error } = await supabase
@@ -33,12 +28,8 @@ export async function DELETE(
     .eq('id', searchId)
 
   if (error) {
-    console.error('Error deleting saved search:', error)
-    return NextResponse.json(
-      { error: 'Failed to delete saved search' },
-      { status: 500 }
-    )
+    return internalError(error, { action: 'delete_saved_search', searchId, userId: user.id })
   }
 
-  return NextResponse.json({ success: true })
+  return successResponse({ deleted: true })
 }

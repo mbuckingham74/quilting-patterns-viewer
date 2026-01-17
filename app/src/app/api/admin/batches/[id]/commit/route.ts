@@ -1,7 +1,16 @@
-import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { generateEmbeddingsForBatch } from '@/lib/embeddings'
 import { logAdminActivity, ActivityAction } from '@/lib/activity-log'
+import {
+  unauthorized,
+  forbidden,
+  badRequest,
+  notFound,
+  invalidState,
+  internalError,
+  successResponse,
+} from '@/lib/api-response'
+import { logError } from '@/lib/errors'
 
 // POST /api/admin/batches/[id]/commit - Commit batch (make patterns visible in browse)
 export async function POST(
@@ -12,7 +21,7 @@ export async function POST(
   const batchId = parseInt(id, 10)
 
   if (isNaN(batchId)) {
-    return NextResponse.json({ error: 'Invalid batch ID' }, { status: 400 })
+    return badRequest('Invalid batch ID')
   }
 
   const supabase = await createClient()
@@ -20,7 +29,7 @@ export async function POST(
   // Check if current user is admin
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
-    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    return unauthorized()
   }
 
   const { data: adminProfile } = await supabase
@@ -30,7 +39,7 @@ export async function POST(
     .single()
 
   if (!adminProfile?.is_admin) {
-    return NextResponse.json({ error: 'Not authorized' }, { status: 403 })
+    return forbidden()
   }
 
   const serviceClient = createServiceClient()
@@ -43,14 +52,11 @@ export async function POST(
     .single()
 
   if (batchError || !batch) {
-    return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
+    return notFound('Batch not found')
   }
 
   if (batch.status !== 'staged') {
-    return NextResponse.json(
-      { error: `Batch is already ${batch.status}` },
-      { status: 400 }
-    )
+    return invalidState(`Batch is already ${batch.status}`)
   }
 
   // Update all patterns in batch to not be staged
@@ -61,8 +67,7 @@ export async function POST(
     .eq('is_staged', true)
 
   if (patternsError) {
-    console.error('Error committing patterns:', patternsError)
-    return NextResponse.json({ error: 'Failed to commit patterns' }, { status: 500 })
+    return internalError(patternsError, { action: 'commit_patterns', batchId })
   }
 
   // Update batch status to committed
@@ -72,14 +77,14 @@ export async function POST(
     .eq('id', batchId)
 
   if (updateError) {
-    console.error('Error updating batch status:', updateError)
     // Patterns are already committed, so just log the error
+    logError(updateError, { action: 'update_batch_status', batchId })
   }
 
   // Generate embeddings for the batch asynchronously (don't block the response)
   // This runs in the background so users don't have to wait
   generateEmbeddingsForBatch(batchId).catch((error) => {
-    console.error(`Error generating embeddings for batch ${batchId}:`, error)
+    logError(error, { action: 'generate_embeddings', batchId })
   })
 
   // Log the commit activity
@@ -94,8 +99,7 @@ export async function POST(
     },
   })
 
-  return NextResponse.json({
-    success: true,
+  return successResponse({
     message: `Committed ${patternsCount || 0} patterns. Embeddings will be generated in the background.`,
     batch_id: batchId,
   })

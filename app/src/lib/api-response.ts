@@ -110,6 +110,38 @@ export function conflict(message?: string) {
   })
 }
 
+/** 410 Gone - Resource has expired or been deleted */
+export function expired(message = 'This link or resource has expired') {
+  return errorResponse(410, {
+    code: ErrorCode.EXPIRED,
+    message,
+  })
+}
+
+/** 400 Bad Request - Invalid state for operation */
+export function invalidState(message?: string) {
+  return errorResponse(400, {
+    code: ErrorCode.INVALID_STATE,
+    message,
+  })
+}
+
+/** 400 Bad Request - Action cannot be reversed */
+export function notReversible(message = 'This action cannot be undone') {
+  return errorResponse(400, {
+    code: ErrorCode.NOT_REVERSIBLE,
+    message,
+  })
+}
+
+/** 400 Bad Request - Resource has been deleted */
+export function resourceDeleted(message = 'This item has been deleted and is no longer available') {
+  return errorResponse(400, {
+    code: ErrorCode.RESOURCE_DELETED,
+    message,
+  })
+}
+
 /** 429 Too Many Requests - Rate limited */
 export function rateLimited(retryAfter: number, message?: string) {
   return errorResponse(429, {
@@ -195,6 +227,8 @@ function statusToErrorCode(status: number): ErrorCode {
       return ErrorCode.NOT_FOUND
     case 409:
       return ErrorCode.CONFLICT
+    case 410:
+      return ErrorCode.EXPIRED
     case 429:
       return ErrorCode.RATE_LIMITED
     case 503:
@@ -217,15 +251,21 @@ function errorCodeToStatus(code: ErrorCode): number {
     case ErrorCode.VALIDATION_FAILED:
     case ErrorCode.INVALID_INPUT:
     case ErrorCode.MISSING_REQUIRED:
+    case ErrorCode.INVALID_STATE:
+    case ErrorCode.NOT_REVERSIBLE:
+    case ErrorCode.RESOURCE_DELETED:
       return 400
     case ErrorCode.ALREADY_EXISTS:
     case ErrorCode.CONFLICT:
       return 409
+    case ErrorCode.EXPIRED:
+      return 410
     case ErrorCode.RATE_LIMITED:
       return 429
     case ErrorCode.SERVICE_UNAVAILABLE:
     case ErrorCode.EXTERNAL_SERVICE_ERROR:
       return 503
+    case ErrorCode.UPLOAD_FAILED:
     case ErrorCode.NETWORK_ERROR:
     case ErrorCode.TIMEOUT:
     case ErrorCode.INTERNAL_ERROR:
