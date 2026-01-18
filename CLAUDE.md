@@ -506,7 +506,21 @@ scripts/011_pattern_id_sequence.sql
 # Profile self-promotion fix
 scripts/009_fix_profile_self_promotion.sql
 scripts/010_fix_security_definer_bypass.sql
+
+# Security hardening (Jan 2026) - RLS policies, anon revokes, function search paths
+scripts/012_security_fixes.sql
 ```
+
+### Security Hardening (Migration 012)
+
+Applied January 2026 to address Supabase Security Advisor warnings:
+
+1. **RLS Policy Gaps**: Added policy to `admin_emails` table (had RLS but no policies)
+2. **Overly Permissive Policies**: Removed "viewable by everyone" SELECT policies that allowed unauthenticated access to `patterns`, `keywords`, `pattern_keywords`, `keyword_groups`, `keyword_group_keywords`
+3. **Anon Role Permissions**: Revoked all permissions from `anon` role on all public tables (defense in depth - RLS was already blocking, but best practice)
+4. **INSERT Validation**: Added WITH CHECK clauses to INSERT policies for `download_logs`, `search_logs`, `view_logs`, `saved_searches`, `user_favorites`, `shared_collections`, `shared_collection_patterns`
+5. **Function Search Paths**: Set `search_path = public` on 11 functions to prevent search path injection attacks
+6. **Note**: "Extension in Public" warning for pgvector is acceptable for self-hosted Supabase
 
 ## Error Handling
 

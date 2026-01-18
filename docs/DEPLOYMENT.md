@@ -89,8 +89,11 @@ ssh michael@100.115.127.119 'cd /home/michael/docker-configs/supabase && docker 
 ## Migration File Naming
 
 Sequential numbering: `XXX_description.sql`
-- Current latest: `028_secure_analytics_rpcs.sql`
-- Next migration should be: `029_*.sql`
+- Current latest: `012_security_fixes.sql`
+- Next migration should be: `013_*.sql`
+
+Note: Migration numbering was reset. The `012_security_fixes.sql` migration addresses
+Supabase Security Advisor warnings (RLS policies, anon permissions, function search paths).
 
 ## Important Notes
 

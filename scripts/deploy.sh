@@ -10,8 +10,9 @@ cd "$(dirname "$0")/.."
 NEXT_PUBLIC_SUPABASE_URL="https://base.tachyonfuture.com"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzY2NDY0NDcwLCJleHAiOjE5MjQxNDQ0NzB9.66TfVQwO4TvSe549H__MAdfubeN11ZmoShPUJ_JoP0A"
 
-echo "Building Docker image..."
+echo "Building Docker image for linux/amd64..."
 docker build \
+  --platform linux/amd64 \
   --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
   --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
   -t quilting-patterns:latest -f Dockerfile .
