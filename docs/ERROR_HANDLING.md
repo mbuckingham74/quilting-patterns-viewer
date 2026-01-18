@@ -205,10 +205,12 @@ const SafePatternCard = withErrorBoundary(PatternCard)
 
 ### API Route Responses
 
-Use the helper functions from `lib/api-response.ts`:
+Use the helper functions from `lib/api-response.ts` and wrap handlers with `withErrorHandler()` to standardize errors:
 
 ```typescript
+import type { NextRequest } from 'next/server'
 import {
+  withErrorHandler,
   unauthorized,
   forbidden,
   badRequest,
@@ -224,71 +226,83 @@ import {
   successResponse
 } from '@/lib/api-response'
 
-export async function POST(request: Request) {
+// Route params are Promises in the App Router context.
+export const GET = withErrorHandler(async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) => {
+  const { id } = await params
+  if (!id) return badRequest('Missing id')
+  return successResponse({ id })
+})
+```
+
+Example flow with common helpers:
+
+```typescript
+export const POST = withErrorHandler(async (request: NextRequest) => {
+  // Auth check
+  const user = await getUser()
+  if (!user) {
+    return unauthorized()
+  }
+
+  // Admin check
+  if (!user.isAdmin) {
+    return forbidden()
+  }
+
+  // Parse body with try-catch for safe JSON parsing
+  let body: { email: string }
   try {
-    // Auth check
-    const user = await getUser()
-    if (!user) {
-      return unauthorized()
-    }
+    body = await request.json()
+  } catch {
+    return badRequest('Invalid JSON in request body')
+  }
 
-    // Admin check
-    if (!user.isAdmin) {
-      return forbidden()
-    }
+  const { email } = body
+  if (!email) {
+    return badRequest('Email is required')
+  }
 
-    // Parse body with try-catch for safe JSON parsing
-    let body: { email: string }
-    try {
-      body = await request.json()
-    } catch {
-      return badRequest('Invalid JSON in request body')
-    }
+  // Rate limiting
+  if (isRateLimited(user.id)) {
+    return rateLimited(60) // Retry after 60 seconds
+  }
 
-    const { email } = body
-    if (!email) {
-      return badRequest('Email is required')
-    }
+  // Check resource state
+  const resource = await getResource(id)
+  if (!resource) {
+    return notFound('Resource not found')
+  }
+  if (resource.deleted_at) {
+    return resourceDeleted('This item has been deleted')
+  }
+  if (resource.status !== 'pending') {
+    return invalidState('Resource must be in pending state')
+  }
 
-    // Rate limiting
-    if (isRateLimited(user.id)) {
-      return rateLimited(60) // Retry after 60 seconds
-    }
+  // Check for expired links
+  if (resource.expires_at && new Date(resource.expires_at) < new Date()) {
+    return expired('This link has expired')
+  }
 
-    // Check resource state
-    const resource = await getResource(id)
-    if (!resource) {
-      return notFound('Resource not found')
-    }
-    if (resource.deleted_at) {
-      return resourceDeleted('This item has been deleted')
-    }
-    if (resource.status !== 'pending') {
-      return invalidState('Resource must be in pending state')
-    }
+  // Check if action can be undone
+  if (action === 'undo' && !resource.reversible) {
+    return notReversible('This action cannot be undone')
+  }
 
-    // Check for expired links
-    if (resource.expires_at && new Date(resource.expires_at) < new Date()) {
-      return expired('This link has expired')
-    }
-
-    // Check if action can be undone
-    if (action === 'undo' && !resource.reversible) {
-      return notReversible('This action cannot be undone')
-    }
-
-    // Business logic
-    const result = await doSomething(email)
-    return successResponse({ data: result })
-
-  } catch (error) {
-    // Logs error and returns 500
-    return internalError(error, {
+  // Business logic
+  const result = await doSomething(email)
+  if (!result) {
+    return internalError(new Error('Operation returned no result'), {
       action: 'create_user',
       userId: user?.id
     })
   }
-}
+
+  return successResponse(result)
+})
 ```
 
 ### Supabase Error Handling
@@ -296,6 +310,8 @@ export async function POST(request: Request) {
 When using Supabase's `.single()` method, distinguish between "no rows found" (user error) and database failures (server error):
 
 ```typescript
+import { isSupabaseNoRowError } from '@/lib/errors'
+
 const { data: profile, error: profileError } = await supabase
   .from('profiles')
   .select('is_admin')
@@ -304,16 +320,15 @@ const { data: profile, error: profileError } = await supabase
 
 // PGRST116 = "JSON object requested, multiple (or no) rows returned"
 // This means no profile exists - a user/auth error, not a server error
-if (profileError) {
-  const isNoRowError = profileError.code === 'PGRST116'
-  if (!isNoRowError) {
-    // Real database error - log and return 500
-    return internalError(profileError, {
-      component: 'my-route',
-      action: 'check_profile',
-      userId: user.id
-    })
-  }
+if (profileError && !isSupabaseNoRowError(profileError)) {
+  // Real database error - log and return 500
+  return internalError(profileError, {
+    component: 'my-route',
+    action: 'check_profile',
+    userId: user.id
+  })
+}
+if (!profile) {
   // No profile found - return 403
   return forbidden('Admin access required')
 }
@@ -345,7 +360,7 @@ if (insertError || !record) {
 |--------|-------------|------------|----------|
 | `unauthorized()` | 401 | `AUTH_REQUIRED` | User not logged in |
 | `forbidden()` | 403 | `AUTH_FORBIDDEN` | User lacks permission (e.g., not admin) |
-| `badRequest(msg)` | 400 | `INVALID_INPUT` | Invalid request data |
+| `badRequest(msg)` | 400 | `VALIDATION_FAILED` | Invalid request data |
 | `notFound(msg)` | 404 | `NOT_FOUND` | Resource doesn't exist |
 | `conflict(msg)` | 409 | `CONFLICT` | Operation conflicts (e.g., duplicate) |
 | `expired(msg)` | 410 | `EXPIRED` | Share links, tokens past expiration |
@@ -492,11 +507,12 @@ export default function GlobalError({ error, reset }) {
 1. **Use error codes, not strings** for programmatic handling
 2. **Show user-friendly messages** via toasts, not raw error text
 3. **Log context** with errors for debugging
-4. **Use retry** for network operations
-5. **Wrap risky components** in error boundaries
-6. **Handle auth errors specially** - prompt re-login
-7. **Wrap JSON parsing in try-catch** - prevents unhandled exceptions
-8. **Use `logError()` instead of `console.error`** - enables Sentry tracking
+4. **Wrap API routes with `withErrorHandler()`** for consistent error responses
+5. **Use retry** for network operations
+6. **Wrap risky components** in error boundaries
+7. **Handle auth errors specially** - prompt re-login
+8. **Wrap JSON parsing in try-catch** - prevents unhandled exceptions
+9. **Use `logError()` instead of `console.error`** - enables Sentry tracking
 
 ### DON'T:
 
