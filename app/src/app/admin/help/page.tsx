@@ -110,6 +110,9 @@ export default async function AdminHelpPage() {
             <a href="#exceptions" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">11.</span> Fix Missing Thumbnails
             </a>
+            <a href="#triage" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">12.</span> Pattern Triage Queue
+            </a>
           </div>
         </div>
 
@@ -1031,6 +1034,140 @@ export default async function AdminHelpPage() {
               <p className="font-medium text-amber-800">About AI embeddings</p>
               <p className="text-amber-700 text-sm mt-1">
                 Patterns need both a thumbnail AND an AI embedding to appear in search results. Embeddings are automatically generated when you commit a batch of patterns. Patterns without thumbnails cannot have embeddings generated — fix the thumbnail first!
+              </p>
+            </div>
+          </section>
+
+          {/* Pattern Triage */}
+          <section id="triage" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gradient-to-r from-purple-100 to-rose-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">Pattern Triage Queue</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              Fix pattern issues in one place! The triage queue shows all patterns that need attention — rotation issues, mirrored images, and missing keywords — in a single prioritized list.
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to Pattern Triage</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    From the <Link href="/admin" className="text-purple-700 underline">Admin Panel</Link>, click &quot;Pattern Triage&quot; in the Quick Actions section. This is the prominent gradient button.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">Filter by issue type</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Use the tabs at the top to filter:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>All</strong> — every pattern needing attention</li>
+                    <li>&bull; <strong>Rotation</strong> — patterns that may be rotated incorrectly</li>
+                    <li>&bull; <strong>Mirror</strong> — patterns that may be horizontally flipped</li>
+                    <li>&bull; <strong>No Keywords</strong> — patterns without any keywords assigned</li>
+                  </ul>
+                  <p className="text-stone-500 text-xs mt-2">Each tab shows a count badge so you can see how many issues are in each category.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Understand the issue badges</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Each pattern card shows colored badges for its issues:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <span className="inline-flex items-center px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">HIGH</span> — AI is confident this needs fixing</li>
+                    <li>&bull; <span className="inline-flex items-center px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">MEDIUM</span> — Likely needs fixing</li>
+                    <li>&bull; <span className="inline-flex items-center px-2 py-0.5 bg-stone-100 text-stone-600 rounded text-xs font-medium">LOW</span> — Might need checking</li>
+                    <li>&bull; <span className="inline-flex items-center px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-xs font-medium">No keywords</span> — Pattern needs keywords assigned</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Fix issues with quick actions</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Each card has buttons for common fixes:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <span className="text-purple-600 font-medium">Purple button</span> — applies the AI&apos;s recommended rotation (90° CW, 90° CCW, or 180°)</li>
+                    <li>&bull; <span className="text-blue-600 font-medium">Flip H</span> — flip horizontally to fix mirrored images</li>
+                    <li>&bull; <span className="text-green-600 font-medium">Looks Correct</span> — mark as reviewed if the AI was wrong</li>
+                    <li>&bull; <span className="text-stone-600 font-medium">Expand</span> — show all controls including manual rotate left/right</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Select multiple patterns</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Click the checkbox on pattern cards to select them. Use shift-click to select a range of patterns at once.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">6</div>
+                <div>
+                  <p className="font-medium text-stone-800">Apply bulk actions</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    When patterns are selected, a toolbar appears at the top:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <span className="text-green-600 font-medium">Mark Reviewed</span> — dismiss rotation/mirror issues for all selected patterns</li>
+                    <li>&bull; <span className="text-amber-600 font-medium">Add Keywords</span> — open the keyword selector to tag all selected patterns at once</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-purple-50 rounded-lg">
+                <div className="w-8 h-8 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-purple-700">7</div>
+                <div>
+                  <p className="font-medium text-stone-800">Use keyboard shortcuts (power users)</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Press <span className="px-1.5 py-0.5 bg-stone-200 rounded text-xs font-mono">?</span> to see all shortcuts:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">j</span> / <span className="font-mono bg-stone-100 px-1 rounded">k</span> — move down/up through the list</li>
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">Space</span> — toggle selection on focused pattern</li>
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">r</span> — apply recommended rotation</li>
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">f</span> — flip horizontally</li>
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">c</span> — mark as correct (dismiss issues)</li>
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">e</span> — expand/collapse action panel</li>
+                    <li>&bull; <span className="font-mono bg-stone-100 px-1 rounded">Ctrl+A</span> — select all visible patterns</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-rose-50 border border-purple-200 rounded-lg">
+              <p className="font-medium text-purple-800">Why use triage?</p>
+              <p className="text-purple-700 text-sm mt-1">
+                The triage queue consolidates multiple admin tasks into one efficient workflow. Instead of checking rotation issues, then mirror issues, then untagged patterns separately, you can work through everything in one prioritized list. Patterns with multiple issues show all their problems at once.
+              </p>
+            </div>
+
+            <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="font-medium text-green-800">Items disappear when fixed!</p>
+              <p className="text-green-700 text-sm mt-1">
+                When you fix an issue (rotate, flip, mark correct, or add keywords), the pattern automatically leaves the queue once it has no remaining issues. Watch the counter at the top decrease as you work through the list!
               </p>
             </div>
           </section>

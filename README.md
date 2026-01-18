@@ -76,6 +76,14 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 
 ### Admin Features
 - **User Management** - Approve/reject new signups, view approved users with last login
+- **Pattern Triage Queue** - Unified workflow for fixing pattern issues:
+  - All rotation, mirror, and missing keyword issues in one prioritized list
+  - Filter tabs with live counts (All, Rotation, Mirror, No Keywords)
+  - Issue badges showing confidence level and type
+  - Quick-fix buttons for recommended actions
+  - Bulk selection with shift-click range support
+  - Keyboard shortcuts for power users (j/k navigate, space select, r rotate, f flip, c mark correct)
+  - Patterns automatically leave queue when all issues are resolved
 - **Staged Upload Workflow** - Upload patterns to a staging area for review before publishing:
   - Bulk upload patterns from ZIP files to staging
   - Review page with thumbnail grid showing all uploaded patterns
@@ -458,6 +466,8 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/patterns/[id]/keywords` | GET/POST/DELETE | Admin | Manage pattern keywords |
 | `/api/admin/patterns/[id]/transform` | POST | Admin | Rotate/flip thumbnail |
 | `/api/admin/orientation` | GET/PATCH | Admin | AI orientation detection results |
+| `/api/admin/triage` | GET | Admin | Unified triage queue (rotation, mirror, no keywords) |
+| `/api/admin/triage/bulk` | PATCH | Admin | Bulk mark reviewed / add keywords |
 | `/api/admin/analytics` | GET | Admin | Overview stats (users, downloads, searches, shares) |
 | `/api/admin/analytics/activity` | GET | Admin | 30-day activity chart data |
 | `/api/admin/analytics/top-patterns` | GET | Admin | Most downloaded patterns |
