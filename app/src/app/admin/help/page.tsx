@@ -723,8 +723,12 @@ export default async function AdminHelpPage() {
             <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
               <p className="font-medium text-purple-800">Quick access from the dashboard</p>
               <p className="text-purple-700 text-sm mt-1">
-                The <Link href="/admin" className="underline">Admin Panel</Link> dashboard shows a &quot;QA Issues&quot; section with counts of patterns that need attention (missing thumbnails, missing AI embeddings, rotation issues, mirror issues). Click any issue type to jump directly to the page where you can fix it.
+                The <Link href="/admin" className="underline">Admin Panel</Link> dashboard shows a &quot;QA Issues&quot; section with counts of patterns that need attention. Click any issue type to jump directly to the right page:
               </p>
+              <ul className="mt-2 text-sm text-purple-700 space-y-1">
+                <li>&bull; <strong>Missing Thumbnails/Embeddings</strong> → Pattern Exceptions page</li>
+                <li>&bull; <strong>Rotation/Mirror Issues</strong> → Pattern Triage queue</li>
+              </ul>
             </div>
           </section>
 
