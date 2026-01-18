@@ -193,7 +193,7 @@ export default function TriageContent() {
       const issueTypesToMark = isFlip ? ['mirror'] : ['rotation']
 
       // 3. Mark the issue as reviewed in the database
-      await fetch('/api/admin/triage/bulk', {
+      const markResponse = await fetch('/api/admin/triage/bulk', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -201,6 +201,11 @@ export default function TriageContent() {
           action: { type: 'mark_reviewed', issue_types: issueTypesToMark }
         })
       })
+
+      if (!markResponse.ok) {
+        const markData = await markResponse.json()
+        throw new Error(markData.error || 'Transform succeeded but failed to mark as reviewed')
+      }
 
       // 4. Update local state - remove the fixed issue from the pattern
       setPatterns(prev => {
