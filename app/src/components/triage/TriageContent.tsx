@@ -109,6 +109,7 @@ export default function TriageContent() {
       setSelectedIds(new Set())
       setFocusedIndex(0)
       setExpandedId(null)
+      setLastSelectedIndex(null) // Reset to prevent shift-select errors
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch patterns')
     } finally {
@@ -129,16 +130,19 @@ export default function TriageContent() {
   }
 
   // Handle selection
-  const handleSelect = (patternId: number, shiftKey: boolean) => {
+  const handleSelect = useCallback((patternId: number, shiftKey: boolean) => {
     const currentIndex = patterns.findIndex(p => p.id === patternId)
+    if (currentIndex === -1) return
 
-    if (shiftKey && lastSelectedIndex !== null) {
-      // Shift-click: select range
+    if (shiftKey && lastSelectedIndex !== null && lastSelectedIndex < patterns.length) {
+      // Shift-click: select range (with bounds checking)
       const start = Math.min(lastSelectedIndex, currentIndex)
       const end = Math.max(lastSelectedIndex, currentIndex)
       const newSelected = new Set(selectedIds)
-      for (let i = start; i <= end; i++) {
-        newSelected.add(patterns[i].id)
+      for (let i = start; i <= end && i < patterns.length; i++) {
+        if (patterns[i]) {
+          newSelected.add(patterns[i].id)
+        }
       }
       setSelectedIds(newSelected)
     } else {
@@ -152,7 +156,7 @@ export default function TriageContent() {
       setSelectedIds(newSelected)
       setLastSelectedIndex(currentIndex)
     }
-  }
+  }, [patterns, selectedIds, lastSelectedIndex])
 
   const handleSelectAll = () => {
     setSelectedIds(new Set(patterns.map(p => p.id)))
@@ -163,10 +167,11 @@ export default function TriageContent() {
     setLastSelectedIndex(null)
   }
 
-  // Handle transform
-  const handleTransform = async (patternId: number, operation: string) => {
+  // Handle transform - also marks the rotation/mirror issue as reviewed
+  const handleTransform = useCallback(async (patternId: number, operation: string) => {
     setTransforming(prev => ({ ...prev, [patternId]: true }))
     try {
+      // 1. Apply the transform
       const response = await fetch(`/api/admin/patterns/${patternId}/transform`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,22 +188,64 @@ export default function TriageContent() {
         setThumbnailUrls(prev => ({ ...prev, [patternId]: data.thumbnail_url }))
       }
 
-      // Remove from list after successful transform (assuming rotation/mirror fixed)
-      setPatterns(prev => prev.filter(p => p.id !== patternId))
+      // 2. Determine which issue type was fixed
+      const isFlip = operation === 'flip_h' || operation === 'flip_v'
+      const issueTypesToMark = isFlip ? ['mirror'] : ['rotation']
+
+      // 3. Mark the issue as reviewed in the database
+      await fetch('/api/admin/triage/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pattern_ids: [patternId],
+          action: { type: 'mark_reviewed', issue_types: issueTypesToMark }
+        })
+      })
+
+      // 4. Update local state - remove the fixed issue from the pattern
+      setPatterns(prev => {
+        return prev.map(p => {
+          if (p.id !== patternId) return p
+          const remainingIssues = p.issues.filter(
+            i => !issueTypesToMark.includes(i.type)
+          )
+          return { ...p, issues: remainingIssues }
+        }).filter(p => {
+          // Remove pattern from list only if it has no remaining issues
+          // that match the current filter
+          if (filter === 'all') {
+            return p.issues.length > 0
+          }
+          return p.issues.some(i => i.type === filter)
+        })
+      })
+
+      // 5. Update selection if pattern was removed
       setSelectedIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(patternId)
-        return newSet
+        const pattern = patterns.find(p => p.id === patternId)
+        if (!pattern) return prev
+        const remainingIssues = pattern.issues.filter(
+          i => !issueTypesToMark.includes(i.type)
+        )
+        const shouldRemove = filter === 'all'
+          ? remainingIssues.length === 0
+          : !remainingIssues.some(i => i.type === filter)
+        if (shouldRemove) {
+          const newSet = new Set(prev)
+          newSet.delete(patternId)
+          return newSet
+        }
+        return prev
       })
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to transform')
     } finally {
       setTransforming(prev => ({ ...prev, [patternId]: false }))
     }
-  }
+  }, [filter, patterns])
 
-  // Handle mark reviewed
-  const handleMarkReviewed = async (patternId: number, issueTypes: string[]) => {
+  // Handle mark reviewed - removes the specified issues from the pattern
+  const handleMarkReviewed = useCallback(async (patternId: number, issueTypes: string[]) => {
     try {
       const response = await fetch('/api/admin/triage/bulk', {
         method: 'PATCH',
@@ -214,26 +261,55 @@ export default function TriageContent() {
         throw new Error(data.error || 'Failed to mark reviewed')
       }
 
-      // Remove from list
-      setPatterns(prev => prev.filter(p => p.id !== patternId))
+      // Update local state - remove the reviewed issues from the pattern
+      setPatterns(prev => {
+        return prev.map(p => {
+          if (p.id !== patternId) return p
+          const remainingIssues = p.issues.filter(
+            i => !issueTypes.includes(i.type)
+          )
+          return { ...p, issues: remainingIssues }
+        }).filter(p => {
+          // Remove pattern from list only if it has no remaining issues
+          // that match the current filter
+          if (filter === 'all') {
+            return p.issues.length > 0
+          }
+          return p.issues.some(i => i.type === filter)
+        })
+      })
+
+      // Update selection if pattern was removed
       setSelectedIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(patternId)
-        return newSet
+        const pattern = patterns.find(p => p.id === patternId)
+        if (!pattern) return prev
+        const remainingIssues = pattern.issues.filter(
+          i => !issueTypes.includes(i.type)
+        )
+        const shouldRemove = filter === 'all'
+          ? remainingIssues.length === 0
+          : !remainingIssues.some(i => i.type === filter)
+        if (shouldRemove) {
+          const newSet = new Set(prev)
+          newSet.delete(patternId)
+          return newSet
+        }
+        return prev
       })
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to mark reviewed')
     }
-  }
+  }, [filter, patterns])
 
   // Handle bulk mark reviewed
-  const handleBulkMarkReviewed = async (issueTypes: ('rotation' | 'mirror')[]) => {
+  const handleBulkMarkReviewed = useCallback(async (issueTypes: ('rotation' | 'mirror')[]) => {
     try {
+      const patternIds = Array.from(selectedIds)
       const response = await fetch('/api/admin/triage/bulk', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          pattern_ids: Array.from(selectedIds),
+          pattern_ids: patternIds,
           action: { type: 'mark_reviewed', issue_types: issueTypes }
         })
       })
@@ -243,101 +319,121 @@ export default function TriageContent() {
         throw new Error(data.error || 'Failed to mark reviewed')
       }
 
-      // Remove from list and clear selection
-      setPatterns(prev => prev.filter(p => !selectedIds.has(p.id)))
+      // Update local state - remove the reviewed issues from selected patterns
+      setPatterns(prev => {
+        return prev.map(p => {
+          if (!selectedIds.has(p.id)) return p
+          const remainingIssues = p.issues.filter(
+            i => !issueTypes.includes(i.type as 'rotation' | 'mirror')
+          )
+          return { ...p, issues: remainingIssues }
+        }).filter(p => {
+          // Remove pattern from list only if it has no remaining issues
+          // that match the current filter
+          if (filter === 'all') {
+            return p.issues.length > 0
+          }
+          return p.issues.some(i => i.type === filter)
+        })
+      })
+
       setSelectedIds(new Set())
+      setLastSelectedIndex(null)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to mark reviewed')
     }
-  }
+  }, [selectedIds, filter])
 
   // Handle expand
   const handleExpand = (patternId: number) => {
     setExpandedId(prev => (prev === patternId ? null : patternId))
   }
 
-  // Keyboard shortcuts
-  const focusedPattern = patterns[focusedIndex]
+  // Keyboard shortcuts - note: handlers use refs to avoid stale closures
+  // We need to include all dependencies that the actions use
+  const shortcuts: KeyboardShortcut[] = useMemo(() => {
+    const focusedPattern = patterns[focusedIndex]
 
-  const shortcuts: KeyboardShortcut[] = useMemo(() => [
-    {
-      key: 'j',
-      action: () => setFocusedIndex(prev => Math.min(prev + 1, patterns.length - 1)),
-      description: 'Next pattern'
-    },
-    {
-      key: 'k',
-      action: () => setFocusedIndex(prev => Math.max(prev - 1, 0)),
-      description: 'Previous pattern'
-    },
-    {
-      key: ' ',
-      action: () => {
-        if (focusedPattern) {
-          handleSelect(focusedPattern.id, false)
-        }
+    return [
+      {
+        key: 'j',
+        action: () => setFocusedIndex(prev => Math.min(prev + 1, patterns.length - 1)),
+        description: 'Next pattern'
       },
-      description: 'Toggle selection'
-    },
-    {
-      key: 'r',
-      action: () => {
-        if (focusedPattern) {
-          const rotationIssue = focusedPattern.issues.find(i => i.type === 'rotation')
-          if (rotationIssue) {
-            const op = rotationIssue.details.orientation === 'rotate_90_cw' ? 'rotate_cw' :
-                       rotationIssue.details.orientation === 'rotate_90_ccw' ? 'rotate_ccw' :
-                       rotationIssue.details.orientation === 'rotate_180' ? 'rotate_180' : null
-            if (op) handleTransform(focusedPattern.id, op)
+      {
+        key: 'k',
+        action: () => setFocusedIndex(prev => Math.max(prev - 1, 0)),
+        description: 'Previous pattern'
+      },
+      {
+        key: ' ',
+        action: () => {
+          if (focusedPattern) {
+            handleSelect(focusedPattern.id, false)
           }
-        }
+        },
+        description: 'Toggle selection'
       },
-      description: 'Apply recommended rotation'
-    },
-    {
-      key: 'f',
-      action: () => {
-        if (focusedPattern && focusedPattern.issues.some(i => i.type === 'mirror')) {
-          handleTransform(focusedPattern.id, 'flip_h')
-        }
-      },
-      description: 'Flip horizontal'
-    },
-    {
-      key: 'c',
-      action: () => {
-        if (focusedPattern) {
-          const issueTypes = focusedPattern.issues
-            .filter(i => i.type === 'rotation' || i.type === 'mirror')
-            .map(i => i.type)
-          if (issueTypes.length > 0) {
-            handleMarkReviewed(focusedPattern.id, issueTypes)
+      {
+        key: 'r',
+        action: () => {
+          if (focusedPattern) {
+            const rotationIssue = focusedPattern.issues.find(i => i.type === 'rotation')
+            if (rotationIssue) {
+              const op = rotationIssue.details.orientation === 'rotate_90_cw' ? 'rotate_cw' :
+                         rotationIssue.details.orientation === 'rotate_90_ccw' ? 'rotate_ccw' :
+                         rotationIssue.details.orientation === 'rotate_180' ? 'rotate_180' : null
+              if (op) handleTransform(focusedPattern.id, op)
+            }
           }
-        }
+        },
+        description: 'Apply recommended rotation'
       },
-      description: 'Mark as correct'
-    },
-    {
-      key: 'e',
-      action: () => {
-        if (focusedPattern) {
-          handleExpand(focusedPattern.id)
-        }
+      {
+        key: 'f',
+        action: () => {
+          if (focusedPattern && focusedPattern.issues.some(i => i.type === 'mirror')) {
+            handleTransform(focusedPattern.id, 'flip_h')
+          }
+        },
+        description: 'Flip horizontal'
       },
-      description: 'Expand/collapse actions'
-    },
-    {
-      key: 'a',
-      modifiers: ['ctrl'],
-      action: handleSelectAll,
-      description: 'Select all'
-    },
-    {
-      key: '?',
-      action: () => setShowShortcuts(prev => !prev),
-      description: 'Show shortcuts'
-    }
-  ], [patterns, focusedPattern, focusedIndex])
+      {
+        key: 'c',
+        action: () => {
+          if (focusedPattern) {
+            const issueTypes = focusedPattern.issues
+              .filter(i => i.type === 'rotation' || i.type === 'mirror')
+              .map(i => i.type)
+            if (issueTypes.length > 0) {
+              handleMarkReviewed(focusedPattern.id, issueTypes)
+            }
+          }
+        },
+        description: 'Mark as correct'
+      },
+      {
+        key: 'e',
+        action: () => {
+          if (focusedPattern) {
+            handleExpand(focusedPattern.id)
+          }
+        },
+        description: 'Expand/collapse actions'
+      },
+      {
+        key: 'a',
+        modifiers: ['ctrl'],
+        action: handleSelectAll,
+        description: 'Select all'
+      },
+      {
+        key: '?',
+        action: () => setShowShortcuts(prev => !prev),
+        description: 'Show shortcuts'
+      }
+    ]
+  }, [patterns, focusedIndex, handleSelect, handleTransform, handleMarkReviewed])
 
   useKeyboardShortcuts(shortcuts, !showShortcuts && !showBulkKeywords)
 

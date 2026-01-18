@@ -29,37 +29,52 @@ export function useKeyboardShortcuts(
       }
 
       for (const shortcut of shortcuts) {
-        // Check if modifiers match (default: no modifiers required)
-        const requiredModifiers = shortcut.modifiers || []
-        const modifiersMatch =
-          requiredModifiers.length === 0
-            ? !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey
-            : requiredModifiers.every((mod) => {
-                switch (mod) {
-                  case 'ctrl':
-                    return e.ctrlKey
-                  case 'shift':
-                    return e.shiftKey
-                  case 'alt':
-                    return e.altKey
-                  case 'meta':
-                    return e.metaKey
-                }
-              }) &&
-              // Ensure no extra modifiers are pressed
-              (requiredModifiers.includes('ctrl') || !e.ctrlKey) &&
-              (requiredModifiers.includes('shift') || !e.shiftKey) &&
-              (requiredModifiers.includes('alt') || !e.altKey) &&
-              (requiredModifiers.includes('meta') || !e.metaKey)
-
-        // Check if key matches (case-insensitive for letters)
+        // Check if key matches first
         const keyMatches =
           e.key.toLowerCase() === shortcut.key.toLowerCase() ||
-          // Handle special cases
+          // Handle special cases - match the actual key produced
           (shortcut.key === ' ' && e.key === ' ') ||
           (shortcut.key === '?' && e.key === '?')
 
-        if (keyMatches && modifiersMatch) {
+        if (!keyMatches) continue
+
+        // Check if modifiers match
+        const requiredModifiers = shortcut.modifiers || []
+
+        // Special case: '?' requires Shift on most keyboards, so we allow it
+        const isShiftedSymbol = shortcut.key === '?' || shortcut.key === '!'
+
+        let modifiersMatch: boolean
+        if (requiredModifiers.length === 0) {
+          // No modifiers required - but allow Shift for shifted symbols like ?
+          modifiersMatch =
+            !e.ctrlKey &&
+            !e.altKey &&
+            !e.metaKey &&
+            (isShiftedSymbol || !e.shiftKey)
+        } else {
+          // Specific modifiers required
+          modifiersMatch =
+            requiredModifiers.every((mod) => {
+              switch (mod) {
+                case 'ctrl':
+                  return e.ctrlKey
+                case 'shift':
+                  return e.shiftKey
+                case 'alt':
+                  return e.altKey
+                case 'meta':
+                  return e.metaKey
+              }
+            }) &&
+            // Ensure no extra modifiers are pressed (except Shift for shifted symbols)
+            (requiredModifiers.includes('ctrl') || !e.ctrlKey) &&
+            (requiredModifiers.includes('shift') || isShiftedSymbol || !e.shiftKey) &&
+            (requiredModifiers.includes('alt') || !e.altKey) &&
+            (requiredModifiers.includes('meta') || !e.metaKey)
+        }
+
+        if (modifiersMatch) {
           e.preventDefault()
           shortcut.action()
           return
