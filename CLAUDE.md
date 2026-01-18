@@ -648,12 +648,13 @@ CREATE TABLE mirror_analysis (
 
 ### Review Page
 
-The rotate-review page (`/admin/rotate-review`) provides:
-- **Filter tabs**: Switch between "Rotation Issues", "Mirrored", and "All Analyzed"
-- **Confidence badges**: High (red), Medium (yellow), Low (gray)
-- **One-click fixes**: Recommended action button (purple for rotation, blue for flip)
-- **Manual controls**: Rotate left/right, Flip H (blue), Flip V (orange)
-- **Refresh button**: Reload data from server
+The pattern triage page (`/admin/triage`) provides a unified workflow for fixing pattern issues:
+- **Filter tabs**: All, Rotation, Mirror, No Keywords (with live counts)
+- **Issue badges**: Confidence levels (high/medium/low) and issue types
+- **Quick actions**: Recommended rotation, flip, mark correct
+- **Bulk selection**: Checkbox selection with shift-click for ranges
+- **Keyboard shortcuts**: j/k navigate, space select, r rotate, f flip, c mark correct
+- Patterns automatically leave the queue when all issues are resolved
 
 ## Notes
 

@@ -94,7 +94,6 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
   - **Auto-generated embeddings** - AI search embeddings generated automatically when batch is committed
   - Pending reviews alert on admin dashboard
 - **Duplicate Finder** - Identify and manage similar patterns
-- **Quick Rotate Review** - AI-assisted thumbnail orientation and mirror fixes with filter tabs
 - **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
 - **Pattern Analytics** - Dashboard showing downloads, pattern views, searches, user activity, top downloaded patterns, most viewed patterns, and popular search queries
 - **Activity Log** - Complete audit trail of admin actions with filtering by target type, action, and date range
