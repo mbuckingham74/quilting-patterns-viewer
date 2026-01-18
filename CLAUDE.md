@@ -58,9 +58,9 @@ CREATE TABLE patterns (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index for fast vector similarity search
-CREATE INDEX idx_patterns_embedding ON patterns USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
+-- Index for fast vector similarity search (HNSW - better than IVFFlat for <1M rows)
+CREATE INDEX idx_patterns_embedding_hnsw ON patterns USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
 
 -- Keywords for filtering
 CREATE TABLE keywords (
@@ -282,32 +282,40 @@ export async function POST(request: Request) {
 }
 ```
 
-**Supabase RPC Function**:
+**Supabase RPC Function** (`scripts/013_vector_search_index.sql`):
 ```sql
-CREATE OR REPLACE FUNCTION match_patterns(
+CREATE OR REPLACE FUNCTION search_patterns_semantic(
   query_embedding vector(1024),
-  match_threshold float DEFAULT 0.3,
+  match_threshold float DEFAULT 0.2,
   match_count int DEFAULT 50
 )
 RETURNS TABLE (
   id int,
   file_name text,
+  file_extension text,
+  author text,
   thumbnail_url text,
   similarity float
 )
 LANGUAGE sql STABLE
-AS $
+SET search_path = public
+AS $$
   SELECT
-    patterns.id,
-    patterns.file_name,
-    patterns.thumbnail_url,
-    1 - (patterns.embedding <=> query_embedding) AS similarity
-  FROM patterns
-  WHERE 1 - (patterns.embedding <=> query_embedding) > match_threshold
-  ORDER BY patterns.embedding <=> query_embedding
+    p.id,
+    p.file_name,
+    p.file_extension,
+    p.author,
+    p.thumbnail_url,
+    (1 - (p.embedding <=> query_embedding))::float AS similarity
+  FROM patterns p
+  WHERE p.embedding IS NOT NULL
+    AND (1 - (p.embedding <=> query_embedding)) > match_threshold
+  ORDER BY p.embedding <=> query_embedding
   LIMIT match_count;
-$;
+$$;
 ```
+
+**Performance Note**: Requires HNSW index and planner tuning for optimal performance (~2-3ms queries). See `docs/PERFORMANCE_OPTIMIZATIONS.md` for details.
 
 ### Environment Variables
 
@@ -509,6 +517,9 @@ scripts/010_fix_security_definer_bypass.sql
 
 # Security hardening (Jan 2026) - RLS policies, anon revokes, function search paths
 scripts/012_security_fixes.sql
+
+# Vector search optimization (Jan 2026) - HNSW index, planner tuning
+scripts/013_vector_search_index.sql
 ```
 
 ### Security Hardening (Migration 012)

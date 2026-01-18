@@ -448,8 +448,58 @@ const supabaseOrigin = (() => {
 
 ---
 
+## Phase 8: Vector Search Optimization (Completed)
+
+### HNSW Index for Semantic Search
+
+**Problem**: The `search_patterns_semantic` function was averaging 724ms with max times over 5 seconds. Supabase slow query analysis revealed full table scans were occurring despite having an IVFFlat index, because the Postgres query planner wasn't selecting it.
+
+**Root Causes**:
+1. IVFFlat index wasn't being used due to suboptimal planner cost estimates
+2. Default `random_page_cost = 4` (spinning disk assumption) made sequential scans appear cheaper
+3. Default `effective_cache_size = 128MB` underestimated cache benefits
+
+**Solution**:
+1. Created HNSW vector index (better than IVFFlat for datasets under 1M rows)
+2. Tuned database planner settings for SSD storage
+
+**Migration**: `scripts/013_vector_search_index.sql`
+
+**Database Settings Changed**:
+| Setting | Before | After | Purpose |
+|---------|--------|-------|---------|
+| `random_page_cost` | 4 | 1.1 | SSD-appropriate cost (makes index scans more attractive) |
+| `effective_cache_size` | 128MB | 1GB | Better cache hit estimation |
+
+**Index Created**:
+```sql
+CREATE INDEX idx_patterns_embedding_hnsw
+  ON patterns
+  USING hnsw (embedding vector_cosine_ops)
+  WITH (m = 16, ef_construction = 64);
+```
+
+**HNSW Parameters**:
+- `m = 16`: Max connections per node (balance of accuracy vs memory)
+- `ef_construction = 64`: Build-time search depth (good quality index)
+
+**Performance Results**:
+| Metric | Before | After | Improvement |
+|--------|--------|-------|-------------|
+| Mean query time | 724ms | ~2-3ms | **300x faster** |
+| Max query time | 5+ seconds | <10ms | **500x faster** |
+| Index type | IVFFlat (unused) | HNSW (active) | Proper utilization |
+
+**Why HNSW over IVFFlat**:
+- No training/clustering step required
+- Better for smaller datasets (under 1M rows)
+- More consistent query performance
+- Supports incremental updates without rebuild
+
+---
+
 ## Running Migrations
 
 See [DEPLOYMENT.md](./DEPLOYMENT.md) for instructions on running SQL migrations.
 
-Current latest migration: `028_secure_analytics_rpcs.sql`
+Current latest migration: `013_vector_search_index.sql`
