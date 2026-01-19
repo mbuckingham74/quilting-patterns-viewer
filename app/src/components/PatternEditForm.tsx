@@ -53,6 +53,7 @@ export default function PatternEditForm({
   const [isSaving, setIsSaving] = useState(false)
   const [isLoadingKeywords, setIsLoadingKeywords] = useState(true)
   const [isTransforming, setIsTransforming] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [thumbnailUrl, setThumbnailUrl] = useState(initialPattern.thumbnail_url)
 
   // Fetch all available keywords
@@ -192,6 +193,51 @@ export default function PatternEditForm({
     }
   }, [patternId, thumbnailUrl, showSuccess, showError])
 
+  // Upload new thumbnail
+  const handleThumbnailUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Validate file type client-side
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      showError(new Error('Invalid file type. Please upload PNG, JPEG, WebP, or GIF.'))
+      return
+    }
+
+    // Validate file size client-side (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showError(new Error('File too large. Maximum size is 5MB.'))
+      return
+    }
+
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('thumbnail', file)
+
+      const response = await fetch(`/api/admin/patterns/${patternId}/thumbnail`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to upload thumbnail')
+      }
+
+      const data = await response.json()
+      setThumbnailUrl(data.thumbnail_url)
+      showSuccess('Thumbnail uploaded successfully. Embedding cleared - will regenerate on next search.')
+    } catch (error) {
+      showError(error instanceof Error ? error : new Error('Failed to upload thumbnail'))
+    } finally {
+      setIsUploading(false)
+      // Reset the input so the same file can be selected again
+      event.target.value = ''
+    }
+  }, [patternId, showSuccess, showError])
+
   return (
     <div className="space-y-6">
       {/* Pattern Info Header */}
@@ -231,7 +277,7 @@ export default function PatternEditForm({
               <div className="flex justify-center gap-1">
                 <button
                   onClick={() => handleTransform('rotate_ccw')}
-                  disabled={isTransforming}
+                  disabled={isTransforming || isUploading}
                   className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Rotate 90° counter-clockwise"
                 >
@@ -241,7 +287,7 @@ export default function PatternEditForm({
                 </button>
                 <button
                   onClick={() => handleTransform('rotate_cw')}
-                  disabled={isTransforming}
+                  disabled={isTransforming || isUploading}
                   className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Rotate 90° clockwise"
                 >
@@ -251,7 +297,7 @@ export default function PatternEditForm({
                 </button>
                 <button
                   onClick={() => handleTransform('rotate_180')}
-                  disabled={isTransforming}
+                  disabled={isTransforming || isUploading}
                   className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Rotate 180°"
                 >
@@ -261,7 +307,7 @@ export default function PatternEditForm({
                 </button>
                 <button
                   onClick={() => handleTransform('flip_h')}
-                  disabled={isTransforming}
+                  disabled={isTransforming || isUploading}
                   className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Flip horizontally"
                 >
@@ -271,7 +317,7 @@ export default function PatternEditForm({
                 </button>
                 <button
                   onClick={() => handleTransform('flip_v')}
-                  disabled={isTransforming}
+                  disabled={isTransforming || isUploading}
                   className="p-2 bg-stone-100 hover:bg-stone-200 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title="Flip vertically"
                 >
@@ -282,6 +328,44 @@ export default function PatternEditForm({
               </div>
             </div>
           )}
+
+          {/* Upload Thumbnail */}
+          <div className="mt-3">
+            <label className="block">
+              <span className="text-xs text-stone-500 text-center font-medium block mb-2">
+                {thumbnailUrl ? 'Replace Thumbnail' : 'Upload Thumbnail'}
+              </span>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  onChange={handleThumbnailUpload}
+                  disabled={isUploading || isTransforming}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                />
+                <div className={`flex items-center justify-center gap-2 px-3 py-2 border-2 border-dashed rounded-lg transition-colors ${
+                  isUploading || isTransforming
+                    ? 'border-stone-200 bg-stone-50 cursor-not-allowed'
+                    : 'border-stone-300 hover:border-rose-400 hover:bg-rose-50 cursor-pointer'
+                }`}>
+                  {isUploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs text-stone-500">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4 text-stone-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      </svg>
+                      <span className="text-xs text-stone-500">Choose image</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-stone-400 text-center mt-1">PNG, JPEG, WebP, GIF (max 5MB)</p>
+            </label>
+          </div>
 
           <p className="text-sm text-stone-500 mt-2 text-center">
             Pattern #{patternId}
