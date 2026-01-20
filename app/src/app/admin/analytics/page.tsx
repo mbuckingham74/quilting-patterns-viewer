@@ -8,6 +8,7 @@ import ActivityChart from '@/components/analytics/ActivityChart'
 import TopPatternsList from '@/components/analytics/TopPatternsList'
 import TopViewsList from '@/components/analytics/TopViewsList'
 import TopSearchesList from '@/components/analytics/TopSearchesList'
+import FailedSearchesList from '@/components/analytics/FailedSearchesList'
 
 async function getAnalyticsData() {
   const supabase = await createClient()
@@ -27,6 +28,7 @@ async function getAnalyticsData() {
     totalSearchesResult,
     searchesLast7DaysResult,
     semanticSearchesResult,
+    failedSearchesResult,
     totalSharesResult,
     sharesWithFeedbackResult,
   ] = await Promise.all([
@@ -40,6 +42,7 @@ async function getAnalyticsData() {
     supabase.from('search_logs').select('*', { count: 'exact', head: true }),
     supabase.from('search_logs').select('*', { count: 'exact', head: true }).gte('searched_at', sevenDaysAgo),
     supabase.from('search_logs').select('*', { count: 'exact', head: true }).eq('search_method', 'semantic'),
+    supabase.from('search_logs').select('*', { count: 'exact', head: true }).eq('result_count', 0),
     supabase.from('shared_collections').select('*', { count: 'exact', head: true }),
     supabase.from('shared_collection_feedback').select('*', { count: 'exact', head: true }),
   ])
@@ -58,6 +61,8 @@ async function getAnalyticsData() {
   const searchesLast7Days = searchesLast7DaysResult.count || 0
   const semanticSearches = semanticSearchesResult.count || 0
   const semanticSearchPercent = totalSearches > 0 ? Math.round((semanticSearches / totalSearches) * 100) : 0
+  const failedSearches = failedSearchesResult.count || 0
+  const failedSearchPercent = totalSearches > 0 ? Math.round((failedSearches / totalSearches) * 100) : 0
 
   const totalShares = totalSharesResult.count || 0
   const sharesWithFeedback = sharesWithFeedbackResult.count || 0
@@ -67,7 +72,7 @@ async function getAnalyticsData() {
     users: { total: totalUsers, pending: pendingUsers, newLast7Days: newUsersLast7Days, activeLast30Days: activeUsersLast30Days },
     patterns: { total: totalPatterns },
     downloads: { total: totalDownloads, last7Days: downloadsLast7Days },
-    searches: { total: totalSearches, last7Days: searchesLast7Days, semanticPercent: semanticSearchPercent },
+    searches: { total: totalSearches, last7Days: searchesLast7Days, semanticPercent: semanticSearchPercent, failed: failedSearches, failedPercent: failedSearchPercent },
     shares: { total: totalShares, withFeedback: sharesWithFeedback, feedbackRate },
   }
 }
@@ -223,6 +228,49 @@ async function getTopViews() {
     .sort((a, b) => b.view_count - a.view_count) || []
 }
 
+// Default to 90-day window for failed searches analytics
+const FAILED_SEARCHES_DAYS = 90
+const FAILED_SEARCHES_LIMIT = 10
+
+async function getFailedSearches() {
+  const supabase = await createClient()
+
+  // Use database aggregation to avoid loading all rows into memory
+  // This performs GROUP BY in Postgres instead of in Node.js
+  const [searchesResult, countResult] = await Promise.all([
+    supabase.rpc('get_failed_searches', {
+      days_ago: FAILED_SEARCHES_DAYS,
+      result_limit: FAILED_SEARCHES_LIMIT,
+    }),
+    supabase.rpc('count_failed_searches', {
+      days_ago: FAILED_SEARCHES_DAYS,
+    }),
+  ])
+
+  // Log errors but don't throw - return empty state with error flag
+  if (searchesResult.error) {
+    console.error('Failed to fetch failed searches:', searchesResult.error)
+    return { searches: [], totalFailed: 0, error: true }
+  }
+
+  if (countResult.error) {
+    console.error('Failed to count failed searches:', countResult.error)
+    return { searches: [], totalFailed: 0, error: true }
+  }
+
+  const searches = (searchesResult.data || []).map((row: { query: string; count: number; last_searched: string }) => ({
+    query: row.query,
+    count: Number(row.count),
+    last_searched: row.last_searched,
+  }))
+
+  return {
+    searches,
+    totalFailed: Number(countResult.data) || 0,
+    error: false,
+  }
+}
+
 export default async function AnalyticsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -241,12 +289,13 @@ export default async function AnalyticsPage() {
     redirect('/browse')
   }
 
-  const [stats, activity, topPatterns, topViews, topSearches] = await Promise.all([
+  const [stats, activity, topPatterns, topViews, topSearches, failedSearches] = await Promise.all([
     getAnalyticsData(),
     getActivityData(),
     getTopPatterns(),
     getTopViews(),
     getTopSearches(),
+    getFailedSearches(),
   ])
 
   return (
@@ -326,7 +375,7 @@ export default async function AnalyticsPage() {
           <StatCard
             title="Searches"
             value={stats.searches.total}
-            subtitle={`${stats.searches.semanticPercent}% AI-powered`}
+            subtitle={`${stats.searches.semanticPercent}% AI • ${stats.searches.failedPercent}% failed`}
             color="blue"
             icon={
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,11 +439,16 @@ export default async function AnalyticsPage() {
           />
         </div>
 
-        {/* Top Patterns, Views, and Searches */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top Patterns and Views */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           <TopPatternsList patterns={topPatterns} />
           <TopViewsList patterns={topViews} />
+        </div>
+
+        {/* Search Analytics */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TopSearchesList searches={topSearches} />
+          <FailedSearchesList searches={failedSearches.searches} totalFailed={failedSearches.totalFailed} error={failedSearches.error} />
         </div>
       </div>
     </div>
