@@ -13,6 +13,17 @@ export default function AuthButtonClient({ email, isAdmin }: AuthButtonClientPro
   const [isSigningOut, setIsSigningOut] = useState(false)
   console.log('AuthButtonClient: rendered with', { email, isAdmin, isSigningOut })
 
+  // Clear Supabase auth cookies manually as a fallback
+  const clearAuthCookies = () => {
+    // Supabase stores auth in cookies with names containing 'auth-token'
+    document.cookie.split(';').forEach(cookie => {
+      const name = cookie.split('=')[0].trim()
+      if (name.includes('auth-token') || name.includes('sb-')) {
+        document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`
+      }
+    })
+  }
+
   const handleSignOut = async () => {
     if (isSigningOut) {
       console.log('AuthButtonClient: already signing out, ignoring')
@@ -29,17 +40,21 @@ export default function AuthButtonClient({ email, isAdmin }: AuthButtonClientPro
         setTimeout(() => reject(new Error('SignOut timed out after 5s')), 5000)
       )
 
-      // Use scope: 'local' to sign out without server call (faster, more reliable)
-      const signOutPromise = supabase.auth.signOut({ scope: 'local' })
+      // Use scope: 'global' (default) to invalidate server-side session
+      // This ensures the middleware won't restore the session from stale cookies
+      const signOutPromise = supabase.auth.signOut()
 
       const { error } = await Promise.race([signOutPromise, timeoutPromise]) as { error: Error | null }
       console.log('AuthButtonClient: signOut result', { error: error?.message })
 
-      // Even if signOut fails, clear local state and redirect
+      // Clear cookies as fallback in case signOut didn't fully clear them
+      clearAuthCookies()
+
       window.location.href = '/'
     } catch (err) {
       console.error('AuthButtonClient: signOut exception', err)
-      // Force redirect even on error - clear the session anyway
+      // Force clear cookies and redirect even on error
+      clearAuthCookies()
       window.location.href = '/'
     }
   }
