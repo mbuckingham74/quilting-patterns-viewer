@@ -228,39 +228,46 @@ async function getTopViews() {
     .sort((a, b) => b.view_count - a.view_count) || []
 }
 
+// Default to 90-day window for failed searches analytics
+const FAILED_SEARCHES_DAYS = 90
+const FAILED_SEARCHES_LIMIT = 10
+
 async function getFailedSearches() {
   const supabase = await createClient()
 
-  // Get all search logs with zero results
-  const { data: searchLogs } = await supabase
-    .from('search_logs')
-    .select('query, searched_at')
-    .eq('result_count', 0)
-    .order('searched_at', { ascending: false })
+  // Use database aggregation to avoid loading all rows into memory
+  // This performs GROUP BY in Postgres instead of in Node.js
+  const [searchesResult, countResult] = await Promise.all([
+    supabase.rpc('get_failed_searches', {
+      days_ago: FAILED_SEARCHES_DAYS,
+      result_limit: FAILED_SEARCHES_LIMIT,
+    }),
+    supabase.rpc('count_failed_searches', {
+      days_ago: FAILED_SEARCHES_DAYS,
+    }),
+  ])
 
-  // Group by normalized query (lowercase, trimmed)
-  const queryCounts = new Map<string, { count: number; lastSearched: string }>()
-  for (const log of searchLogs || []) {
-    const normalizedQuery = log.query.toLowerCase().trim()
-    const existing = queryCounts.get(normalizedQuery)
-    if (existing) {
-      existing.count++
-      if (log.searched_at > existing.lastSearched) {
-        existing.lastSearched = log.searched_at
-      }
-    } else {
-      queryCounts.set(normalizedQuery, { count: 1, lastSearched: log.searched_at })
-    }
+  // Log errors but don't throw - return empty state with error flag
+  if (searchesResult.error) {
+    console.error('Failed to fetch failed searches:', searchesResult.error)
+    return { searches: [], totalFailed: 0, error: true }
   }
 
-  const searches = Array.from(queryCounts.entries())
-    .map(([query, data]) => ({ query, count: data.count, last_searched: data.lastSearched }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
+  if (countResult.error) {
+    console.error('Failed to count failed searches:', countResult.error)
+    return { searches: [], totalFailed: 0, error: true }
+  }
+
+  const searches = (searchesResult.data || []).map((row: { query: string; count: number; last_searched: string }) => ({
+    query: row.query,
+    count: Number(row.count),
+    last_searched: row.last_searched,
+  }))
 
   return {
     searches,
-    totalFailed: searchLogs?.length || 0,
+    totalFailed: Number(countResult.data) || 0,
+    error: false,
   }
 }
 
@@ -441,7 +448,7 @@ export default async function AnalyticsPage() {
         {/* Search Analytics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TopSearchesList searches={topSearches} />
-          <FailedSearchesList searches={failedSearches.searches} totalFailed={failedSearches.totalFailed} />
+          <FailedSearchesList searches={failedSearches.searches} totalFailed={failedSearches.totalFailed} error={failedSearches.error} />
         </div>
       </div>
     </div>

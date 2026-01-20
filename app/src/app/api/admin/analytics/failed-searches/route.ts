@@ -3,6 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { isSupabaseNoRowError, logError } from '@/lib/errors'
 import { unauthorized, forbidden, internalError, withErrorHandler } from '@/lib/api-response'
 
+// Default to 90-day window for failed searches analytics
+const DEFAULT_DAYS = 90
+const DEFAULT_LIMIT = 10
+
 export const GET = withErrorHandler(async () => {
   const supabase = await createClient()
 
@@ -27,51 +31,38 @@ export const GET = withErrorHandler(async () => {
     return forbidden()
   }
 
-  // Get all search logs with zero results
-  const { data: searchLogs, error: searchError } = await supabase
-    .from('search_logs')
-    .select('query, searched_at')
-    .eq('result_count', 0)
-    .order('searched_at', { ascending: false })
+  // Use database aggregation to avoid loading all rows into memory
+  // This performs GROUP BY in Postgres instead of in Node.js
+  const [searchesResult, countResult] = await Promise.all([
+    supabase.rpc('get_failed_searches', {
+      days_ago: DEFAULT_DAYS,
+      result_limit: DEFAULT_LIMIT,
+    }),
+    supabase.rpc('count_failed_searches', {
+      days_ago: DEFAULT_DAYS,
+    }),
+  ])
 
-  if (searchError) {
-    return internalError(searchError, { action: 'fetch_failed_searches' })
+  if (searchesResult.error) {
+    logError(searchesResult.error, { action: 'fetch_failed_searches' })
+    return internalError(searchesResult.error, { action: 'fetch_failed_searches' })
   }
 
-  // Group by normalized query (lowercase, trimmed)
-  const queryCounts = new Map<string, { count: number; lastSearched: string }>()
-  for (const log of searchLogs || []) {
-    const normalizedQuery = log.query.toLowerCase().trim()
-    const existing = queryCounts.get(normalizedQuery)
-    if (existing) {
-      existing.count++
-      // Keep the most recent search date
-      if (log.searched_at > existing.lastSearched) {
-        existing.lastSearched = log.searched_at
-      }
-    } else {
-      queryCounts.set(normalizedQuery, {
-        count: 1,
-        lastSearched: log.searched_at,
-      })
-    }
+  if (countResult.error) {
+    logError(countResult.error, { action: 'count_failed_searches' })
+    return internalError(countResult.error, { action: 'count_failed_searches' })
   }
 
-  // Get top 10 failed queries by count
-  const failedSearches = Array.from(queryCounts.entries())
-    .map(([query, data]) => ({
-      query,
-      count: data.count,
-      last_searched: data.lastSearched,
-    }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
-
-  // Also get total failed search count
-  const totalFailedSearches = searchLogs?.length || 0
+  // Transform RPC result to match expected format
+  const failedSearches = (searchesResult.data || []).map((row: { query: string; count: number; last_searched: string }) => ({
+    query: row.query,
+    count: Number(row.count),
+    last_searched: row.last_searched,
+  }))
 
   return NextResponse.json({
     searches: failedSearches,
-    total_failed: totalFailedSearches,
+    total_failed: Number(countResult.data) || 0,
+    days_window: DEFAULT_DAYS,
   })
 })
