@@ -9,6 +9,8 @@ import TriagePatternCard from './TriagePatternCard'
 import TriageBulkActions from './TriageBulkActions'
 import { useKeyboardShortcuts, KeyboardShortcut, formatShortcut } from '@/hooks/useKeyboardShortcuts'
 import { TriagePattern, TriageStats } from '@/app/api/admin/triage/route'
+import { useToast } from '@/components/Toast'
+import { parseResponseError, AppError } from '@/lib/errors'
 
 const PATTERNS_PER_PAGE = 24
 
@@ -48,6 +50,8 @@ function getPageNumbers(currentPage: number, totalPages: number): (number | 'ell
 }
 
 export default function TriageContent() {
+  const { showError } = useToast()
+
   // Data state
   const [patterns, setPatterns] = useState<TriagePattern[]>([])
   const [stats, setStats] = useState<TriageStats | null>(null)
@@ -179,8 +183,8 @@ export default function TriageContent() {
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to transform')
+        const parsed = await parseResponseError(response)
+        throw new AppError({ code: parsed.code, message: parsed.message, retryable: parsed.retryable })
       }
 
       const data = await response.json()
@@ -203,8 +207,12 @@ export default function TriageContent() {
       })
 
       if (!markResponse.ok) {
-        const markData = await markResponse.json()
-        throw new Error(markData.error || 'Transform succeeded but failed to mark as reviewed')
+        const parsed = await parseResponseError(markResponse)
+        throw new AppError({
+          code: parsed.code,
+          message: `Transform succeeded but failed to mark as reviewed: ${parsed.message}`,
+          retryable: parsed.retryable
+        })
       }
 
       // 4. Update local state - remove the fixed issue from the pattern
@@ -243,11 +251,11 @@ export default function TriageContent() {
         return prev
       })
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to transform')
+      showError(err, 'Failed to transform pattern')
     } finally {
       setTransforming(prev => ({ ...prev, [patternId]: false }))
     }
-  }, [filter, patterns])
+  }, [filter, patterns, showError])
 
   // Handle mark reviewed - removes the specified issues from the pattern
   const handleMarkReviewed = useCallback(async (patternId: number, issueTypes: string[]) => {
@@ -262,8 +270,8 @@ export default function TriageContent() {
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to mark reviewed')
+        const parsed = await parseResponseError(response)
+        throw new AppError({ code: parsed.code, message: parsed.message, retryable: parsed.retryable })
       }
 
       // Update local state - remove the reviewed issues from the pattern
@@ -302,9 +310,9 @@ export default function TriageContent() {
         return prev
       })
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to mark reviewed')
+      showError(err, 'Failed to mark as reviewed')
     }
-  }, [filter, patterns])
+  }, [filter, patterns, showError])
 
   // Handle bulk mark reviewed
   const handleBulkMarkReviewed = useCallback(async (issueTypes: ('rotation' | 'mirror')[]) => {
@@ -320,8 +328,8 @@ export default function TriageContent() {
       })
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to mark reviewed')
+        const parsed = await parseResponseError(response)
+        throw new AppError({ code: parsed.code, message: parsed.message, retryable: parsed.retryable })
       }
 
       // Update local state - remove the reviewed issues from selected patterns
@@ -345,9 +353,9 @@ export default function TriageContent() {
       setSelectedIds(new Set())
       setLastSelectedIndex(null)
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to mark reviewed')
+      showError(err, 'Failed to mark patterns as reviewed')
     }
-  }, [selectedIds, filter])
+  }, [selectedIds, filter, showError])
 
   // Handle expand
   const handleExpand = (patternId: number) => {

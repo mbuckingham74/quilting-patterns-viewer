@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from './Toast'
-import { parseResponseError } from '@/lib/errors'
+import { parseResponseError, logError } from '@/lib/errors'
 
 interface ThumbnailControlsProps {
   patternId: number
@@ -55,7 +55,7 @@ export default function ThumbnailControls({
         onTransformed(patternId, data.thumbnail_url)
       }
     } catch (error) {
-      console.error('Error transforming thumbnail:', error)
+      logError(error, { component: 'ThumbnailControls', action: 'transform', patternId, operation })
       showError(error, 'Failed to transform thumbnail')
     } finally {
       setIsTransforming(false)
@@ -85,7 +85,7 @@ export default function ThumbnailControls({
         onDeleted(patternId)
       }
     } catch (error) {
-      console.error('Error deleting pattern:', error)
+      logError(error, { component: 'ThumbnailControls', action: 'delete', patternId })
       showError(error, 'Failed to delete pattern')
     } finally {
       setIsDeleting(false)
