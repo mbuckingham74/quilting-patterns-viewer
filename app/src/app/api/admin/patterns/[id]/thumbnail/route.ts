@@ -69,9 +69,11 @@ export const POST = withErrorHandler(async (
     return badRequest('Invalid form data')
   }
 
-  const file = formData.get('thumbnail') as File | null
-  if (!file) {
-    return badRequest('No thumbnail file provided')
+  const file = formData.get('thumbnail')
+
+  // Validate that we received a File object (not a string or other value)
+  if (!file || !(file instanceof File)) {
+    return badRequest('No thumbnail file provided or invalid file format')
   }
 
   // Validate file type
@@ -84,20 +86,32 @@ export const POST = withErrorHandler(async (
     return badRequest(`File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024}MB`)
   }
 
+  // Read file buffer
+  let buffer: Buffer
   try {
-    // Read file buffer
     const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    buffer = Buffer.from(arrayBuffer)
+  } catch {
+    return badRequest('Failed to read uploaded file')
+  }
 
-    // Process with sharp - resize to 256x256 and convert to PNG
-    const processedBuffer = await sharp(buffer)
-      .resize(256, 256, {
+  // Process with sharp - resize to 600px width to match PDF pipeline quality
+  let processedBuffer: Buffer
+  try {
+    processedBuffer = await sharp(buffer)
+      .resize(600, 600, {
         fit: 'contain',
         background: { r: 255, g: 255, b: 255, alpha: 1 }
       })
       .png()
       .toBuffer()
+  } catch (error) {
+    // Sharp throws on corrupt/invalid image data
+    logError(error, { action: 'decode_thumbnail', patternId, originalName: file.name })
+    return badRequest('Invalid or corrupt image file. Please upload a valid PNG, JPEG, WebP, or GIF image.')
+  }
 
+  try {
     // Upload to Supabase Storage
     const serviceClient = createServiceClient()
     const storagePath = `${patternId}.png`
