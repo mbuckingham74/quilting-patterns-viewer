@@ -601,16 +601,17 @@ export default async function AdminHelpPage() {
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
                 <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">4</div>
                 <div>
-                  <p className="font-medium text-stone-800">Rotate or flip the thumbnail (if needed)</p>
+                  <p className="font-medium text-stone-800">Rotate, flip, or upload a new thumbnail</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    If the pattern thumbnail is oriented incorrectly, use the transform controls below the image:
+                    If the pattern thumbnail is oriented incorrectly or missing, use the transform controls below the image:
                   </p>
                   <ul className="mt-2 text-sm text-stone-600 space-y-1">
                     <li>&bull; <strong>Rotate buttons</strong> — turn the image 90° left, 90° right, or 180°</li>
                     <li>&bull; <strong>Flip buttons</strong> — mirror the image horizontally or vertically</li>
+                    <li>&bull; <strong>Upload New Thumbnail</strong> — click &quot;Choose File&quot; to upload a custom image (PNG, JPEG, WebP, or GIF up to 5MB)</li>
                   </ul>
                   <p className="text-stone-500 text-xs mt-2">
-                    Note: After rotating/flipping, the AI search data will be regenerated automatically.
+                    Note: After rotating/flipping or uploading a new thumbnail, the AI search data will be regenerated automatically.
                   </p>
                 </div>
               </div>
@@ -711,12 +712,30 @@ export default async function AdminHelpPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="flex gap-4 p-4 bg-indigo-50 rounded-lg">
+                <div className="w-8 h-8 bg-indigo-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-indigo-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Review failed searches</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    The &quot;Failed Searches&quot; panel shows search queries that returned zero results in the last 90 days. This helps you identify:
+                  </p>
+                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
+                    <li>&bull; <strong>Missing patterns</strong> — queries for patterns you might want to add to the collection</li>
+                    <li>&bull; <strong>Missing keywords</strong> — terms users search for that should be added to existing patterns</li>
+                    <li>&bull; <strong>Common misspellings</strong> — search terms that could be addressed with additional keywords</li>
+                  </ul>
+                  <p className="text-stone-500 text-xs mt-2">
+                    The list shows the top 10 failed queries by frequency, with a count of how many times each was searched.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-lg">
               <p className="font-medium text-indigo-800">Note about historical data</p>
               <p className="text-indigo-700 text-sm mt-1">
-                Analytics tracking starts from when this feature was added. Downloads and searches from before that time aren&apos;t counted.
+                Analytics tracking starts from when this feature was added. Downloads and searches from before that time aren&apos;t counted. Failed searches show data from the last 90 days.
               </p>
             </div>
 

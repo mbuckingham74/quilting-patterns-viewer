@@ -94,8 +94,8 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
   - **Auto-generated embeddings** - AI search embeddings generated automatically when batch is committed
   - Pending reviews alert on admin dashboard
 - **Duplicate Finder** - Identify and manage similar patterns
-- **Pattern Metadata Editor** - Edit pattern details (name, author, notes) and manage keywords after upload
-- **Pattern Analytics** - Dashboard showing downloads, pattern views, searches, user activity, top downloaded patterns, most viewed patterns, and popular search queries
+- **Pattern Metadata Editor** - Edit pattern details (name, author, notes), manage keywords, and upload custom thumbnails (resized to 600px for consistent quality)
+- **Pattern Analytics** - Dashboard showing downloads, pattern views, searches, user activity, top downloaded patterns, most viewed patterns, popular search queries, and failed searches (queries with zero results in last 90 days)
 - **Activity Log** - Complete audit trail of admin actions with filtering by target type, action, and date range
   - Tracks user approvals, pattern changes, keyword management, and more
   - **Undo capability** - Reverse certain actions (keyword renames, user approvals) directly from the log
@@ -472,6 +472,8 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/analytics/top-patterns` | GET | Admin | Most downloaded patterns |
 | `/api/admin/analytics/top-views` | GET | Admin | Most viewed patterns |
 | `/api/admin/analytics/top-searches` | GET | Admin | Most popular search queries |
+| `/api/admin/analytics/failed-searches` | GET | Admin | Top failed searches (zero results) in last 90 days |
+| `/api/admin/patterns/[id]/thumbnail` | POST | Admin | Upload custom thumbnail for a pattern |
 | `/api/admin/activity` | GET | Admin | Admin activity audit log with filters |
 | `/api/admin/activity/undo` | POST | Admin | Undo a reversible admin action |
 | `/api/views` | POST | Required | Log a pattern detail page view |
