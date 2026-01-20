@@ -116,6 +116,54 @@ Toast types:
 - `warning` - Amber, auto-dismisses in 5s
 - `info` - Blue, auto-dismisses in 5s
 
+### Preserving Error Metadata When Rethrowing
+
+When parsing API response errors and rethrowing them, use `AppError` instead of plain `Error` to preserve structured metadata. This allows the Toast system to display context-aware messages like auth CTAs or rate-limit countdowns.
+
+```tsx
+import { parseResponseError, AppError } from '@/lib/errors'
+import { useToast } from '@/components/Toast'
+
+function MyComponent() {
+  const { showError } = useToast()
+
+  const handleAction = async () => {
+    try {
+      const response = await fetch('/api/something', { method: 'POST' })
+      if (!response.ok) {
+        const parsed = await parseResponseError(response)
+        // ✅ Good - preserves code, retryable, retryAfter for Toast
+        throw new AppError({
+          code: parsed.code,
+          message: parsed.message,
+          retryable: parsed.retryable,
+        })
+      }
+    } catch (err) {
+      // showError will display auth CTAs for 401s, retry countdowns for 429s
+      showError(err, 'Action failed')
+    }
+  }
+}
+```
+
+**Why this matters:**
+
+- `showError()` parses the error to extract `code`, `retryable`, and `retryAfter`
+- Auth errors (`AUTH_REQUIRED`, `AUTH_EXPIRED`, etc.) show a "Sign in" button
+- Rate-limited errors show "(try again in Xs)" countdown
+- Non-retryable errors display as persistent toasts
+
+**Anti-pattern to avoid:**
+
+```tsx
+// ❌ Bad - loses metadata, all errors become generic persistent toasts
+if (!response.ok) {
+  const parsed = await parseResponseError(response)
+  throw new Error(parsed.message)  // Loses code, retryable, retryAfter!
+}
+```
+
 ### Fetch with Retry
 
 Use `fetchWithRetry()` for API calls that should retry on transient failures:
@@ -513,6 +561,7 @@ export default function GlobalError({ error, reset }) {
 7. **Handle auth errors specially** - prompt re-login
 8. **Wrap JSON parsing in try-catch** - prevents unhandled exceptions
 9. **Use `logError()` instead of `console.error`** - enables Sentry tracking
+10. **Use `AppError` when rethrowing parsed errors** - preserves metadata for Toast
 
 ### DON'T:
 
@@ -522,6 +571,7 @@ export default function GlobalError({ error, reset }) {
 4. **Block UI on errors** - show fallback content
 5. **Expose internal details** in API error messages
 6. **Use raw `request.json()`** - always wrap in try-catch
+7. **Rethrow parsed errors as plain `Error`** - loses metadata for Toast behavior
 
 ### Safe JSON Parsing Pattern
 
