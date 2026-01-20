@@ -94,6 +94,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
   - **Auto-generated embeddings** - AI search embeddings generated automatically when batch is committed
   - Pending reviews alert on admin dashboard
 - **Duplicate Finder** - Identify and manage similar patterns
+- **Keyword Management** - Create, rename, merge, and delete keywords with usage statistics
 - **Pattern Metadata Editor** - Edit pattern details (name, author, notes), manage keywords, and upload custom thumbnails (resized to 600px for consistent quality)
 - **Pattern Analytics** - Dashboard showing downloads, pattern views, searches, user activity, top downloaded patterns, most viewed patterns, popular search queries, and failed searches (queries with zero results in last 90 days)
 - **Activity Log** - Complete audit trail of admin actions with filtering by target type, action, and date range
@@ -453,11 +454,18 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/shares/[token]` | GET | Public | Get share details by token |
 | `/api/shares/[token]/feedback` | POST | Public | Submit customer rankings |
 | `/api/admin/upload` | POST | Admin | Upload new patterns (staged by default) |
+| `/api/admin/upload-logs` | GET | Admin | List upload batch history |
 | `/api/admin/batches/[id]` | GET | Admin | Get batch details with patterns |
 | `/api/admin/batches/[id]/commit` | POST | Admin | Commit staged batch (publish patterns) |
 | `/api/admin/batches/[id]/cancel` | POST | Admin | Cancel batch (delete all patterns) |
 | `/api/admin/batches/[id]/keywords` | POST | Admin | Bulk add/remove keywords from batch |
 | `/api/admin/users` | GET | Admin | User management |
+| `/api/admin/users/[id]/approve` | POST | Admin | Approve pending user |
+| `/api/admin/users/[id]/reject` | POST | Admin | Reject pending user |
+| `/api/admin/users/[id]/revoke` | POST | Admin | Revoke approved user access |
+| `/api/admin/keywords` | GET/POST | Admin | List keywords with stats / Create keyword |
+| `/api/admin/keywords/[id]` | PATCH/DELETE | Admin | Update or delete keyword |
+| `/api/admin/keywords/merge` | POST | Admin | Merge two keywords into one |
 | `/api/admin/duplicates` | GET | Admin | Find similar patterns |
 | `/api/admin/duplicates/review` | POST | Admin | Mark duplicate status |
 | `/api/admin/patterns` | GET | Admin | List patterns (paginated) |
