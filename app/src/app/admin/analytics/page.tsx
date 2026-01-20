@@ -9,6 +9,7 @@ import TopPatternsList from '@/components/analytics/TopPatternsList'
 import TopViewsList from '@/components/analytics/TopViewsList'
 import TopSearchesList from '@/components/analytics/TopSearchesList'
 import FailedSearchesList from '@/components/analytics/FailedSearchesList'
+import { logError } from '@/lib/errors'
 
 async function getAnalyticsData() {
   const supabase = await createClient()
@@ -249,13 +250,13 @@ async function getFailedSearches() {
 
   // Log errors but don't throw - return empty state with error flag
   if (searchesResult.error) {
-    console.error('Failed to fetch failed searches:', searchesResult.error)
-    return { searches: [], totalFailed: 0, error: true }
+    logError(searchesResult.error, { component: 'AnalyticsPage', action: 'get_failed_searches' })
+    return { searches: [], totalFailed: 0, error: true, errorMessage: 'Failed to load failed searches data' }
   }
 
   if (countResult.error) {
-    console.error('Failed to count failed searches:', countResult.error)
-    return { searches: [], totalFailed: 0, error: true }
+    logError(countResult.error, { component: 'AnalyticsPage', action: 'count_failed_searches' })
+    return { searches: [], totalFailed: 0, error: true, errorMessage: 'Failed to count failed searches' }
   }
 
   const searches = (searchesResult.data || []).map((row: { query: string; count: number; last_searched: string }) => ({
@@ -268,6 +269,7 @@ async function getFailedSearches() {
     searches,
     totalFailed: Number(countResult.data) || 0,
     error: false,
+    errorMessage: undefined,
   }
 }
 
@@ -448,7 +450,7 @@ export default async function AnalyticsPage() {
         {/* Search Analytics */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TopSearchesList searches={topSearches} />
-          <FailedSearchesList searches={failedSearches.searches} totalFailed={failedSearches.totalFailed} error={failedSearches.error} />
+          <FailedSearchesList searches={failedSearches.searches} totalFailed={failedSearches.totalFailed} error={failedSearches.error} errorMessage={failedSearches.errorMessage} />
         </div>
       </div>
     </div>
