@@ -6,9 +6,29 @@ import { render, screen, act } from '@testing-library/react'
 import BrowseContent from './BrowseContent'
 import { Pattern } from '@/lib/types'
 
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => ({
+    toString: () => 'search=test&page=1',
+  }),
+}))
+
+// Mock BrowseStateContext
+const mockSaveBrowseState = vi.fn()
+const mockMarkScrollRestored = vi.fn()
+vi.mock('@/contexts/BrowseStateContext', () => ({
+  useBrowseState: () => ({
+    browseState: null,
+    saveBrowseState: mockSaveBrowseState,
+    clearBrowseState: vi.fn(),
+    shouldRestoreScroll: false,
+    markScrollRestored: mockMarkScrollRestored,
+  }),
+}))
+
 // Mock child components
 vi.mock('./PatternGrid', () => ({
-  default: vi.fn(({ patterns, error, favoritePatternIds, onToggleFavorite, isAdmin }) => (
+  default: vi.fn(({ patterns, error, favoritePatternIds, onToggleFavorite, isAdmin, onBeforeNavigate }) => (
     <div data-testid="pattern-grid">
       <span data-testid="pattern-count">{patterns.length}</span>
       <span data-testid="error">{error || 'none'}</span>
@@ -23,6 +43,9 @@ vi.mock('./PatternGrid', () => ({
           Toggle {p.id}
         </button>
       ))}
+      <button data-testid="before-navigate" onClick={onBeforeNavigate}>
+        Navigate
+      </button>
     </div>
   )),
 }))
@@ -64,6 +87,8 @@ describe('BrowseContent', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    mockSaveBrowseState.mockClear()
+    mockMarkScrollRestored.mockClear()
   })
 
   describe('rendering', () => {
@@ -400,6 +425,52 @@ describe('BrowseContent', () => {
 
       // Favorites should be tracked even if not in current patterns
       expect(screen.getByTestId('favorite-count')).toHaveTextContent('2')
+    })
+  })
+
+  describe('browse state', () => {
+    it('calls saveBrowseState when onBeforeNavigate is called', async () => {
+      // Mock window.scrollY
+      Object.defineProperty(window, 'scrollY', { value: 500, writable: true })
+
+      render(
+        <BrowseContent
+          patterns={mockPatterns}
+          error={null}
+          currentPage={1}
+          totalPages={5}
+          totalCount={100}
+          initialFavoriteIds={[]}
+        />
+      )
+
+      await act(async () => {
+        screen.getByTestId('before-navigate').click()
+      })
+
+      expect(mockSaveBrowseState).toHaveBeenCalledWith('?search=test&page=1', 500)
+    })
+
+    it('saves current search params before navigation', async () => {
+      Object.defineProperty(window, 'scrollY', { value: 0, writable: true })
+
+      render(
+        <BrowseContent
+          patterns={mockPatterns}
+          error={null}
+          currentPage={1}
+          totalPages={5}
+          totalCount={100}
+          initialFavoriteIds={[]}
+        />
+      )
+
+      await act(async () => {
+        screen.getByTestId('before-navigate').click()
+      })
+
+      expect(mockSaveBrowseState).toHaveBeenCalledTimes(1)
+      expect(mockSaveBrowseState).toHaveBeenCalledWith(expect.any(String), expect.any(Number))
     })
   })
 })
