@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import PatternDetailClient from '@/components/PatternDetailClient'
 import ViewLogger from '@/components/ViewLogger'
 import BackToBrowseLink from '@/components/BackToBrowseLink'
+import SimilarPatterns from '@/components/SimilarPatterns'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -123,6 +124,9 @@ export default async function PatternPage({ params }: PageProps) {
           keywords={pattern.keywords}
           isAdmin={isAdmin}
         />
+
+        {/* Similar Patterns Section */}
+        <SimilarPatterns patternId={patternId} />
       </main>
     </div>
   )
