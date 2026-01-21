@@ -27,7 +27,7 @@ export default function BrowseContent({
   isAdmin = false,
 }: BrowseContentProps) {
   const searchParams = useSearchParams()
-  const { saveBrowseState, shouldRestoreScroll, markScrollRestored, browseState } = useBrowseState()
+  const { saveBrowseState, requestScrollRestore, markScrollRestored, browseState } = useBrowseState()
   const [favoritePatternIds, setFavoritePatternIds] = useState<Set<number>>(
     new Set(initialFavoriteIds)
   )
@@ -38,15 +38,17 @@ export default function BrowseContent({
   }, [initialFavoriteIds])
 
   // Restore scroll position when returning from pattern detail
+  // Check on mount if we should restore (uses ref-based check that works with persistent provider)
   useEffect(() => {
-    if (shouldRestoreScroll && browseState) {
+    if (requestScrollRestore() && browseState) {
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         window.scrollTo(0, browseState.scrollY)
         markScrollRestored()
       })
     }
-  }, [shouldRestoreScroll, browseState, markScrollRestored])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Empty deps - only check on mount
 
   const handleToggleFavorite = (patternId: number, newState: boolean) => {
     setFavoritePatternIds((prev) => {

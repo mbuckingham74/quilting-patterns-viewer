@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, waitFor, cleanup } from '@testing-library/react'
+import { useEffect } from 'react'
 import { BrowseStateProvider, useBrowseState, getBrowseUrl, BrowseState } from './BrowseStateContext'
 
 // Simple test component that displays context state
@@ -13,7 +14,7 @@ function TestDisplay() {
       <span data-testid="has-state">{context.browseState ? 'yes' : 'no'}</span>
       <span data-testid="search-params">{context.browseState?.searchParams ?? ''}</span>
       <span data-testid="scroll-y">{context.browseState?.scrollY ?? 0}</span>
-      <span data-testid="should-restore">{context.shouldRestoreScroll ? 'yes' : 'no'}</span>
+      <span data-testid="request-restore">{context.requestScrollRestore() ? 'yes' : 'no'}</span>
     </div>
   )
 }
@@ -125,7 +126,7 @@ describe('BrowseStateContext', () => {
       expect(screen.getByTestId('scroll-y')).toHaveTextContent('500')
     })
 
-    it('sets shouldRestoreScroll to true when loading from storage', async () => {
+    it('requestScrollRestore returns true when loading from storage', async () => {
       const state = createState()
       mockStorage.setItem('browse-state', JSON.stringify(state))
 
@@ -136,7 +137,7 @@ describe('BrowseStateContext', () => {
       )
 
       await waitFor(() => {
-        expect(screen.getByTestId('should-restore')).toHaveTextContent('yes')
+        expect(screen.getByTestId('request-restore')).toHaveTextContent('yes')
       })
     })
 
@@ -233,7 +234,7 @@ describe('BrowseStateContext', () => {
       })
     })
 
-    it('does not set shouldRestoreScroll immediately (deferred to remount)', async () => {
+    it('requestScrollRestore returns true immediately after saveBrowseState (for persistent provider)', async () => {
       render(
         <BrowseStateProvider>
           <TestDisplay />
@@ -249,31 +250,46 @@ describe('BrowseStateContext', () => {
         await new Promise((r) => setTimeout(r, 0))
       })
 
-      // Initially no restore flag
-      expect(screen.getByTestId('should-restore')).toHaveTextContent('no')
+      // Initially no restore flag (no state saved yet)
+      expect(screen.getByTestId('request-restore')).toHaveTextContent('no')
 
       act(() => {
         screen.getByTestId('action').click()
       })
 
-      // After saving, shouldRestoreScroll should still be false - it only becomes
-      // true when the provider remounts and loads from sessionStorage
-      expect(screen.getByTestId('should-restore')).toHaveTextContent('no')
-
-      // But state should be saved
+      // After saving, requestScrollRestore should return true
+      // This is the key fix: the pending flag is set via ref so it works
+      // even when provider doesn't remount (root layout scenario)
+      expect(screen.getByTestId('request-restore')).toHaveTextContent('yes')
       expect(screen.getByTestId('has-state')).toHaveTextContent('yes')
     })
 
-    it('sets shouldRestoreScroll on remount after save', async () => {
-      // First render - save state
-      const { unmount } = render(
+    it('simulates browse -> detail -> browse navigation with persistent provider', async () => {
+      // This test keeps the provider mounted (like root layout) and simulates
+      // unmounting/remounting only the BrowseContent-like component
+
+      // Custom component that simulates BrowseContent mount behavior
+      function BrowseContentSimulator({ onMount }: { onMount: (shouldRestore: boolean) => void }) {
+        const ctx = useBrowseState()
+        useEffect(() => {
+          // On mount, check if we should restore (same logic as BrowseContent)
+          onMount(ctx.requestScrollRestore())
+        }, [])
+        return <div data-testid="browse-sim">mounted</div>
+      }
+
+      const mountCallback = vi.fn()
+
+      // Initial render - provider + browse content
+      const { rerender } = render(
         <BrowseStateProvider>
           <TestDisplay />
           <TestActions
             onAction={(ctx) => {
-              ctx.saveBrowseState('?page=3', 800)
+              ctx.saveBrowseState('?keywords=1,2', 750)
             }}
           />
+          <BrowseContentSimulator onMount={mountCallback} />
         </BrowseStateProvider>
       )
 
@@ -281,34 +297,43 @@ describe('BrowseStateContext', () => {
         await new Promise((r) => setTimeout(r, 0))
       })
 
+      // First mount - no pending restore
+      expect(mountCallback).toHaveBeenLastCalledWith(false)
+      mountCallback.mockClear()
+
+      // User clicks a pattern - save state before navigating
       act(() => {
         screen.getByTestId('action').click()
       })
 
-      // Wait for sessionStorage write
-      await act(async () => {
-        await new Promise((r) => setTimeout(r, 0))
-      })
-
-      // Unmount (simulates navigating away)
-      unmount()
-
-      // Remount (simulates navigating back to browse)
-      render(
+      // Simulate navigating to pattern detail (remove BrowseContent but keep provider)
+      rerender(
         <BrowseStateProvider>
           <TestDisplay />
+          <div data-testid="detail-page">Pattern Detail</div>
         </BrowseStateProvider>
       )
 
-      // Wait for hydration
-      await act(async () => {
-        await new Promise((r) => setTimeout(r, 0))
-      })
+      expect(screen.getByTestId('detail-page')).toBeInTheDocument()
+      expect(screen.queryByTestId('browse-sim')).not.toBeInTheDocument()
 
-      // Now shouldRestoreScroll should be true from loading sessionStorage
-      expect(screen.getByTestId('should-restore')).toHaveTextContent('yes')
-      expect(screen.getByTestId('search-params')).toHaveTextContent('?page=3')
-      expect(screen.getByTestId('scroll-y')).toHaveTextContent('800')
+      // Simulate navigating back to browse (remount BrowseContent, provider stays)
+      rerender(
+        <BrowseStateProvider>
+          <TestDisplay />
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?keywords=1,2', 750)
+            }}
+          />
+          <BrowseContentSimulator onMount={mountCallback} />
+        </BrowseStateProvider>
+      )
+
+      // The BrowseContentSimulator should detect pending restore on its mount
+      expect(mountCallback).toHaveBeenLastCalledWith(true)
+      expect(screen.getByTestId('search-params')).toHaveTextContent('?keywords=1,2')
+      expect(screen.getByTestId('scroll-y')).toHaveTextContent('750')
     })
   })
 
@@ -337,36 +362,64 @@ describe('BrowseStateContext', () => {
       })
 
       expect(screen.getByTestId('has-state')).toHaveTextContent('no')
-      expect(screen.getByTestId('should-restore')).toHaveTextContent('no')
+      expect(screen.getByTestId('request-restore')).toHaveTextContent('no')
       expect(mockStorage.getItem('browse-state')).toBeNull()
     })
   })
 
   describe('markScrollRestored', () => {
-    it('sets shouldRestoreScroll to false', async () => {
+    it('makes requestScrollRestore return false', async () => {
       const state = createState()
       mockStorage.setItem('browse-state', JSON.stringify(state))
 
+      // Track the result of requestScrollRestore calls
+      let restoreResults: boolean[] = []
+
+      function RestoreChecker() {
+        const ctx = useBrowseState()
+        return (
+          <button
+            data-testid="check-restore"
+            onClick={() => {
+              restoreResults.push(ctx.requestScrollRestore())
+            }}
+          >
+            Check
+          </button>
+        )
+      }
+
       render(
         <BrowseStateProvider>
-          <TestDisplay />
           <TestActions
             onAction={(ctx) => {
               ctx.markScrollRestored()
             }}
           />
+          <RestoreChecker />
         </BrowseStateProvider>
       )
 
-      await waitFor(() => {
-        expect(screen.getByTestId('should-restore')).toHaveTextContent('yes')
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
       })
 
+      // Check before marking restored
+      act(() => {
+        screen.getByTestId('check-restore').click()
+      })
+      expect(restoreResults[0]).toBe(true)
+
+      // Mark as restored
       act(() => {
         screen.getByTestId('action').click()
       })
 
-      expect(screen.getByTestId('should-restore')).toHaveTextContent('no')
+      // Check after marking restored
+      act(() => {
+        screen.getByTestId('check-restore').click()
+      })
+      expect(restoreResults[1]).toBe(false)
     })
   })
 

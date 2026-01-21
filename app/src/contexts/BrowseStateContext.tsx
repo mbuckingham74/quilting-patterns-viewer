@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react'
 
 export interface BrowseState {
   /** The full URL search params string (e.g., "?search=foo&keywords=1,2&page=3") */
@@ -18,8 +18,8 @@ interface BrowseStateContextType {
   saveBrowseState: (searchParams: string, scrollY: number) => void
   /** Clear the saved state (e.g., after restoring) */
   clearBrowseState: () => void
-  /** Check if we should restore scroll position */
-  shouldRestoreScroll: boolean
+  /** Signal that the browse page has mounted and check if restoration is needed */
+  requestScrollRestore: () => boolean
   /** Mark scroll as restored */
   markScrollRestored: () => void
 }
@@ -33,7 +33,8 @@ const STATE_EXPIRY_MS = 30 * 60 * 1000
 export function BrowseStateProvider({ children }: { children: ReactNode }) {
   const [browseState, setBrowseState] = useState<BrowseState | null>(null)
   const [isHydrated, setIsHydrated] = useState(false)
-  const [shouldRestoreScroll, setShouldRestoreScroll] = useState(false)
+  // Track if we have pending scroll restoration (state was saved before navigation)
+  const pendingRestoreRef = useRef(false)
 
   // Load from sessionStorage on mount
   useEffect(() => {
@@ -44,7 +45,8 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
         // Check if state has expired
         if (Date.now() - parsed.timestamp < STATE_EXPIRY_MS) {
           setBrowseState(parsed)
-          setShouldRestoreScroll(true)
+          // Mark that we have state to potentially restore
+          pendingRestoreRef.current = true
         } else {
           // Clear expired state
           sessionStorage.removeItem(STORAGE_KEY)
@@ -73,13 +75,13 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
       scrollY,
       timestamp: Date.now(),
     })
-    // Note: Don't set shouldRestoreScroll here - it will be set when the browse
-    // page remounts and loads state from sessionStorage via the hydration effect
+    // Mark that we have pending restoration for when browse page mounts
+    pendingRestoreRef.current = true
   }, [])
 
   const clearBrowseState = useCallback(() => {
     setBrowseState(null)
-    setShouldRestoreScroll(false)
+    pendingRestoreRef.current = false
     try {
       sessionStorage.removeItem(STORAGE_KEY)
     } catch (e) {
@@ -87,8 +89,16 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Called by BrowseContent on mount to check if scroll should be restored
+  const requestScrollRestore = useCallback(() => {
+    if (pendingRestoreRef.current && browseState) {
+      return true
+    }
+    return false
+  }, [browseState])
+
   const markScrollRestored = useCallback(() => {
-    setShouldRestoreScroll(false)
+    pendingRestoreRef.current = false
   }, [])
 
   return (
@@ -97,7 +107,7 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
         browseState,
         saveBrowseState,
         clearBrowseState,
-        shouldRestoreScroll,
+        requestScrollRestore,
         markScrollRestored,
       }}
     >

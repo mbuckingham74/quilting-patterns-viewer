@@ -16,12 +16,13 @@ vi.mock('next/navigation', () => ({
 // Mock BrowseStateContext
 const mockSaveBrowseState = vi.fn()
 const mockMarkScrollRestored = vi.fn()
+const mockRequestScrollRestore = vi.fn(() => false)
 vi.mock('@/contexts/BrowseStateContext', () => ({
   useBrowseState: () => ({
     browseState: null,
     saveBrowseState: mockSaveBrowseState,
     clearBrowseState: vi.fn(),
-    shouldRestoreScroll: false,
+    requestScrollRestore: mockRequestScrollRestore,
     markScrollRestored: mockMarkScrollRestored,
   }),
 }))
@@ -89,6 +90,8 @@ describe('BrowseContent', () => {
     vi.clearAllMocks()
     mockSaveBrowseState.mockClear()
     mockMarkScrollRestored.mockClear()
+    mockRequestScrollRestore.mockClear()
+    mockRequestScrollRestore.mockReturnValue(false)
   })
 
   describe('rendering', () => {
