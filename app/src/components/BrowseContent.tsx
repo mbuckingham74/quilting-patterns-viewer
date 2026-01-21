@@ -27,11 +27,11 @@ export default function BrowseContent({
   isAdmin = false,
 }: BrowseContentProps) {
   const searchParams = useSearchParams()
-  const { saveBrowseState, requestScrollRestore, markScrollRestored, browseState } = useBrowseState()
+  const { saveBrowseState, requestScrollRestore, markScrollRestored, browseState, isHydrated } = useBrowseState()
   const [favoritePatternIds, setFavoritePatternIds] = useState<Set<number>>(
     new Set(initialFavoriteIds)
   )
-  // One-shot guard to prevent multiple scroll restorations
+  // One-shot guard to prevent multiple scroll restorations per mount
   const hasRestoredRef = useRef(false)
 
   // Update favorites when initialFavoriteIds changes (e.g., on navigation)
@@ -40,18 +40,23 @@ export default function BrowseContent({
   }, [initialFavoriteIds])
 
   // Restore scroll position when returning from pattern detail
-  // Runs when browseState changes (including after hydration) but only restores once
+  // Only triggers when isHydrated changes (not browseState) to avoid running when we save state
+  // - In-app return: isHydrated is already true on mount, effect runs once
+  // - Hard reload: isHydrated becomes true after mount, effect runs when it changes
   useEffect(() => {
-    if (hasRestoredRef.current) return
-    if (requestScrollRestore() && browseState) {
+    if (!isHydrated || hasRestoredRef.current) return
+    if (requestScrollRestore()) {
       hasRestoredRef.current = true
+      // Capture browseState at restore time (don't include in deps to avoid re-runs)
+      const scrollY = browseState?.scrollY ?? 0
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
-        window.scrollTo(0, browseState.scrollY)
+        window.scrollTo(0, scrollY)
         markScrollRestored()
       })
     }
-  }, [browseState, requestScrollRestore, markScrollRestored])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isHydrated]) // Only re-run when hydration completes, not when browseState changes
 
   const handleToggleFavorite = (patternId: number, newState: boolean) => {
     setFavoritePatternIds((prev) => {

@@ -14,11 +14,13 @@ export interface BrowseState {
 interface BrowseStateContextType {
   /** Get the saved browse state */
   browseState: BrowseState | null
+  /** Whether the provider has finished hydrating from sessionStorage */
+  isHydrated: boolean
   /** Save the current browse state before navigating away */
   saveBrowseState: (searchParams: string, scrollY: number) => void
   /** Clear the saved state (e.g., after restoring) */
   clearBrowseState: () => void
-  /** Signal that the browse page has mounted and check if restoration is needed */
+  /** Check if scroll restoration is pending (call on mount or when isHydrated becomes true) */
   requestScrollRestore: () => boolean
   /** Mark scroll as restored */
   markScrollRestored: () => void
@@ -111,6 +113,7 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
     <BrowseStateContext.Provider
       value={{
         browseState,
+        isHydrated,
         saveBrowseState,
         clearBrowseState,
         requestScrollRestore,

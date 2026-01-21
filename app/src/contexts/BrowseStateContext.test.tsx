@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, act, waitFor, cleanup } from '@testing-library/react'
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { BrowseStateProvider, useBrowseState, getBrowseUrl, BrowseState } from './BrowseStateContext'
 
 // Simple test component that displays context state
@@ -15,6 +15,7 @@ function TestDisplay() {
       <span data-testid="search-params">{context.browseState?.searchParams ?? ''}</span>
       <span data-testid="scroll-y">{context.browseState?.scrollY ?? 0}</span>
       <span data-testid="request-restore">{context.requestScrollRestore() ? 'yes' : 'no'}</span>
+      <span data-testid="is-hydrated">{context.isHydrated ? 'yes' : 'no'}</span>
     </div>
   )
 }
@@ -319,6 +320,62 @@ describe('BrowseStateContext', () => {
       expect(restoreResults[1]).toBe(false)
 
       vi.spyOn(Date, 'now').mockRestore()
+    })
+
+    it('does not restore scroll when saveBrowseState is called (race condition fix)', async () => {
+      // This tests that calling saveBrowseState while BrowseContent is mounted
+      // does NOT trigger scroll restoration (because isHydrated doesn't change)
+
+      // Simulates BrowseContent's scroll restore logic (mirrors the actual implementation)
+      function BrowseContentSimulator({ onRestore }: { onRestore: () => void }) {
+        const ctx = useBrowseState()
+        const hasRestoredRef = React.useRef(false)
+
+        useEffect(() => {
+          if (!ctx.isHydrated || hasRestoredRef.current) return
+          if (ctx.requestScrollRestore()) {
+            hasRestoredRef.current = true
+            onRestore()
+            ctx.markScrollRestored()
+          }
+        // Only depends on isHydrated, not browseState
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [ctx.isHydrated])
+
+        return <div data-testid="browse-sim">mounted</div>
+      }
+
+      const restoreCallback = vi.fn()
+
+      render(
+        <BrowseStateProvider>
+          <TestDisplay />
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?page=3', 800)
+            }}
+          />
+          <BrowseContentSimulator onRestore={restoreCallback} />
+        </BrowseStateProvider>
+      )
+
+      // Wait for hydration
+      await waitFor(() => {
+        expect(screen.getByTestId('is-hydrated')).toHaveTextContent('yes')
+      })
+
+      // No restore should have happened on initial mount (no saved state)
+      expect(restoreCallback).not.toHaveBeenCalled()
+
+      // Now save state (simulating user clicking a pattern)
+      act(() => {
+        screen.getByTestId('action').click()
+      })
+
+      // State should be saved but restore should NOT have been called
+      // because isHydrated didn't change (it was already true)
+      expect(screen.getByTestId('has-state')).toHaveTextContent('yes')
+      expect(restoreCallback).not.toHaveBeenCalled()
     })
 
     it('simulates browse -> detail -> browse navigation with persistent provider', async () => {

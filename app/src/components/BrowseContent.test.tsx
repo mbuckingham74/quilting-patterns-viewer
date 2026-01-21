@@ -20,6 +20,7 @@ const mockRequestScrollRestore = vi.fn(() => false)
 vi.mock('@/contexts/BrowseStateContext', () => ({
   useBrowseState: () => ({
     browseState: null,
+    isHydrated: true,
     saveBrowseState: mockSaveBrowseState,
     clearBrowseState: vi.fn(),
     requestScrollRestore: mockRequestScrollRestore,
