@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Pattern } from '@/lib/types'
 import { useBrowseState } from '@/contexts/BrowseStateContext'
@@ -31,6 +31,8 @@ export default function BrowseContent({
   const [favoritePatternIds, setFavoritePatternIds] = useState<Set<number>>(
     new Set(initialFavoriteIds)
   )
+  // One-shot guard to prevent multiple scroll restorations
+  const hasRestoredRef = useRef(false)
 
   // Update favorites when initialFavoriteIds changes (e.g., on navigation)
   useEffect(() => {
@@ -38,17 +40,18 @@ export default function BrowseContent({
   }, [initialFavoriteIds])
 
   // Restore scroll position when returning from pattern detail
-  // Check on mount if we should restore (uses ref-based check that works with persistent provider)
+  // Runs when browseState changes (including after hydration) but only restores once
   useEffect(() => {
+    if (hasRestoredRef.current) return
     if (requestScrollRestore() && browseState) {
+      hasRestoredRef.current = true
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         window.scrollTo(0, browseState.scrollY)
         markScrollRestored()
       })
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Empty deps - only check on mount
+  }, [browseState, requestScrollRestore, markScrollRestored])
 
   const handleToggleFavorite = (patternId: number, newState: boolean) => {
     setFavoritePatternIds((prev) => {

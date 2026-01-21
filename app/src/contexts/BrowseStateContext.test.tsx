@@ -264,6 +264,63 @@ describe('BrowseStateContext', () => {
       expect(screen.getByTestId('has-state')).toHaveTextContent('yes')
     })
 
+    it('requestScrollRestore returns false for expired state on in-app return', async () => {
+      // This tests that expiry is enforced during in-app navigation, not just hydration
+      let restoreResults: boolean[] = []
+
+      function RestoreChecker() {
+        const ctx = useBrowseState()
+        return (
+          <button
+            data-testid="check-restore"
+            onClick={() => {
+              restoreResults.push(ctx.requestScrollRestore())
+            }}
+          >
+            Check
+          </button>
+        )
+      }
+
+      render(
+        <BrowseStateProvider>
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?page=3', 800)
+            }}
+          />
+          <RestoreChecker />
+        </BrowseStateProvider>
+      )
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // Save state
+      act(() => {
+        screen.getByTestId('action').click()
+      })
+
+      // Check that restore is available immediately
+      act(() => {
+        screen.getByTestId('check-restore').click()
+      })
+      expect(restoreResults[0]).toBe(true)
+
+      // Fast forward time by 31 minutes
+      const realDateNow = Date.now
+      vi.spyOn(Date, 'now').mockReturnValue(realDateNow() + (31 * 60 * 1000))
+
+      // Now requestScrollRestore should return false due to expiry
+      act(() => {
+        screen.getByTestId('check-restore').click()
+      })
+      expect(restoreResults[1]).toBe(false)
+
+      vi.spyOn(Date, 'now').mockRestore()
+    })
+
     it('simulates browse -> detail -> browse navigation with persistent provider', async () => {
       // This test keeps the provider mounted (like root layout) and simulates
       // unmounting/remounting only the BrowseContent-like component

@@ -90,8 +90,14 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Called by BrowseContent on mount to check if scroll should be restored
+  // Also enforces expiry for in-app returns (not just hydration)
   const requestScrollRestore = useCallback(() => {
     if (pendingRestoreRef.current && browseState) {
+      // Check expiry for in-app returns as well
+      if (Date.now() - browseState.timestamp >= STATE_EXPIRY_MS) {
+        pendingRestoreRef.current = false
+        return false
+      }
       return true
     }
     return false
