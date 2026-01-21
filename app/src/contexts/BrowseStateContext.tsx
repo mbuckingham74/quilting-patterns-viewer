@@ -73,6 +73,8 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
       scrollY,
       timestamp: Date.now(),
     })
+    // Note: Don't set shouldRestoreScroll here - it will be set when the browse
+    // page remounts and loads state from sessionStorage via the hydration effect
   }, [])
 
   const clearBrowseState = useCallback(() => {

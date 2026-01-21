@@ -232,6 +232,84 @@ describe('BrowseStateContext', () => {
         expect(parsed.timestamp).toBeDefined()
       })
     })
+
+    it('does not set shouldRestoreScroll immediately (deferred to remount)', async () => {
+      render(
+        <BrowseStateProvider>
+          <TestDisplay />
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?page=3', 800)
+            }}
+          />
+        </BrowseStateProvider>
+      )
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // Initially no restore flag
+      expect(screen.getByTestId('should-restore')).toHaveTextContent('no')
+
+      act(() => {
+        screen.getByTestId('action').click()
+      })
+
+      // After saving, shouldRestoreScroll should still be false - it only becomes
+      // true when the provider remounts and loads from sessionStorage
+      expect(screen.getByTestId('should-restore')).toHaveTextContent('no')
+
+      // But state should be saved
+      expect(screen.getByTestId('has-state')).toHaveTextContent('yes')
+    })
+
+    it('sets shouldRestoreScroll on remount after save', async () => {
+      // First render - save state
+      const { unmount } = render(
+        <BrowseStateProvider>
+          <TestDisplay />
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?page=3', 800)
+            }}
+          />
+        </BrowseStateProvider>
+      )
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      act(() => {
+        screen.getByTestId('action').click()
+      })
+
+      // Wait for sessionStorage write
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // Unmount (simulates navigating away)
+      unmount()
+
+      // Remount (simulates navigating back to browse)
+      render(
+        <BrowseStateProvider>
+          <TestDisplay />
+        </BrowseStateProvider>
+      )
+
+      // Wait for hydration
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // Now shouldRestoreScroll should be true from loading sessionStorage
+      expect(screen.getByTestId('should-restore')).toHaveTextContent('yes')
+      expect(screen.getByTestId('search-params')).toHaveTextContent('?page=3')
+      expect(screen.getByTestId('scroll-y')).toHaveTextContent('800')
+    })
   })
 
   describe('clearBrowseState', () => {

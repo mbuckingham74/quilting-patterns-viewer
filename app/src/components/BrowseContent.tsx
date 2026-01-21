@@ -39,7 +39,7 @@ export default function BrowseContent({
 
   // Restore scroll position when returning from pattern detail
   useEffect(() => {
-    if (shouldRestoreScroll && browseState?.scrollY) {
+    if (shouldRestoreScroll && browseState) {
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         window.scrollTo(0, browseState.scrollY)
