@@ -10,9 +10,11 @@ interface PatternGridProps {
   favoritePatternIds?: Set<number>
   onToggleFavorite?: (patternId: number, newState: boolean) => void
   isAdmin?: boolean
+  /** Called before navigating to pattern detail - use to save browse state */
+  onBeforeNavigate?: () => void
 }
 
-export default function PatternGrid({ patterns, loading, error, favoritePatternIds, onToggleFavorite, isAdmin = false }: PatternGridProps) {
+export default function PatternGrid({ patterns, loading, error, favoritePatternIds, onToggleFavorite, isAdmin = false, onBeforeNavigate }: PatternGridProps) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -63,6 +65,7 @@ export default function PatternGrid({ patterns, loading, error, favoritePatternI
           onToggleFavorite={onToggleFavorite}
           showEditButton={isAdmin}
           showFlipButton={isAdmin}
+          onBeforeNavigate={onBeforeNavigate}
         />
       ))}
     </div>

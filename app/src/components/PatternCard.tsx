@@ -15,9 +15,11 @@ interface PatternCardProps {
   showShareButton?: boolean
   showEditButton?: boolean
   showFlipButton?: boolean
+  /** Called before navigating to pattern detail - use to save browse state */
+  onBeforeNavigate?: () => void
 }
 
-const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false }: PatternCardProps) {
+const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false, onBeforeNavigate }: PatternCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState(pattern.thumbnail_url)
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
@@ -32,9 +34,16 @@ const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, on
     setThumbnailUrl(newThumbnailUrl)
   }
 
+  const handleClick = () => {
+    if (onBeforeNavigate) {
+      onBeforeNavigate()
+    }
+  }
+
   return (
     <Link
       href={`/patterns/${pattern.id}`}
+      onClick={handleClick}
       className="group block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow border border-stone-200 overflow-hidden"
     >
       <div className="aspect-square relative bg-white p-2">

@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Pattern } from '@/lib/types'
+import { useBrowseState } from '@/contexts/BrowseStateContext'
 import PatternGrid from './PatternGrid'
 import Pagination from './Pagination'
 
@@ -24,6 +26,8 @@ export default function BrowseContent({
   initialFavoriteIds,
   isAdmin = false,
 }: BrowseContentProps) {
+  const searchParams = useSearchParams()
+  const { saveBrowseState, shouldRestoreScroll, markScrollRestored, browseState } = useBrowseState()
   const [favoritePatternIds, setFavoritePatternIds] = useState<Set<number>>(
     new Set(initialFavoriteIds)
   )
@@ -32,6 +36,17 @@ export default function BrowseContent({
   useEffect(() => {
     setFavoritePatternIds(new Set(initialFavoriteIds))
   }, [initialFavoriteIds])
+
+  // Restore scroll position when returning from pattern detail
+  useEffect(() => {
+    if (shouldRestoreScroll && browseState?.scrollY) {
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        window.scrollTo(0, browseState.scrollY)
+        markScrollRestored()
+      })
+    }
+  }, [shouldRestoreScroll, browseState, markScrollRestored])
 
   const handleToggleFavorite = (patternId: number, newState: boolean) => {
     setFavoritePatternIds((prev) => {
@@ -45,6 +60,13 @@ export default function BrowseContent({
     })
   }
 
+  // Save browse state before navigating to pattern detail
+  const handleBeforeNavigate = useCallback(() => {
+    const paramsString = searchParams.toString()
+    const fullParams = paramsString ? `?${paramsString}` : ''
+    saveBrowseState(fullParams, window.scrollY)
+  }, [searchParams, saveBrowseState])
+
   return (
     <>
       <PatternGrid
@@ -53,6 +75,7 @@ export default function BrowseContent({
         favoritePatternIds={favoritePatternIds}
         onToggleFavorite={handleToggleFavorite}
         isAdmin={isAdmin}
+        onBeforeNavigate={handleBeforeNavigate}
       />
       <Pagination
         currentPage={currentPage}
