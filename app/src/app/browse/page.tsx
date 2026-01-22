@@ -235,6 +235,27 @@ async function getUserFavoriteIds(userId: string): Promise<number[]> {
   return favorites?.map(f => f.pattern_id) || []
 }
 
+async function getPinnedKeywords(userId: string) {
+  const supabase = await createClient()
+  const { data: pinnedKeywords } = await supabase
+    .from('pinned_keywords')
+    .select(`
+      id,
+      user_id,
+      keyword_id,
+      display_order,
+      created_at,
+      keywords (
+        id,
+        value
+      )
+    `)
+    .eq('user_id', userId)
+    .order('display_order', { ascending: true })
+
+  return pinnedKeywords || []
+}
+
 export default async function BrowsePage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -258,12 +279,13 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const currentPage = parseInt(resolvedParams.page || '1', 10)
 
   // Use AI search or regular pattern fetch based on ai_search param
-  const [patternResult, keywords, favoriteIds] = await Promise.all([
+  const [patternResult, keywords, favoriteIds, pinnedKeywords] = await Promise.all([
     isAISearch
       ? getAISearchPatterns(resolvedParams.ai_search!, currentPage)
       : getPatterns(resolvedParams),
     getKeywords(),
     getUserFavoriteIds(user.id),
+    getPinnedKeywords(user.id),
   ])
 
   const { patterns, count, page, totalPages, error: patternsError } = patternResult
@@ -309,7 +331,11 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-36">
               <Suspense fallback={<div className="h-96 bg-white/80 rounded-xl animate-pulse" />}>
-                <KeywordSidebar keywords={keywords} />
+                <KeywordSidebar
+                  keywords={keywords}
+                  pinnedKeywords={pinnedKeywords}
+                  isAuthenticated={true}
+                />
               </Suspense>
             </div>
           </aside>

@@ -97,3 +97,15 @@ export interface AdminActivityLogWithAdmin extends AdminActivityLog {
     display_name: string | null
   }
 }
+
+export interface PinnedKeyword {
+  id: number
+  user_id: string
+  keyword_id: number
+  display_order: number
+  created_at: string
+}
+
+export interface PinnedKeywordWithKeyword extends PinnedKeyword {
+  keywords: Keyword
+}
