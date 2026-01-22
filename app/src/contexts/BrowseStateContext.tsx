@@ -97,7 +97,14 @@ export function BrowseStateProvider({ children }: { children: ReactNode }) {
     if (pendingRestoreRef.current && browseState) {
       // Check expiry for in-app returns as well
       if (Date.now() - browseState.timestamp >= STATE_EXPIRY_MS) {
+        // Clear expired state entirely (both scroll and params)
         pendingRestoreRef.current = false
+        setBrowseState(null)
+        try {
+          sessionStorage.removeItem(STORAGE_KEY)
+        } catch (e) {
+          // Ignore storage errors
+        }
         return false
       }
       return true
@@ -134,10 +141,15 @@ export function useBrowseState() {
 }
 
 /**
- * Build the browse URL with saved state params
+ * Build the browse URL with saved state params.
+ * Returns plain /browse if state is expired or missing.
  */
 export function getBrowseUrl(browseState: BrowseState | null): string {
   if (!browseState || !browseState.searchParams) {
+    return '/browse'
+  }
+  // Check if state has expired - don't use stale params
+  if (Date.now() - browseState.timestamp >= STATE_EXPIRY_MS) {
     return '/browse'
   }
   return `/browse${browseState.searchParams}`
