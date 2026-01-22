@@ -36,6 +36,9 @@ export default function PinnedKeywordsManager({
   }, [allKeywords, pinnedKeywordIds, searchFilter])
 
   const handleUnpin = useCallback(async (keywordId: number) => {
+    // Guard against concurrent operations
+    if (pinningId !== null || unpinningId !== null) return
+
     const previousPinned = pinnedKeywords
     setUnpinningId(keywordId)
     setPinnedKeywords(prev => prev.filter(pk => pk.keyword_id !== keywordId))
@@ -60,9 +63,12 @@ export default function PinnedKeywordsManager({
     } finally {
       setUnpinningId(null)
     }
-  }, [pinnedKeywords, router, showError, showSuccess])
+  }, [pinnedKeywords, pinningId, unpinningId, router, showError, showSuccess])
 
   const handlePin = useCallback(async (keywordId: number) => {
+    // Guard against concurrent operations
+    if (pinningId !== null || unpinningId !== null) return
+
     setPinningId(keywordId)
     setIsDropdownOpen(false)
     setSearchFilter('')
@@ -95,7 +101,7 @@ export default function PinnedKeywordsManager({
     } finally {
       setPinningId(null)
     }
-  }, [router, showError, showSuccess])
+  }, [pinningId, unpinningId, router, showError, showSuccess])
 
   const canAddMore = pinnedKeywords.length < MAX_PINNED
   const isOperationInProgress = pinningId !== null || unpinningId !== null
@@ -161,8 +167,8 @@ export default function PinnedKeywordsManager({
 
               <button
                 onClick={() => handleUnpin(pinnedKeyword.keyword_id)}
-                disabled={unpinningId !== null}
-                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                disabled={isOperationInProgress}
+                className="p-2 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Unpin keyword"
               >
                 {unpinningId === pinnedKeyword.keyword_id ? (
