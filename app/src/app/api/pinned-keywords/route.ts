@@ -28,6 +28,7 @@ export const GET = withErrorHandler(async () => {
     `)
     .eq('user_id', user.id)
     .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   if (error) {
     return internalError(error, { action: 'fetch_pinned_keywords', userId: user.id })

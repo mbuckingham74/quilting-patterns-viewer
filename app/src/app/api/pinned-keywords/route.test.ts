@@ -33,9 +33,11 @@ describe('GET /api/pinned-keywords', () => {
       from: vi.fn().mockReturnValue({
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({
-              data: pinnedKeywords,
-              error,
+            order: vi.fn().mockReturnValue({
+              order: vi.fn().mockResolvedValue({
+                data: pinnedKeywords,
+                error,
+              }),
             }),
           }),
         }),
