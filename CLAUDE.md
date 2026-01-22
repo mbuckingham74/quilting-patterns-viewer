@@ -87,6 +87,19 @@ CREATE TABLE keyword_group_keywords (
   PRIMARY KEY (keyword_group_id, keyword_id)
 );
 
+-- Pinned keywords (user's favorite keywords for quick access)
+CREATE TABLE pinned_keywords (
+  id SERIAL PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  keyword_id INTEGER REFERENCES keywords(id) ON DELETE CASCADE NOT NULL,
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, keyword_id)
+);
+
+CREATE INDEX idx_pinned_keywords_user ON pinned_keywords(user_id);
+CREATE INDEX idx_pinned_keywords_keyword ON pinned_keywords(keyword_id);
+
 -- Indexes for performance
 CREATE INDEX idx_patterns_file_extension ON patterns(file_extension);
 CREATE INDEX idx_patterns_author ON patterns(author);
@@ -376,6 +389,29 @@ When an admin commits a batch of imported patterns, embeddings are automatically
 Implementation: `app/src/lib/embeddings.ts` - Voyage AI integration called from batch commit endpoint.
 
 The manual script `scripts/generate_embeddings.py` can still be run to backfill any patterns missing embeddings.
+
+## Pinned Keywords
+
+Authenticated users can pin up to 10 keywords for quick access. Pinned keywords appear at the top of the keyword sidebar on the browse page.
+
+### Features
+- **Inline pinning**: Hover over any keyword in the sidebar and click the pin icon
+- **Account management**: Full pin management available at `/account`
+- **Display order**: Pinned keywords maintain their order (by display_order, then created_at)
+- **10-pin limit**: Enforced both client-side and via database trigger
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/pinned-keywords` | GET | Fetch user's pinned keywords with keyword data |
+| `/api/pinned-keywords` | POST | Pin a keyword `{ keyword_id }` → 201/409/422 |
+| `/api/pinned-keywords/[keywordId]` | DELETE | Unpin a keyword (idempotent) |
+
+### Components
+- `KeywordSidebar.tsx` - Displays pinned section at top, pin/unpin buttons on hover
+- `KeywordSidebarWrapper.tsx` - Client wrapper handling API calls with optimistic updates
+- `PinnedKeywordsManager.tsx` - Account page component for managing pins
 
 ## Phase 2 Features (Future)
 
