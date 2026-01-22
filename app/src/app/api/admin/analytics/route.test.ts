@@ -49,6 +49,7 @@ describe('GET /api/admin/analytics', () => {
           error: null,
         }),
       },
+      rpc: vi.fn().mockResolvedValue({ data: defaultCounts.profiles_active, error: null }),
       from: vi.fn().mockImplementation((table) => {
         return {
           select: vi.fn().mockImplementation((fields, opts) => {

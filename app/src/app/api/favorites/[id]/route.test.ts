@@ -81,7 +81,7 @@ describe('DELETE /api/favorites/[id]', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.success).toBe(true)
+    expect(body.data.removed).toBe(true)
   })
 
   it('returns 500 on database error', async () => {

@@ -3,6 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // Mock the Supabase client
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(),
+  createServiceClient: vi.fn(() => ({
+    from: vi.fn().mockReturnValue({
+      insert: vi.fn().mockResolvedValue({ error: null }),
+    }),
+  })),
 }))
 
 import { POST } from './route'
@@ -126,7 +131,7 @@ describe('POST /api/admin/duplicates/review', () => {
     const body = await response.json()
 
     expect(response.status).toBe(400)
-    expect(body.error).toContain('Missing required')
+    expect(body.error).toContain('required')
   })
 
   it('returns 400 for invalid decision value', async () => {
@@ -156,8 +161,7 @@ describe('POST /api/admin/duplicates/review', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.deleted_pattern_id).toBeNull()
+    expect(body.data.deleted_pattern_id).toBeNull()
   })
 
   it('deletes first pattern when deleted_first decision', async () => {
@@ -172,8 +176,7 @@ describe('POST /api/admin/duplicates/review', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.deleted_pattern_id).toBe(10)
+    expect(body.data.deleted_pattern_id).toBe(10)
     expect(mockSupabase.from).toHaveBeenCalledWith('patterns')
   })
 
@@ -189,8 +192,7 @@ describe('POST /api/admin/duplicates/review', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.success).toBe(true)
-    expect(body.deleted_pattern_id).toBe(20)
+    expect(body.data.deleted_pattern_id).toBe(20)
   })
 
   it('returns 500 when pattern deletion fails', async () => {

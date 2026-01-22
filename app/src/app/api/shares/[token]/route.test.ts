@@ -105,7 +105,7 @@ describe('GET /api/shares/[token]', () => {
   it('returns 404 when share not found', async () => {
     const mockSupabase = createMockSupabase({
       share: null,
-      shareError: { message: 'Not found' },
+      shareError: null, // No error, just null data
     })
     mockCreateClient.mockReturnValue(mockSupabase as any)
 
