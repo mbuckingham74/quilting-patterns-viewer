@@ -318,21 +318,24 @@ export default async function AdminHelpPage() {
               Pin keywords you use frequently so they always appear at the top of the sidebar when browsing patterns. No more scrolling or searching!
             </p>
 
-            <div className="space-y-4">
+            <h3 className="font-semibold text-stone-800 mb-3">Quick Method: Pin while browsing</h3>
+            <div className="space-y-4 mb-8">
               <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
                 <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">1</div>
                 <div>
-                  <p className="font-medium text-stone-800">Go to My Account</p>
-                  <p className="text-stone-600 text-sm mt-1">Click your email or profile in the top-right corner, then select <Link href="/account" className="text-amber-700 underline">My Account</Link></p>
+                  <p className="font-medium text-stone-800">Hover over any keyword in the sidebar</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    While on <Link href="/browse" className="text-amber-700 underline">Browse Patterns</Link>, hover over any keyword in the left sidebar. A bookmark icon will appear.
+                  </p>
                 </div>
               </div>
 
               <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
                 <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">2</div>
                 <div>
-                  <p className="font-medium text-stone-800">Find the Pinned Keywords section</p>
+                  <p className="font-medium text-stone-800">Click the bookmark icon to pin</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    At the top of your account page, you&apos;ll see the &quot;Pinned Keywords&quot; section with a flame icon.
+                    The keyword instantly moves to the &quot;Pinned&quot; section at the top of the sidebar.
                   </p>
                 </div>
               </div>
@@ -340,29 +343,30 @@ export default async function AdminHelpPage() {
               <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
                 <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">3</div>
                 <div>
-                  <p className="font-medium text-stone-800">Click &quot;Add Pinned Keyword&quot;</p>
+                  <p className="font-medium text-stone-800">Unpin by hovering and clicking again</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    A dropdown will appear where you can search for any keyword. Click a keyword to pin it.
+                    Hover over a pinned keyword and click the flame icon to unpin it.
                   </p>
+                </div>
+              </div>
+            </div>
+
+            <h3 className="font-semibold text-stone-800 mb-3">Alternative: Manage from Account page</h3>
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to My Account</p>
+                  <p className="text-stone-600 text-sm mt-1">Click your email in the top-right corner, then select <Link href="/account" className="text-amber-700 underline">My Account</Link></p>
                 </div>
               </div>
 
               <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
-                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">4</div>
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">2</div>
                 <div>
-                  <p className="font-medium text-stone-800">Browse patterns with your pins</p>
+                  <p className="font-medium text-stone-800">Use the Pinned Keywords section</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    Go to <Link href="/browse" className="text-amber-700 underline">Browse Patterns</Link> and you&apos;ll see your pinned keywords at the top of the sidebar, ready to use!
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
-                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">5</div>
-                <div>
-                  <p className="font-medium text-stone-800">Remove a pin</p>
-                  <p className="text-stone-600 text-sm mt-1">
-                    To unpin a keyword, go back to <Link href="/account" className="text-amber-700 underline">My Account</Link> and click the <span className="text-red-500 font-medium">X</span> button next to the keyword you want to remove.
+                    Click &quot;Add Pinned Keyword&quot; to search and add keywords, or click the <span className="text-red-500 font-medium">X</span> to remove existing pins.
                   </p>
                 </div>
               </div>
