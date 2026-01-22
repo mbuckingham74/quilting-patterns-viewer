@@ -86,32 +86,35 @@ export default async function AdminHelpPage() {
             <a href="#favorites" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
               <span className="text-lg">3.</span> Save Favorite Patterns
             </a>
+            <a href="#pinned-keywords" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
+              <span className="text-lg">4.</span> Pin Your Favorite Keywords
+            </a>
             <a href="#duplicates" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">4.</span> Find & Remove Duplicates
+              <span className="text-lg">5.</span> Find & Remove Duplicates
             </a>
             <a href="#upload" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">5.</span> Upload New Patterns
+              <span className="text-lg">6.</span> Upload New Patterns
             </a>
             <a href="#users" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">6.</span> Manage Users
+              <span className="text-lg">7.</span> Manage Users
             </a>
             <a href="#edit-pattern" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">7.</span> Edit Pattern Details
+              <span className="text-lg">8.</span> Edit Pattern Details
             </a>
             <a href="#analytics" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">8.</span> View Analytics
+              <span className="text-lg">9.</span> View Analytics
             </a>
             <a href="#keywords" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">9.</span> Manage Keywords
+              <span className="text-lg">10.</span> Manage Keywords
             </a>
             <a href="#activity" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">10.</span> Audit Admin Activity
+              <span className="text-lg">11.</span> Audit Admin Activity
             </a>
             <a href="#exceptions" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">11.</span> Fix Missing Thumbnails
+              <span className="text-lg">12.</span> Fix Missing Thumbnails
             </a>
             <a href="#triage" className="flex items-center gap-2 text-purple-600 hover:text-purple-800">
-              <span className="text-lg">12.</span> Pattern Triage Queue
+              <span className="text-lg">13.</span> Pattern Triage Queue
             </a>
           </div>
         </div>
@@ -297,6 +300,79 @@ export default async function AdminHelpPage() {
                   </p>
                 </div>
               </div>
+            </div>
+          </section>
+
+          {/* Pinned Keywords */}
+          <section id="pinned-keywords" className="bg-white rounded-xl shadow-sm border border-purple-100 p-6 scroll-mt-24">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-600" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8.074.945A4.993 4.993 0 0 0 6 5v.032c.004.6.114 1.176.311 1.709.16.428-.204.91-.61.7a5.023 5.023 0 0 1-1.868-1.677c-.202-.304-.648-.363-.848-.058a6 6 0 1 0 8.017-1.901l-.004-.007a4.98 4.98 0 0 1-2.18-2.574c-.116-.31-.477-.472-.744-.28a4.98 4.98 0 0 0-.744.545ZM6.43 13.158a5.023 5.023 0 0 0 3.14 0 .75.75 0 1 1 .43 1.435 6.52 6.52 0 0 1-4 0 .75.75 0 1 1 .43-1.435Z"/>
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-stone-800">Pin Your Favorite Keywords</h2>
+            </div>
+
+            <p className="text-stone-600 mb-6">
+              Pin keywords you use frequently so they always appear at the top of the sidebar when browsing patterns. No more scrolling or searching!
+            </p>
+
+            <div className="space-y-4">
+              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">1</div>
+                <div>
+                  <p className="font-medium text-stone-800">Go to My Account</p>
+                  <p className="text-stone-600 text-sm mt-1">Click your email or profile in the top-right corner, then select <Link href="/account" className="text-amber-700 underline">My Account</Link></p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">2</div>
+                <div>
+                  <p className="font-medium text-stone-800">Find the Pinned Keywords section</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    At the top of your account page, you&apos;ll see the &quot;Pinned Keywords&quot; section with a flame icon.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">3</div>
+                <div>
+                  <p className="font-medium text-stone-800">Click &quot;Add Pinned Keyword&quot;</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    A dropdown will appear where you can search for any keyword. Click a keyword to pin it.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">4</div>
+                <div>
+                  <p className="font-medium text-stone-800">Browse patterns with your pins</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    Go to <Link href="/browse" className="text-amber-700 underline">Browse Patterns</Link> and you&apos;ll see your pinned keywords at the top of the sidebar, ready to use!
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4 p-4 bg-amber-50 rounded-lg">
+                <div className="w-8 h-8 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-amber-700">5</div>
+                <div>
+                  <p className="font-medium text-stone-800">Remove a pin</p>
+                  <p className="text-stone-600 text-sm mt-1">
+                    To unpin a keyword, go back to <Link href="/account" className="text-amber-700 underline">My Account</Link> and click the <span className="text-red-500 font-medium">X</span> button next to the keyword you want to remove.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="font-medium text-amber-800">You can pin up to 10 keywords</p>
+              <p className="text-amber-700 text-sm mt-1">
+                Choose wisely! If you find yourself always filtering by &quot;E2E&quot; or &quot;Butterflies&quot;, those are great candidates to pin.
+              </p>
             </div>
           </section>
 

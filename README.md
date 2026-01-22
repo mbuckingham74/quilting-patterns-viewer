@@ -38,6 +38,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 - Infinite scroll pagination (50 patterns per page)
 - Filter by keyword, file extension, or author
 - Sort by name, author, or date added
+- **Pinned Keywords** - Pin up to 10 frequently used keywords for quick access at the top of the sidebar
 
 ### AI-Powered Search
 - **Natural language search** - Describe what you're looking for (e.g., "butterflies with swirls", "floral border patterns")
@@ -439,6 +440,7 @@ The app uses Supabase Postgres with the following main tables:
 | **search_logs** | Search query tracking for analytics |
 | **view_logs** | Pattern detail page view tracking for analytics |
 | **admin_activity_log** | Audit trail of all admin actions with undo support |
+| **pinned_keywords** | User's pinned keywords for quick sidebar access (max 10 per user) |
 
 ---
 
@@ -486,6 +488,8 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/activity/undo` | POST | Admin | Undo a reversible admin action |
 | `/api/views` | POST | Required | Log a pattern detail page view |
 | `/api/keywords` | GET | Required | List all keywords |
+| `/api/pinned-keywords` | GET/POST | Required | Get or pin a keyword |
+| `/api/pinned-keywords/[keywordId]` | DELETE | Required | Unpin a keyword |
 
 ---
 
