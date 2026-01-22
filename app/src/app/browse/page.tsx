@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import BrowseContent from '@/components/BrowseContent'
 import AISearchBar from '@/components/AISearchBar'
-import KeywordSidebar from '@/components/KeywordSidebar'
+import KeywordSidebarWrapper from '@/components/KeywordSidebarWrapper'
 import AuthButtonServer from '@/components/AuthButtonServer'
+import { PinnedKeywordWithKeyword } from '@/lib/types'
 
 const PAGE_SIZE = 50
 const NO_THUMBNAIL_KEYWORD_ID = 616  // Keyword ID for patterns without thumbnails
@@ -235,6 +236,28 @@ async function getUserFavoriteIds(userId: string): Promise<number[]> {
   return favorites?.map(f => f.pattern_id) || []
 }
 
+async function getPinnedKeywords(userId: string): Promise<PinnedKeywordWithKeyword[]> {
+  const supabase = await createClient()
+  const { data: pinnedKeywords } = await supabase
+    .from('pinned_keywords')
+    .select(`
+      id,
+      user_id,
+      keyword_id,
+      display_order,
+      created_at,
+      keywords (
+        id,
+        value
+      )
+    `)
+    .eq('user_id', userId)
+    .order('display_order', { ascending: true })
+    .order('created_at', { ascending: true })
+
+  return (pinnedKeywords as unknown as PinnedKeywordWithKeyword[]) || []
+}
+
 export default async function BrowsePage({ searchParams }: PageProps) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -258,12 +281,13 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const currentPage = parseInt(resolvedParams.page || '1', 10)
 
   // Use AI search or regular pattern fetch based on ai_search param
-  const [patternResult, keywords, favoriteIds] = await Promise.all([
+  const [patternResult, keywords, favoriteIds, pinnedKeywords] = await Promise.all([
     isAISearch
       ? getAISearchPatterns(resolvedParams.ai_search!, currentPage)
       : getPatterns(resolvedParams),
     getKeywords(),
     getUserFavoriteIds(user.id),
+    getPinnedKeywords(user.id),
   ])
 
   const { patterns, count, page, totalPages, error: patternsError } = patternResult
@@ -309,7 +333,11 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-36">
               <Suspense fallback={<div className="h-96 bg-white/80 rounded-xl animate-pulse" />}>
-                <KeywordSidebar keywords={keywords} />
+                <KeywordSidebarWrapper
+                  keywords={keywords}
+                  initialPinnedKeywords={pinnedKeywords}
+                  isAuthenticated={true}
+                />
               </Suspense>
             </div>
           </aside>

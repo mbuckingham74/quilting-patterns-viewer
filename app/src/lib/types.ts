@@ -61,6 +61,18 @@ export interface SavedSearch {
   created_at: string
 }
 
+export interface PinnedKeyword {
+  id: number
+  user_id: string
+  keyword_id: number
+  display_order: number
+  created_at: string
+}
+
+export interface PinnedKeywordWithKeyword extends PinnedKeyword {
+  keywords: Keyword
+}
+
 export interface UserFavoriteWithPattern extends UserFavorite {
   patterns: Pattern
 }
