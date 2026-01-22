@@ -206,7 +206,8 @@ describe('GET /api/download/[id]', () => {
     it('returns 404 when pattern not found', async () => {
       const mockSupabase = createMockSupabase({
         pattern: null,
-        patternError: new Error('Not found'),
+        // Use Supabase's PGRST116 error code for "no rows" which isSupabaseNoRowError() checks
+        patternError: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' } as any,
       })
       mockCreateClient.mockResolvedValue(mockSupabase as any)
 

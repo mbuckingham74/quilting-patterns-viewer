@@ -80,9 +80,21 @@ describe('TopPatternsList', () => {
     render(<TopPatternsList patterns={samplePatterns} />)
 
     const links = screen.getAllByRole('link')
-    expect(links[0]).toHaveAttribute('href', '/patterns/1')
-    expect(links[1]).toHaveAttribute('href', '/patterns/2')
-    expect(links[2]).toHaveAttribute('href', '/patterns/3')
+    // Each pattern has 3 links: thumbnail, filename, and admin edit
+    // So 3 patterns = 9 total links
+    expect(links).toHaveLength(9)
+    // First pattern links
+    expect(links[0]).toHaveAttribute('href', '/patterns/1') // thumbnail
+    expect(links[1]).toHaveAttribute('href', '/patterns/1') // filename
+    expect(links[2]).toHaveAttribute('href', '/admin/patterns/1/edit') // edit
+    // Second pattern links
+    expect(links[3]).toHaveAttribute('href', '/patterns/2')
+    expect(links[4]).toHaveAttribute('href', '/patterns/2')
+    expect(links[5]).toHaveAttribute('href', '/admin/patterns/2/edit')
+    // Third pattern links
+    expect(links[6]).toHaveAttribute('href', '/patterns/3')
+    expect(links[7]).toHaveAttribute('href', '/patterns/3')
+    expect(links[8]).toHaveAttribute('href', '/admin/patterns/3/edit')
   })
 
   it('renders thumbnail images when available', () => {
