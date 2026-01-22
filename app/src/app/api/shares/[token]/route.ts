@@ -55,6 +55,10 @@ export const GET = withErrorHandler(async (request: Request, { params }: RoutePa
   const share = shareData as ShareData | null
 
   if (shareError) {
+    // PGRST116 means no rows returned from .single() - this is a 404, not 500
+    if (isSupabaseNoRowError(shareError)) {
+      return notFound('Share not found or expired')
+    }
     logError(shareError, { action: 'get_share_by_token', token: token.substring(0, 8) + '...' })
     return internalError(shareError, { action: 'get_share_by_token' })
   }

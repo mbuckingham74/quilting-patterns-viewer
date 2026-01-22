@@ -165,7 +165,8 @@ describe('POST /api/shares/[token]/feedback', () => {
   it('returns 404 when share not found', async () => {
     const mockSupabase = createMockSupabase({
       share: null,
-      shareError: null,
+      // Supabase .single() returns PGRST116 when no rows found
+      shareError: { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' },
     })
     mockCreateClient.mockReturnValue(mockSupabase as any)
 
