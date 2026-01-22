@@ -1,6 +1,6 @@
 # Test Coverage Documentation
 
-Last updated: January 17, 2026
+Last updated: January 22, 2026
 
 ## Summary
 
@@ -11,7 +11,7 @@ Last updated: January 17, 2026
 | Functions  | ~51%     |
 | Lines      | ~54%     |
 
-**Total Tests:** 770 across 53 test files
+**Total Tests:** 995 across 66 test files
 
 ## Running Tests
 
@@ -80,6 +80,8 @@ cd app && npm test
 | /api/admin/patterns/[id]            | 11    |
 | /api/admin/patterns/[id]/keywords   | 16    |
 | /api/keywords                       | 4     |
+| /api/pinned-keywords                | 10    |
+| /api/pinned-keywords/[keywordId]    | 6     |
 
 #### Mostly Covered (85%+)
 
@@ -137,6 +139,8 @@ Components with new coverage:
 - **TopSearchesList.tsx** - 7 tests (100% coverage)
 - **PatternEditForm.tsx** - 37 tests (97.91% coverage)
 - **BrowseContent.tsx** - 17 tests (100% coverage)
+- **KeywordSidebar.tsx** - 18 tests (100% coverage)
+- **PinnedKeywordsManager.tsx** - 16 tests (100% coverage)
 
 Components still at 0% coverage:
 - AccountContent.tsx
@@ -145,7 +149,6 @@ Components still at 0% coverage:
 - AuthButtonClient.tsx / AuthButtonServer.tsx
 - AuthTabs.tsx
 - DuplicateReview.tsx
-- KeywordSidebar.tsx
 - LandingPage.tsx
 - PatternRanker.tsx
 
@@ -214,6 +217,58 @@ Components still at 0% coverage:
    - AuthButtonClient.tsx / AuthButtonServer.tsx
 
 ## Recent Progress
+
+### January 22, 2026
+
+Added tests for Pinned Keywords feature (50 new tests):
+
+**Pinned Keywords API Routes:**
+
+- **GET/POST /api/pinned-keywords** (`route.test.ts`) - 10 tests
+  - Authentication required (401 for unauthenticated)
+  - Returns pinned keywords with keyword data
+  - Returns empty array when no pins
+  - POST validates keyword_id is required
+  - POST validates keyword exists
+  - POST enforces 10-pin limit (422)
+  - POST prevents duplicates (409)
+  - POST returns created pinned keyword
+  - Error handling for database failures
+
+- **DELETE /api/pinned-keywords/[keywordId]** (`route.test.ts`) - 6 tests
+  - Authentication required (401 for unauthenticated)
+  - Validates keywordId parameter
+  - Returns success on delete
+  - Returns 404 when pin doesn't exist
+  - Error handling for database failures
+
+**Pinned Keywords Components:**
+
+- **KeywordSidebar.tsx** (`KeywordSidebar.test.tsx`) - 18 tests
+  - Renders keywords header
+  - Shows pinned section when pins exist
+  - Hides pinned section when no pins
+  - Displays all keywords in list
+  - Search filter functionality
+  - Keyword selection/deselection
+  - Clear all button visibility and functionality
+  - Pin/unpin button interactions
+  - Calls callbacks correctly
+
+- **PinnedKeywordsManager.tsx** (`PinnedKeywordsManager.test.tsx`) - 16 tests
+  - Renders pinned keywords list
+  - Shows count indicator (X of 10)
+  - Shows empty state when no pins
+  - Shows/hides add button based on limit
+  - Shows maximum reached message at 10 pins
+  - Unpin API call and success message
+  - Unpin error handling with rollback
+  - Add keyword dropdown opens on click
+  - Filters available keywords (excludes pinned)
+  - Search filter in dropdown
+  - Pin API call and success message
+  - Pin error handling (422 limit, 409 duplicate)
+  - Closes dropdown on backdrop click
 
 ### January 17, 2026
 
