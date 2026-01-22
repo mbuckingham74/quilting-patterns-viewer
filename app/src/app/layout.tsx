@@ -4,6 +4,7 @@ import Script from "next/script";
 import "./globals.css";
 import { ToastProvider } from "@/components/Toast";
 import { ShareProvider } from "@/contexts/ShareContext";
+import { BrowseStateProvider } from "@/contexts/BrowseStateContext";
 import ShareBasket from "@/components/ShareBasket";
 import WebVitals from "@/components/WebVitals";
 
@@ -64,8 +65,10 @@ export default function RootLayout({
         <WebVitals />
         <ToastProvider>
           <ShareProvider>
-            {children}
-            <ShareBasket />
+            <BrowseStateProvider>
+              {children}
+              <ShareBasket />
+            </BrowseStateProvider>
           </ShareProvider>
         </ToastProvider>
       </body>

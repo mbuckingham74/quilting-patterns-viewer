@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import PatternDetailClient from '@/components/PatternDetailClient'
 import ViewLogger from '@/components/ViewLogger'
+import BackToBrowseLink from '@/components/BackToBrowseLink'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -93,15 +94,14 @@ export default async function PatternPage({ params }: PageProps) {
                 className="h-10 w-auto"
               />
             </Link>
-            <Link
-              href="/browse"
+            <BackToBrowseLink
               className="inline-flex items-center gap-2 text-stone-600 hover:text-stone-800"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Back to patterns
-            </Link>
+            </BackToBrowseLink>
           </div>
         </div>
       </header>
