@@ -322,6 +322,78 @@ describe('BrowseStateContext', () => {
       vi.spyOn(Date, 'now').mockRestore()
     })
 
+    it('requestScrollRestore clears expired state from context and storage', async () => {
+      // This tests that when state is expired, it gets fully cleared (not just skipped)
+      // Uses the shared mockStorage from beforeEach
+
+      // Component that calls requestScrollRestore on mount
+      function RestoreTrigger({ onResult }: { onResult: (result: boolean) => void }) {
+        const ctx = useBrowseState()
+        useEffect(() => {
+          onResult(ctx.requestScrollRestore())
+        }, [])
+        return null
+      }
+
+      let restoreResult: boolean | null = null
+
+      const { rerender } = render(
+        <BrowseStateProvider>
+          <TestDisplay />
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?page=3', 800)
+            }}
+          />
+        </BrowseStateProvider>
+      )
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // Save state
+      act(() => {
+        screen.getByTestId('action').click()
+      })
+
+      // Verify state is saved
+      expect(screen.getByTestId('has-state')).toHaveTextContent('yes')
+      expect(mockStorage.getItem('browse-state')).not.toBeNull()
+
+      // Fast forward time by 31 minutes
+      const realDateNow = Date.now
+      const expiredTime = realDateNow() + (31 * 60 * 1000)
+      vi.spyOn(Date, 'now').mockReturnValue(expiredTime)
+
+      // Add RestoreTrigger to call requestScrollRestore
+      rerender(
+        <BrowseStateProvider>
+          <TestDisplay />
+          <TestActions
+            onAction={(ctx) => {
+              ctx.saveBrowseState('?page=3', 800)
+            }}
+          />
+          <RestoreTrigger onResult={(r) => { restoreResult = r }} />
+        </BrowseStateProvider>
+      )
+
+      // Wait for effect to run
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0))
+      })
+
+      // requestScrollRestore should have returned false due to expiry
+      expect(restoreResult).toBe(false)
+      // State should be cleared from context
+      expect(screen.getByTestId('has-state')).toHaveTextContent('no')
+      // Storage should also be cleared
+      expect(mockStorage.getItem('browse-state')).toBeNull()
+
+      vi.spyOn(Date, 'now').mockRestore()
+    })
+
     it('does not restore scroll when saveBrowseState is called (race condition fix)', async () => {
       // This tests that calling saveBrowseState while BrowseContent is mounted
       // does NOT trigger scroll restoration (because isHydrated doesn't change)
@@ -639,5 +711,25 @@ describe('getBrowseUrl', () => {
       timestamp: Date.now(),
     }
     expect(getBrowseUrl(state)).toBe('/browse?keywords=1,2,3&page=5')
+  })
+
+  it('returns /browse when state is expired', () => {
+    // Create state that expired 31 minutes ago
+    const expiredState: BrowseState = {
+      searchParams: '?search=expired&page=99',
+      scrollY: 500,
+      timestamp: Date.now() - (31 * 60 * 1000),
+    }
+    expect(getBrowseUrl(expiredState)).toBe('/browse')
+  })
+
+  it('returns browse URL with params when state is not expired', () => {
+    // Create state that was saved 29 minutes ago (still valid)
+    const validState: BrowseState = {
+      searchParams: '?search=valid&page=1',
+      scrollY: 100,
+      timestamp: Date.now() - (29 * 60 * 1000),
+    }
+    expect(getBrowseUrl(validState)).toBe('/browse?search=valid&page=1')
   })
 })
