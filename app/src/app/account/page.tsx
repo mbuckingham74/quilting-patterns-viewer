@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import AuthButton from '@/components/AuthButton'
 import AccountContent from '@/components/AccountContent'
+import PinnedKeywordsManager from '@/components/PinnedKeywordsManager'
+import { Keyword, PinnedKeywordWithKeyword } from '@/lib/types'
 
 interface FavoriteWithPattern {
   id: number
@@ -86,6 +88,37 @@ async function getShares(userId: string) {
   }))
 }
 
+async function getPinnedKeywords(userId: string): Promise<PinnedKeywordWithKeyword[]> {
+  const supabase = await createClient()
+  const { data: pinnedKeywords } = await supabase
+    .from('pinned_keywords')
+    .select(`
+      id,
+      user_id,
+      keyword_id,
+      display_order,
+      created_at,
+      keywords (
+        id,
+        value
+      )
+    `)
+    .eq('user_id', userId)
+    .order('display_order', { ascending: true })
+
+  return (pinnedKeywords as unknown as PinnedKeywordWithKeyword[]) || []
+}
+
+async function getAllKeywords(): Promise<Keyword[]> {
+  const supabase = await createClient()
+  const { data: keywords } = await supabase
+    .from('keywords')
+    .select('id, value')
+    .order('value')
+
+  return keywords || []
+}
+
 export default async function AccountPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -94,10 +127,12 @@ export default async function AccountPage() {
     redirect('/')
   }
 
-  const [favorites, savedSearches, shares] = await Promise.all([
+  const [favorites, savedSearches, shares, pinnedKeywords, allKeywords] = await Promise.all([
     getFavorites(user.id),
     getSavedSearches(user.id),
     getShares(user.id),
+    getPinnedKeywords(user.id),
+    getAllKeywords(),
   ])
 
   return (
@@ -135,11 +170,18 @@ export default async function AccountPage() {
           <p className="mt-1 text-stone-600">{user.email}</p>
         </div>
 
-        <AccountContent
-          initialFavorites={favorites}
-          initialSavedSearches={savedSearches}
-          initialShares={shares}
-        />
+        <div className="space-y-10">
+          <PinnedKeywordsManager
+            initialPinnedKeywords={pinnedKeywords}
+            allKeywords={allKeywords}
+          />
+
+          <AccountContent
+            initialFavorites={favorites}
+            initialSavedSearches={savedSearches}
+            initialShares={shares}
+          />
+        </div>
       </div>
     </div>
   )
