@@ -345,6 +345,13 @@ export default function PatternModal({
           </svg>
         </button>
 
+        {/* Accessible title - always present for screen readers */}
+        <h1 id="pattern-modal-title" className="sr-only">
+          {loadingState === 'loading' && 'Loading pattern'}
+          {loadingState === 'error' && 'Error loading pattern'}
+          {loadingState === 'success' && displayName}
+        </h1>
+
         {/* Loading state */}
         {loadingState === 'loading' && (
           <div className="flex items-center justify-center py-24">
@@ -420,11 +427,6 @@ export default function PatternModal({
 
               {/* Details Section */}
               <div className="md:w-1/2 p-6 max-h-[70vh] overflow-y-auto">
-                {/* Accessible title - always present for screen readers */}
-                <h1 id="pattern-modal-title" className="sr-only">
-                  {displayName}
-                </h1>
-
                 {/* Title - editable for admin */}
                 {isAdmin ? (
                   <div className="mb-4">
