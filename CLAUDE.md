@@ -161,6 +161,7 @@ patterns/
 │   │   ├── patterns/
 │   │   │   └── [id]/page.tsx   # Pattern detail page
 │   │   └── api/
+│   │       ├── patterns/[id]/route.ts  # Fetch single pattern with keywords
 │   │       └── download/[id]/route.ts  # Pattern file download
 │   ├── components/
 │   │   ├── PatternGrid.tsx
@@ -172,6 +173,7 @@ patterns/
 │   │   ├── ErrorBoundary.tsx   # React error boundary
 │   │   ├── FlipButton.tsx      # Horizontal flip button for mirrored thumbnails
 │   │   ├── PatternDetailThumbnail.tsx  # Client-side thumbnail with flip support
+│   │   ├── PatternModal.tsx    # URL-synced modal for pattern details
 │   │   └── AdminActivityLog.tsx # Admin activity audit log with undo
 │   ├── lib/
 │   │   ├── supabase/
@@ -185,7 +187,8 @@ patterns/
 │   │   ├── fetch-with-retry.ts # Fetch wrapper with retry logic
 │   │   └── utils.ts
 │   ├── hooks/
-│   │   └── useFetch.ts         # React hook for fetch with retry
+│   │   ├── useFetch.ts         # React hook for fetch with retry
+│   │   └── usePatternModal.ts  # URL-synced modal state management
 │   ├── public/
 │   ├── package.json
 │   ├── next.config.js
@@ -209,11 +212,13 @@ patterns/
 - Filter by file extension
 - Sort by: name, author, date added
 
-### Pattern Detail Page
-- Larger thumbnail view
-- Metadata: file name, extension, author, notes
-- Keywords as clickable tags
+### Pattern Detail (Modal + Page)
+- **Modal view**: Click pattern in browse grid → opens URL-synced modal overlay
+- **Full page**: Direct navigation to `/patterns/{id}` shows dedicated page
+- Larger thumbnail view with metadata (file name, extension, author, notes)
+- Keywords as clickable tags (filter by keyword)
 - Download button (requires auth)
+- Admin inline editing (name, author, notes, keywords, thumbnail transforms)
 
 ### Authentication
 - Google OAuth via Supabase
@@ -412,6 +417,40 @@ Authenticated users can pin up to 10 keywords for quick access. Pinned keywords 
 - `KeywordSidebar.tsx` - Displays pinned section at top, pin/unpin buttons on hover
 - `KeywordSidebarWrapper.tsx` - Client wrapper handling API calls with optimistic updates
 - `PinnedKeywordsManager.tsx` - Account page component for managing pins
+
+## Pattern Modal (URL-Synced)
+
+When browsing patterns, clicking a pattern opens a modal overlay instead of navigating to a new page. The modal uses the URL-synced pattern (similar to Instagram/Pinterest) for seamless UX.
+
+### How It Works
+1. **Click pattern** → Modal opens over browse page
+2. **URL updates** → `pushState` changes URL to `/patterns/{id}` (bookmarkable/shareable)
+3. **Back button** → Closes modal via `popstate` event, returns to browse
+4. **Direct navigation** → Going to `/patterns/{id}` directly shows the full page (not modal)
+5. **Modifier clicks** → Ctrl/Cmd/Shift/middle-click opens in new tab (respects user intent)
+
+### Components
+
+| Component | Purpose |
+|-----------|---------|
+| `usePatternModal.ts` | Hook managing modal state, URL sync, body scroll lock, escape key |
+| `PatternModal.tsx` | Full modal UI with pattern details, admin editing, similar patterns |
+| `BrowseContent.tsx` | Integrates modal into browse page |
+| `PatternCard.tsx` | Calls `onOpenModal` on unmodified clicks |
+
+### API Endpoint
+
+**GET `/api/patterns/[id]`** - Fetch single pattern with keywords
+- Returns pattern data with `keywords` array (sorted alphabetically)
+- Requires authentication
+- Returns 404 for invalid/missing patterns
+
+### Key Implementation Details
+- Body scroll locked when modal open (`overflow: hidden`)
+- Escape key closes modal
+- Click outside modal content closes it
+- `navigateToPattern(id)` uses `replaceState` for similar pattern navigation (no extra history entries)
+- Accessible: `aria-modal`, `aria-labelledby` with state-aware heading for loading/error/success
 
 ## Phase 2 Features (Future)
 

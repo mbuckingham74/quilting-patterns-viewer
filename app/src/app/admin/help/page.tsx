@@ -633,16 +633,16 @@ export default async function AdminHelpPage() {
             </div>
 
             <p className="text-stone-600 mb-6">
-              Fix mistakes or update information on any pattern — change the name, author, notes, or keywords.
+              Fix mistakes or update information on any pattern — change the name, author, notes, or keywords. As an admin, you can edit patterns directly in the quick-view modal that opens when you click a pattern.
             </p>
 
             <div className="space-y-4">
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
                 <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">1</div>
                 <div>
-                  <p className="font-medium text-stone-800">Find the pattern you want to edit</p>
+                  <p className="font-medium text-stone-800">Click any pattern to open the quick-view modal</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    <Link href="/browse" className="text-rose-700 underline">Browse patterns</Link> or use search to find it
+                    From <Link href="/browse" className="text-rose-700 underline">Browse Patterns</Link>, click any pattern. A modal will open over the current page — you don&apos;t need to navigate away. As an admin, you&apos;ll see editable fields directly in the modal.
                   </p>
                 </div>
               </div>
@@ -650,36 +650,15 @@ export default async function AdminHelpPage() {
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
                 <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">2</div>
                 <div>
-                  <p className="font-medium text-stone-800">Click the Edit button</p>
+                  <p className="font-medium text-stone-800">Edit fields directly in the modal</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    Look for the pencil icon <span className="inline-flex items-center justify-center w-5 h-5 bg-stone-100 text-stone-600 rounded text-xs">
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </span> on the pattern card, or click &quot;Edit Pattern&quot; on the pattern detail page.
+                    As an admin, you&apos;ll see input fields for File Name, Author, Author Website, and Notes. Make your changes and click &quot;Save&quot; when a save button appears.
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
                 <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">3</div>
-                <div>
-                  <p className="font-medium text-stone-800">Update the information</p>
-                  <p className="text-stone-600 text-sm mt-1">
-                    You can change:
-                  </p>
-                  <ul className="mt-2 text-sm text-stone-600 space-y-1">
-                    <li>&bull; <strong>File Name</strong> — the display name of the pattern</li>
-                    <li>&bull; <strong>Author</strong> — who designed the pattern</li>
-                    <li>&bull; <strong>Author Website</strong> — link to the designer&apos;s site</li>
-                    <li>&bull; <strong>Author Notes</strong> — notes from the designer</li>
-                    <li>&bull; <strong>Notes</strong> — your own notes about the pattern</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
-                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">4</div>
                 <div>
                   <p className="font-medium text-stone-800">Rotate, flip, or upload a new thumbnail</p>
                   <p className="text-stone-600 text-sm mt-1">
@@ -697,22 +676,22 @@ export default async function AdminHelpPage() {
               </div>
 
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
-                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">5</div>
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">4</div>
                 <div>
                   <p className="font-medium text-stone-800">Add or remove keywords</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    Scroll down to the Keywords section. Click the <span className="text-rose-600 font-medium">×</span> on any keyword to remove it.
+                    Scroll down to the Keywords section in the modal. Click the <span className="text-rose-600 font-medium">×</span> on any keyword to remove it.
                     Use the search box to find and add new keywords.
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-4 p-4 bg-rose-50 rounded-lg">
-                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">6</div>
+                <div className="w-8 h-8 bg-rose-200 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-rose-700">5</div>
                 <div>
-                  <p className="font-medium text-stone-800">Click &quot;Save Changes&quot;</p>
+                  <p className="font-medium text-stone-800">Close the modal to continue browsing</p>
                   <p className="text-stone-600 text-sm mt-1">
-                    Your changes will be saved and you&apos;ll return to the pattern detail page.
+                    Click the &times; button, press Escape, or click outside the modal to close it. You&apos;ll be right back where you were in the browse grid — no page reload needed!
                   </p>
                 </div>
               </div>
@@ -723,6 +702,13 @@ export default async function AdminHelpPage() {
               <p className="text-rose-700 text-sm mt-1">
                 Use this feature to fix typos, add missing author information, update notes, organize patterns with better keywords, or fix incorrectly oriented thumbnails.
                 The pattern file itself cannot be changed — to replace that, delete the pattern and re-upload it.
+              </p>
+            </div>
+
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="font-medium text-blue-800">Tip: Quick-view modal makes editing faster!</p>
+              <p className="text-blue-700 text-sm mt-1">
+                The pattern modal lets you view and edit patterns without leaving the browse page. You can quickly check similar patterns, make edits, and move on to the next pattern — all without reloading pages. Hold Ctrl/Cmd and click to open a pattern in a new tab instead.
               </p>
             </div>
           </section>
