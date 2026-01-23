@@ -17,9 +17,11 @@ interface PatternCardProps {
   showFlipButton?: boolean
   /** Called before navigating to pattern detail - use to save browse state */
   onBeforeNavigate?: () => void
+  /** Called to open pattern in modal instead of navigating. When provided, click opens modal. */
+  onOpenModal?: (patternId: number) => void
 }
 
-const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false, onBeforeNavigate }: PatternCardProps) {
+const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, onToggleFavorite, showShareButton = false, showEditButton = false, showFlipButton = false, onBeforeNavigate, onOpenModal }: PatternCardProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState(pattern.thumbnail_url)
   const displayName = pattern.file_name || `Pattern ${pattern.id}`
   const extension = pattern.file_extension?.toUpperCase() || ''
@@ -34,8 +36,15 @@ const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, on
     setThumbnailUrl(newThumbnailUrl)
   }
 
-  const handleClick = () => {
-    if (onBeforeNavigate) {
+  const handleClick = (e: React.MouseEvent) => {
+    // Only intercept unmodified left-clicks for modal
+    // Allow ctrl/cmd/shift/middle-click to open in new tab
+    const isModifiedClick = e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0
+
+    if (onOpenModal && !isModifiedClick) {
+      e.preventDefault()
+      onOpenModal(pattern.id)
+    } else if (onBeforeNavigate) {
       onBeforeNavigate()
     }
   }

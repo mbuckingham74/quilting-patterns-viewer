@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Pattern } from '@/lib/types'
 import { useBrowseState } from '@/contexts/BrowseStateContext'
+import { usePatternModal } from '@/hooks/usePatternModal'
 import PatternGrid from './PatternGrid'
 import Pagination from './Pagination'
+import PatternModal from './PatternModal'
 
 interface BrowseContentProps {
   patterns: Pattern[]
@@ -28,6 +30,7 @@ export default function BrowseContent({
 }: BrowseContentProps) {
   const searchParams = useSearchParams()
   const { saveBrowseState, requestScrollRestore, markScrollRestored, browseState, isHydrated } = useBrowseState()
+  const { patternId: modalPatternId, isOpen: isModalOpen, openModal, closeModal, navigateToPattern } = usePatternModal()
   const [favoritePatternIds, setFavoritePatternIds] = useState<Set<number>>(
     new Set(initialFavoriteIds)
   )
@@ -70,12 +73,17 @@ export default function BrowseContent({
     })
   }
 
-  // Save browse state before navigating to pattern detail
+  // Save browse state before navigating to pattern detail (used as fallback)
   const handleBeforeNavigate = useCallback(() => {
     const paramsString = searchParams.toString()
     const fullParams = paramsString ? `?${paramsString}` : ''
     saveBrowseState(fullParams, window.scrollY)
   }, [searchParams, saveBrowseState])
+
+  // Open pattern in modal
+  const handleOpenModal = useCallback((patternId: number) => {
+    openModal(patternId)
+  }, [openModal])
 
   return (
     <>
@@ -86,12 +94,23 @@ export default function BrowseContent({
         onToggleFavorite={handleToggleFavorite}
         isAdmin={isAdmin}
         onBeforeNavigate={handleBeforeNavigate}
+        onOpenModal={handleOpenModal}
       />
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
         totalCount={totalCount}
       />
+
+      {/* Pattern Modal */}
+      {isModalOpen && modalPatternId && (
+        <PatternModal
+          patternId={modalPatternId}
+          isAdmin={isAdmin}
+          onClose={closeModal}
+          onNavigateToPattern={navigateToPattern}
+        />
+      )}
     </>
   )
 }
