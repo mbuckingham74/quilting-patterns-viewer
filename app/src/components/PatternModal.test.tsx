@@ -138,7 +138,9 @@ describe('PatternModal', () => {
       render(<PatternModal {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Pattern')).toBeInTheDocument()
+        // Use getAllByText since pattern name appears in both sr-only h1 and visible p
+        const titles = screen.getAllByText('Test Pattern')
+        expect(titles.length).toBeGreaterThanOrEqual(1)
       })
 
       expect(screen.getByText('Test Author')).toBeInTheDocument()
@@ -231,7 +233,7 @@ describe('PatternModal', () => {
       render(<PatternModal {...defaultProps} onClose={onClose} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Pattern')).toBeInTheDocument()
+        expect(screen.getAllByText('Test Pattern').length).toBeGreaterThanOrEqual(1)
       })
 
       const closeButton = screen.getByRole('button', { name: 'Close modal' })
@@ -245,7 +247,7 @@ describe('PatternModal', () => {
       render(<PatternModal {...defaultProps} onClose={onClose} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Pattern')).toBeInTheDocument()
+        expect(screen.getAllByText('Test Pattern').length).toBeGreaterThanOrEqual(1)
       })
 
       const backdrop = screen.getByRole('dialog')
@@ -259,11 +261,12 @@ describe('PatternModal', () => {
       render(<PatternModal {...defaultProps} onClose={onClose} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Pattern')).toBeInTheDocument()
+        expect(screen.getAllByText('Test Pattern').length).toBeGreaterThanOrEqual(1)
       })
 
-      const title = screen.getByText('Test Pattern')
-      fireEvent.click(title)
+      // Click on the visible title (the p element, not the sr-only h1)
+      const visibleTitle = screen.getAllByText('Test Pattern').find(el => !el.classList.contains('sr-only'))
+      fireEvent.click(visibleTitle!)
 
       expect(onClose).not.toHaveBeenCalled()
     })
@@ -296,7 +299,7 @@ describe('PatternModal', () => {
       render(<PatternModal {...defaultProps} isAdmin={false} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Pattern')).toBeInTheDocument()
+        expect(screen.getAllByText('Test Pattern').length).toBeGreaterThanOrEqual(1)
       })
 
       expect(screen.queryByTestId('thumbnail-controls')).not.toBeInTheDocument()
@@ -350,12 +353,21 @@ describe('PatternModal', () => {
       render(<PatternModal {...defaultProps} />)
 
       await waitFor(() => {
-        expect(screen.getByText('Test Pattern')).toBeInTheDocument()
+        expect(screen.getAllByText('Test Pattern').length).toBeGreaterThanOrEqual(1)
       })
 
       const dialog = screen.getByRole('dialog')
       expect(dialog).toHaveAttribute('aria-modal', 'true')
       expect(dialog).toHaveAttribute('aria-labelledby', 'pattern-modal-title')
+    })
+
+    it('has accessible heading always present', async () => {
+      render(<PatternModal {...defaultProps} />)
+
+      await waitFor(() => {
+        // The sr-only h1 should always be present
+        expect(screen.getByRole('heading', { level: 1, name: 'Test Pattern' })).toBeInTheDocument()
+      })
     })
   })
 })

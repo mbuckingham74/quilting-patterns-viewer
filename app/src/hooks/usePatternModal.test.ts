@@ -10,8 +10,10 @@ describe('usePatternModal', () => {
   const originalPushState = window.history.pushState
   const originalReplaceState = window.history.replaceState
   const originalBack = window.history.back
-  const originalAddEventListener = window.addEventListener
-  const originalRemoveEventListener = window.removeEventListener
+  const originalWindowAddEventListener = window.addEventListener
+  const originalWindowRemoveEventListener = window.removeEventListener
+  const originalDocAddEventListener = document.addEventListener
+  const originalDocRemoveEventListener = document.removeEventListener
   const originalBodyStyle = document.body.style.overflow
 
   // Mock functions
@@ -69,8 +71,10 @@ describe('usePatternModal', () => {
     window.history.pushState = originalPushState
     window.history.replaceState = originalReplaceState
     window.history.back = originalBack
-    window.addEventListener = originalAddEventListener
-    window.removeEventListener = originalRemoveEventListener
+    window.addEventListener = originalWindowAddEventListener
+    window.removeEventListener = originalWindowRemoveEventListener
+    document.addEventListener = originalDocAddEventListener
+    document.removeEventListener = originalDocRemoveEventListener
     document.body.style.overflow = originalBodyStyle
   })
 

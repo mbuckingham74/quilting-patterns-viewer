@@ -420,6 +420,11 @@ export default function PatternModal({
 
               {/* Details Section */}
               <div className="md:w-1/2 p-6 max-h-[70vh] overflow-y-auto">
+                {/* Accessible title - always present for screen readers */}
+                <h1 id="pattern-modal-title" className="sr-only">
+                  {displayName}
+                </h1>
+
                 {/* Title - editable for admin */}
                 {isAdmin ? (
                   <div className="mb-4">
@@ -430,12 +435,13 @@ export default function PatternModal({
                       onChange={(e) => setFileName(e.target.value)}
                       className="w-full text-2xl font-semibold text-stone-800 border border-stone-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-rose-500 focus:border-rose-500"
                       placeholder="Pattern name"
+                      aria-describedby="pattern-modal-title"
                     />
                   </div>
                 ) : (
-                  <h1 id="pattern-modal-title" className="text-2xl font-semibold text-stone-800 mb-4 pr-8">
+                  <p className="text-2xl font-semibold text-stone-800 mb-4 pr-8" aria-hidden="true">
                     {displayName}
-                  </h1>
+                  </p>
                 )}
 
                 <dl className="space-y-4">

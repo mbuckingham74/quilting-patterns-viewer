@@ -37,7 +37,11 @@ const PatternCard = memo(function PatternCard({ pattern, isFavorited = false, on
   }
 
   const handleClick = (e: React.MouseEvent) => {
-    if (onOpenModal) {
+    // Only intercept unmodified left-clicks for modal
+    // Allow ctrl/cmd/shift/middle-click to open in new tab
+    const isModifiedClick = e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0
+
+    if (onOpenModal && !isModifiedClick) {
       e.preventDefault()
       onOpenModal(pattern.id)
     } else if (onBeforeNavigate) {
