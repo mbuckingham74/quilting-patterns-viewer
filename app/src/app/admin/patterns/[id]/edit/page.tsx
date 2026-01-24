@@ -4,20 +4,25 @@ import Image from 'next/image'
 import { createClient } from '@/lib/supabase/server'
 import AuthButton from '@/components/AuthButton'
 import PatternEditForm from '@/components/PatternEditForm'
+import { getSafeReturnUrl } from '@/lib/url-utils'
 
 interface Props {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ returnUrl?: string }>
+  searchParams: Promise<{ returnUrl?: string | string[] }>
 }
 
 export default async function AdminPatternEditPage({ params, searchParams }: Props) {
   const { id } = await params
-  const { returnUrl } = await searchParams
+  const { returnUrl: rawReturnUrl } = await searchParams
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
     notFound()
   }
+
+  // Validate returnUrl to prevent open redirects
+  const defaultUrl = `/patterns/${patternId}`
+  const safeReturnUrl = getSafeReturnUrl(rawReturnUrl, defaultUrl)
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -117,9 +122,9 @@ export default async function AdminPatternEditPage({ params, searchParams }: Pro
         {/* Page Title */}
         <div className="flex items-center gap-4 mb-8">
           <Link
-            href={returnUrl || `/patterns/${patternId}`}
+            href={safeReturnUrl}
             className="text-stone-500 hover:text-purple-600 transition-colors"
-            title={returnUrl === '/admin/triage' ? 'Back to Triage' : 'Back to Pattern'}
+            title={safeReturnUrl.startsWith('/admin/triage') ? 'Back to Triage' : 'Back to Pattern'}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -139,7 +144,7 @@ export default async function AdminPatternEditPage({ params, searchParams }: Pro
             patternId={patternId}
             initialPattern={pattern}
             initialKeywords={keywords}
-            returnUrl={returnUrl}
+            returnUrl={safeReturnUrl}
           />
         </div>
       </div>

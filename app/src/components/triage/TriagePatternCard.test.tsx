@@ -51,7 +51,7 @@ describe('TriagePatternCard', () => {
       expect(editLink).toHaveAttribute('href', '/admin/patterns/123/edit?returnUrl=/admin/triage')
     })
 
-    it('includes returnUrl in pattern name link', () => {
+    it('pattern name links to detail page without returnUrl', () => {
       render(<TriagePatternCard {...defaultProps} />)
 
       const patternLink = screen.getByRole('link', { name: 'test-pattern.qli' })
