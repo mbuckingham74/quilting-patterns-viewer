@@ -41,6 +41,13 @@ export function getSafeReturnUrl(
     return fallback
   }
 
+  // Block path traversal attempts (before query string)
+  // Check for ".." both raw and URL-encoded (%2e%2e)
+  const pathPart = trimmed.split('?')[0]
+  if (pathPart.includes('..') || pathPart.toLowerCase().includes('%2e%2e')) {
+    return fallback
+  }
+
   // Only allow specific admin paths for now
   // This can be expanded as needed
   const allowedPrefixes = [

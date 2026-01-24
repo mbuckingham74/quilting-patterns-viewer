@@ -111,6 +111,29 @@ describe('getSafeReturnUrl', () => {
     })
   })
 
+  describe('blocks path traversal attacks', () => {
+    it('blocks .. in path that bypasses prefix check', () => {
+      expect(getSafeReturnUrl('/patterns/../admin/users', fallback)).toBe(fallback)
+      expect(getSafeReturnUrl('/browse/../admin/users', fallback)).toBe(fallback)
+    })
+
+    it('blocks URL-encoded .. (%2e%2e)', () => {
+      expect(getSafeReturnUrl('/patterns/%2e%2e/admin/users', fallback)).toBe(fallback)
+      expect(getSafeReturnUrl('/patterns/%2E%2E/admin/users', fallback)).toBe(fallback)
+    })
+
+    it('blocks .. at various positions', () => {
+      expect(getSafeReturnUrl('/patterns/123/..', fallback)).toBe(fallback)
+      expect(getSafeReturnUrl('/patterns/../', fallback)).toBe(fallback)
+      expect(getSafeReturnUrl('/admin/triage/../users', fallback)).toBe(fallback)
+    })
+
+    it('allows .. in query string (not a traversal risk)', () => {
+      expect(getSafeReturnUrl('/admin/triage?path=..', fallback)).toBe('/admin/triage?path=..')
+      expect(getSafeReturnUrl('/browse?ref=../other', fallback)).toBe('/browse?ref=../other')
+    })
+  })
+
   describe('trims whitespace', () => {
     it('trims leading and trailing whitespace', () => {
       expect(getSafeReturnUrl('  /admin/triage  ', fallback)).toBe('/admin/triage')
