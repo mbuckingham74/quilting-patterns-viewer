@@ -808,6 +808,55 @@ async function serviceWithFallback<T>(
 }
 ```
 
+### Query Embedding Cache
+
+Search queries are cached in the database to reduce Voyage AI API calls and improve latency for repeated searches.
+
+**How it works:**
+
+1. User enters search query
+2. App normalizes query (lowercase, trim, collapse whitespace)
+3. Check database cache for existing embedding
+4. **Cache hit**: Use cached embedding, skip Voyage API call (~200ms faster)
+5. **Cache miss**: Call Voyage AI, cache result for future use
+
+**Response Format:**
+
+```json
+{
+  "patterns": [...],
+  "searchMethod": "semantic" | "text",
+  "fallbackUsed": true | false,
+  "cacheHit": true | false
+}
+```
+
+**Graceful Degradation:**
+
+- If cache lookup fails, search continues normally (calls Voyage API)
+- If cache write fails, search still succeeds (logged but non-blocking)
+- Cache errors never cause search failures
+
+**Database Table:**
+
+```sql
+query_embedding_cache (
+  id SERIAL PRIMARY KEY,
+  query_text TEXT NOT NULL UNIQUE,  -- normalized query
+  embedding vector(1024) NOT NULL,
+  hit_count INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ,
+  last_used_at TIMESTAMPTZ
+)
+```
+
+**Cleanup:**
+
+Stale cache entries (not used in 30+ days) can be cleaned up via:
+```sql
+SELECT cleanup_query_embedding_cache(30);  -- removes entries older than 30 days
+```
+
 ### Future Graceful Degradation Candidates
 
 - **Thumbnail loading**: Fall back to placeholder on storage errors

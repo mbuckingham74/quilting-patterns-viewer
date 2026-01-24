@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 22, 2026
+Last updated: January 24, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | ~54%     |
-| Branches   | ~47%     |
-| Functions  | ~51%     |
-| Lines      | ~54%     |
+| Statements | ~55%     |
+| Branches   | ~48%     |
+| Functions  | ~52%     |
+| Lines      | ~55%     |
 
-**Total Tests:** 995 across 66 test files
+**Total Tests:** 1102 across 70 test files
 
 ## Running Tests
 
@@ -33,16 +33,19 @@ cd app && npm test
 | File               | Statements | Branches | Functions | Lines   |
 |--------------------|------------|----------|-----------|---------|
 | filename.ts        | 100%       | 100%     | 100%      | 100%    |
+| url-utils.ts       | 100%       | 100%     | 100%      | 100%    |
 | fetch-with-retry.ts| 91.30%     | 84%      | 90.9%     | 90.9%   |
 | api-response.ts    | 84.44%     | 71.73%   | 100%      | 84.44%  |
 | errors.ts          | 77.33%     | 76.05%   | 66.66%    | 80.55%  |
 
 **Test files:**
 - `src/lib/filename.test.ts` - 32 tests
+- `src/lib/url-utils.test.ts` - 41 tests
 - `src/lib/errors.test.ts` - 32 tests
 - `src/lib/api-response.test.ts` - 35 tests
 - `src/lib/fetch-with-retry.test.ts` - 19 tests
-- `src/app/api/search/route.test.ts` - 20 tests
+- `src/lib/query-embedding-cache.test.ts` - 26 tests
+- `src/app/api/search/route.test.ts` - 23 tests
 - `src/app/api/search/rateLimit.test.ts` - 8 tests
 - `src/app/auth/callback/route.test.ts` - 18 tests
 - `src/app/auth/signin/route.test.ts` - 14 tests
@@ -137,7 +140,8 @@ Components with new coverage:
 - **ActivityChart.tsx** - 5 tests (100% coverage)
 - **TopPatternsList.tsx** - 9 tests (100% coverage)
 - **TopSearchesList.tsx** - 7 tests (100% coverage)
-- **PatternEditForm.tsx** - 37 tests (97.91% coverage)
+- **PatternEditForm.tsx** - 39 tests (97.91% coverage)
+- **TriagePatternCard.tsx** - 7 tests (100% coverage)
 - **BrowseContent.tsx** - 17 tests (100% coverage)
 - **KeywordSidebar.tsx** - 18 tests (100% coverage)
 - **PinnedKeywordsManager.tsx** - 16 tests (100% coverage)
@@ -217,6 +221,74 @@ Components still at 0% coverage:
    - AuthButtonClient.tsx / AuthButtonServer.tsx
 
 ## Recent Progress
+
+### January 24, 2026
+
+Added tests for Query Embedding Cache feature and URL validation improvements (44 new tests):
+
+**Query Embedding Cache:**
+
+- **query-embedding-cache.ts** (`src/lib/query-embedding-cache.test.ts`) - 26 tests
+  - `normalizeQuery()` - lowercases, trims, collapses whitespace
+  - `getCachedEmbedding()` - returns cached embedding on hit, null on miss
+  - `getCachedEmbedding()` - error handling (returns null, doesn't throw)
+  - `cacheEmbedding()` - stores normalized query with embedding
+  - `cacheEmbedding()` - error handling (logs but doesn't throw)
+  - `getCacheStats()` - returns statistics (total entries, hits, dates)
+  - `cleanupCache()` - removes entries older than specified days
+
+**Search API Cache Integration:**
+
+- **route.test.ts** (`src/app/api/search/route.test.ts`) - 3 new tests (total: 23)
+  - Uses cached embedding when available (cache hit)
+  - Calls Voyage API and caches result on cache miss
+  - Continues search even if cache check fails (graceful degradation)
+
+**URL Validation Security:**
+
+- **url-utils.ts** (`src/lib/url-utils.test.ts`) - 13 new tests (total: 41)
+  - Allows javascript: in query params (not a scheme attack)
+  - Allows URLs with http:/https: in query params
+  - Allows all admin pages (/admin/users, /admin/analytics, /admin/exceptions, etc.)
+  - Allows /account path
+  - Improved scheme detection (path-only, not query params)
+
+**Triage Component:**
+
+- **TriagePatternCard.tsx** (`src/components/triage/TriagePatternCard.test.tsx`) - 2 new tests (total: 9)
+  - Encodes custom returnUrl with query params
+  - Uses custom returnUrl prop
+
+### January 23, 2026
+
+Added tests for triage navigation fix and URL validation security (37 new tests):
+
+**URL Validation Utility:**
+
+- **url-utils.ts** (`src/lib/url-utils.test.ts`) - 28 tests
+  - Returns fallback for invalid inputs (undefined, empty, whitespace, non-paths)
+  - Blocks open redirect attacks (protocol-relative, absolute URLs)
+  - Blocks dangerous protocols (javascript:, data:, vbscript:)
+  - Handles array inputs (takes first value, validates)
+  - Allows valid admin paths (/admin/triage, /admin/keywords, etc.)
+  - Blocks non-allowed paths (arbitrary admin paths, root, random paths)
+  - Blocks path traversal attacks (.. in path, URL-encoded %2e%2e)
+  - Allows .. in query string (not a traversal risk)
+  - Trims whitespace
+
+**Triage Component:**
+
+- **TriagePatternCard.tsx** (`src/components/triage/TriagePatternCard.test.tsx`) - 7 tests
+  - Edit link includes returnUrl=/admin/triage
+  - Pattern name links to detail page without returnUrl
+  - Add Keywords link includes returnUrl when no_keywords issue present
+  - Displays pattern name, author, issue badges
+  - Displays mirrored badge for mirror issues
+
+**PatternEditForm.tsx** - 2 new tests (total: 39 tests)
+
+- Navigates to returnUrl after saving when provided
+- Cancel link navigates to returnUrl when provided
 
 ### January 22, 2026
 
