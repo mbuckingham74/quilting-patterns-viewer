@@ -54,7 +54,7 @@ This application replaces the legacy Windows-only **PVM (Pattern Viewer and Mana
 
 ### Duplicate Detection
 - **Visual similarity search** - Find patterns that look alike using AI embeddings
-- **Adjustable threshold** - Control how similar patterns need to be (0.90-0.99)
+- **Adjustable threshold** - Control how similar patterns need to be (0.85-0.98)
 - **Batch review** - Mark pairs as duplicates or not-duplicates
 - **Admin tool** - Helps clean up redundant patterns in the library
 
@@ -466,7 +466,7 @@ The app uses Supabase Postgres with the following main tables:
 | `/api/admin/users/[id]/reject` | POST | Admin | Reject pending user |
 | `/api/admin/users/[id]/revoke` | POST | Admin | Revoke approved user access |
 | `/api/admin/keywords` | GET/POST | Admin | List keywords with stats / Create keyword |
-| `/api/admin/keywords/[id]` | PATCH/DELETE | Admin | Update or delete keyword |
+| `/api/admin/keywords/[id]` | PUT/DELETE | Admin | Update or delete keyword |
 | `/api/admin/keywords/merge` | POST | Admin | Merge two keywords into one |
 | `/api/admin/duplicates` | GET | Admin | Find similar patterns |
 | `/api/admin/duplicates/review` | POST | Admin | Mark duplicate status |

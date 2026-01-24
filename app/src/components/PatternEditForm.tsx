@@ -26,12 +26,14 @@ interface PatternEditFormProps {
   patternId: number
   initialPattern: Pattern
   initialKeywords: Keyword[]
+  returnUrl?: string
 }
 
 export default function PatternEditForm({
   patternId,
   initialPattern,
   initialKeywords,
+  returnUrl,
 }: PatternEditFormProps) {
   const router = useRouter()
   const { showSuccess, showError } = useToast()
@@ -103,7 +105,7 @@ export default function PatternEditForm({
       }
 
       showSuccess('Pattern updated successfully!')
-      router.push(`/patterns/${patternId}`)
+      router.push(returnUrl || `/patterns/${patternId}`)
     } catch (error) {
       showError(error instanceof Error ? error : new Error('Failed to save pattern'))
     } finally {
@@ -543,7 +545,7 @@ export default function PatternEditForm({
       {/* Action Buttons */}
       <div className="flex items-center justify-end gap-4 pt-6 border-t border-stone-200">
         <Link
-          href={`/patterns/${patternId}`}
+          href={returnUrl || `/patterns/${patternId}`}
           className="px-4 py-2 text-stone-600 hover:text-stone-800 font-medium"
         >
           Cancel
