@@ -213,7 +213,7 @@ function TriagePatternCard({
               )}
             </div>
             <Link
-              href={`/admin/patterns/${pattern.id}/edit`}
+              href={`/admin/patterns/${pattern.id}/edit?returnUrl=/admin/triage`}
               className="text-xs text-purple-600 hover:text-purple-700 font-medium flex-shrink-0"
             >
               Edit
@@ -322,7 +322,7 @@ function TriagePatternCard({
             {/* Keywords link */}
             {pattern.issues.some(i => i.type === 'no_keywords') && (
               <Link
-                href={`/admin/patterns/${pattern.id}/edit`}
+                href={`/admin/patterns/${pattern.id}/edit?returnUrl=/admin/triage`}
                 className="px-2 py-1 text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 rounded"
               >
                 + Add Keywords

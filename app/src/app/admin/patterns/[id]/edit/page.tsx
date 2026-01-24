@@ -7,10 +7,12 @@ import PatternEditForm from '@/components/PatternEditForm'
 
 interface Props {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ returnUrl?: string }>
 }
 
-export default async function AdminPatternEditPage({ params }: Props) {
+export default async function AdminPatternEditPage({ params, searchParams }: Props) {
   const { id } = await params
+  const { returnUrl } = await searchParams
   const patternId = parseInt(id, 10)
 
   if (isNaN(patternId)) {
@@ -115,8 +117,9 @@ export default async function AdminPatternEditPage({ params }: Props) {
         {/* Page Title */}
         <div className="flex items-center gap-4 mb-8">
           <Link
-            href={`/patterns/${patternId}`}
+            href={returnUrl || `/patterns/${patternId}`}
             className="text-stone-500 hover:text-purple-600 transition-colors"
+            title={returnUrl === '/admin/triage' ? 'Back to Triage' : 'Back to Pattern'}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -136,6 +139,7 @@ export default async function AdminPatternEditPage({ params }: Props) {
             patternId={patternId}
             initialPattern={pattern}
             initialKeywords={keywords}
+            returnUrl={returnUrl}
           />
         </div>
       </div>

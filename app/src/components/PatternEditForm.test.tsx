@@ -178,6 +178,41 @@ describe('PatternEditForm', () => {
     })
   })
 
+  it('navigates to returnUrl after saving when provided', async () => {
+    mockFetch.mockImplementation((url: string, options?: { method?: string }) => {
+      if (url === '/api/keywords') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ keywords: allKeywords }),
+        })
+      }
+      if (url === '/api/admin/patterns/1' && options?.method === 'PATCH') {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ pattern: defaultPattern }),
+        })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    })
+
+    render(
+      <PatternEditForm
+        patternId={1}
+        initialPattern={defaultPattern}
+        initialKeywords={defaultKeywords}
+        returnUrl="/admin/triage"
+      />
+    )
+
+    const saveButton = screen.getByText('Save Changes')
+    fireEvent.click(saveButton)
+
+    await waitFor(() => {
+      expect(mockShowSuccess).toHaveBeenCalledWith('Pattern updated successfully!')
+      expect(mockPush).toHaveBeenCalledWith('/admin/triage')
+    })
+  })
+
   it('shows error when save fails', async () => {
     mockFetch.mockImplementation((url: string, options?: { method?: string }) => {
       if (url === '/api/keywords') {
@@ -211,7 +246,7 @@ describe('PatternEditForm', () => {
     })
   })
 
-  it('shows Cancel link that navigates back', () => {
+  it('shows Cancel link that navigates to pattern page by default', () => {
     render(
       <PatternEditForm
         patternId={1}
@@ -222,6 +257,20 @@ describe('PatternEditForm', () => {
 
     const cancelLink = screen.getByText('Cancel')
     expect(cancelLink).toHaveAttribute('href', '/patterns/1')
+  })
+
+  it('shows Cancel link that navigates to returnUrl when provided', () => {
+    render(
+      <PatternEditForm
+        patternId={1}
+        initialPattern={defaultPattern}
+        initialKeywords={defaultKeywords}
+        returnUrl="/admin/triage"
+      />
+    )
+
+    const cancelLink = screen.getByText('Cancel')
+    expect(cancelLink).toHaveAttribute('href', '/admin/triage')
   })
 
   it('removes keyword when X is clicked', async () => {
