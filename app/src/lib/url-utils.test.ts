@@ -33,9 +33,13 @@ describe('getSafeReturnUrl', () => {
       expect(getSafeReturnUrl('http://evil.com', fallback)).toBe(fallback)
     })
 
-    it('blocks javascript: URLs', () => {
+    it('blocks javascript: URLs in path', () => {
       expect(getSafeReturnUrl('javascript:alert(1)', fallback)).toBe(fallback)
-      expect(getSafeReturnUrl('/admin/triage?x=javascript:alert(1)', fallback)).toBe(fallback)
+    })
+
+    it('allows javascript: in query params (not a scheme attack)', () => {
+      // Query params can safely contain javascript: - it's the path that matters
+      expect(getSafeReturnUrl('/admin/triage?x=javascript:alert(1)', fallback)).toBe('/admin/triage?x=javascript:alert(1)')
     })
 
     it('blocks data: URLs', () => {
@@ -95,19 +99,70 @@ describe('getSafeReturnUrl', () => {
       expect(getSafeReturnUrl('/browse', fallback)).toBe('/browse')
       expect(getSafeReturnUrl('/browse?keywords=1,2', fallback)).toBe('/browse?keywords=1,2')
     })
+
+    it('allows /admin/users', () => {
+      expect(getSafeReturnUrl('/admin/users', fallback)).toBe('/admin/users')
+    })
+
+    it('allows /admin/analytics', () => {
+      expect(getSafeReturnUrl('/admin/analytics', fallback)).toBe('/admin/analytics')
+    })
+
+    it('allows /admin/exceptions', () => {
+      expect(getSafeReturnUrl('/admin/exceptions', fallback)).toBe('/admin/exceptions')
+    })
+
+    it('allows /admin/videos', () => {
+      expect(getSafeReturnUrl('/admin/videos', fallback)).toBe('/admin/videos')
+    })
+
+    it('allows /admin/approved-users', () => {
+      expect(getSafeReturnUrl('/admin/approved-users', fallback)).toBe('/admin/approved-users')
+    })
+
+    it('allows /admin/upload', () => {
+      expect(getSafeReturnUrl('/admin/upload', fallback)).toBe('/admin/upload')
+    })
+
+    it('allows /admin/batches', () => {
+      expect(getSafeReturnUrl('/admin/batches/123/review', fallback)).toBe('/admin/batches/123/review')
+    })
+
+    it('allows /admin/activity', () => {
+      expect(getSafeReturnUrl('/admin/activity', fallback)).toBe('/admin/activity')
+    })
+
+    it('allows /admin/help', () => {
+      expect(getSafeReturnUrl('/admin/help', fallback)).toBe('/admin/help')
+    })
+
+    it('allows /admin/patterns', () => {
+      expect(getSafeReturnUrl('/admin/patterns/123/edit', fallback)).toBe('/admin/patterns/123/edit')
+    })
+
+    it('allows /account', () => {
+      expect(getSafeReturnUrl('/account', fallback)).toBe('/account')
+    })
+
+    it('allows URLs with http: in query param (not a scheme attack)', () => {
+      // This is a valid internal URL that happens to have a URL in a query param
+      expect(getSafeReturnUrl('/patterns/123?ref=http://example.com', fallback)).toBe('/patterns/123?ref=http://example.com')
+      expect(getSafeReturnUrl('/browse?source=https://google.com', fallback)).toBe('/browse?source=https://google.com')
+    })
   })
 
   describe('blocks non-allowed paths', () => {
-    it('blocks arbitrary admin paths', () => {
-      expect(getSafeReturnUrl('/admin/users', fallback)).toBe(fallback)
-    })
-
     it('blocks root path', () => {
       expect(getSafeReturnUrl('/', fallback)).toBe(fallback)
     })
 
     it('blocks random paths', () => {
       expect(getSafeReturnUrl('/some/random/path', fallback)).toBe(fallback)
+    })
+
+    it('blocks paths not in allowlist', () => {
+      expect(getSafeReturnUrl('/api/admin/users', fallback)).toBe(fallback)
+      expect(getSafeReturnUrl('/auth/login', fallback)).toBe(fallback)
     })
   })
 

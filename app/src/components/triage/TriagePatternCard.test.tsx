@@ -44,11 +44,12 @@ describe('TriagePatternCard', () => {
   }
 
   describe('navigation links', () => {
-    it('includes returnUrl in Edit link', () => {
+    it('includes returnUrl in Edit link with default value', () => {
       render(<TriagePatternCard {...defaultProps} />)
 
       const editLink = screen.getByRole('link', { name: 'Edit' })
-      expect(editLink).toHaveAttribute('href', '/admin/patterns/123/edit?returnUrl=/admin/triage')
+      // Default returnUrl is /admin/triage, which gets encoded
+      expect(editLink).toHaveAttribute('href', '/admin/patterns/123/edit?returnUrl=%2Fadmin%2Ftriage')
     })
 
     it('pattern name links to detail page without returnUrl', () => {
@@ -78,7 +79,35 @@ describe('TriagePatternCard', () => {
       )
 
       const addKeywordsLink = screen.getByRole('link', { name: '+ Add Keywords' })
-      expect(addKeywordsLink).toHaveAttribute('href', '/admin/patterns/123/edit?returnUrl=/admin/triage')
+      expect(addKeywordsLink).toHaveAttribute('href', '/admin/patterns/123/edit?returnUrl=%2Fadmin%2Ftriage')
+    })
+
+    it('encodes custom returnUrl with query params', () => {
+      render(
+        <TriagePatternCard
+          {...defaultProps}
+          returnUrl="/admin/triage?filter=rotation&page=2"
+        />
+      )
+
+      const editLink = screen.getByRole('link', { name: 'Edit' })
+      // The & and = in the query params should be encoded
+      expect(editLink).toHaveAttribute(
+        'href',
+        '/admin/patterns/123/edit?returnUrl=%2Fadmin%2Ftriage%3Ffilter%3Drotation%26page%3D2'
+      )
+    })
+
+    it('uses custom returnUrl prop', () => {
+      render(
+        <TriagePatternCard
+          {...defaultProps}
+          returnUrl="/admin/keywords"
+        />
+      )
+
+      const editLink = screen.getByRole('link', { name: 'Edit' })
+      expect(editLink).toHaveAttribute('href', '/admin/patterns/123/edit?returnUrl=%2Fadmin%2Fkeywords')
     })
   })
 

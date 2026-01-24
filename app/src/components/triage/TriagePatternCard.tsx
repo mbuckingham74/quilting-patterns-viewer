@@ -16,6 +16,8 @@ interface TriagePatternCardProps {
   isExpanded: boolean
   isTransforming: boolean
   thumbnailUrl: string | null
+  /** URL to return to after editing, will be properly encoded */
+  returnUrl?: string
 }
 
 // Issue badge component
@@ -128,10 +130,14 @@ function TriagePatternCard({
   onExpand,
   isExpanded,
   isTransforming,
-  thumbnailUrl
+  thumbnailUrl,
+  returnUrl = '/admin/triage'
 }: TriagePatternCardProps) {
   const [localTransforming, setLocalTransforming] = useState(false)
   const recommended = getRecommendedOperation(pattern.issues)
+
+  // Encode returnUrl to safely include in query params (handles & and other special chars)
+  const encodedReturnUrl = encodeURIComponent(returnUrl)
 
   const handleTransform = async (operation: string) => {
     setLocalTransforming(true)
@@ -213,7 +219,7 @@ function TriagePatternCard({
               )}
             </div>
             <Link
-              href={`/admin/patterns/${pattern.id}/edit?returnUrl=/admin/triage`}
+              href={`/admin/patterns/${pattern.id}/edit?returnUrl=${encodedReturnUrl}`}
               className="text-xs text-purple-600 hover:text-purple-700 font-medium flex-shrink-0"
             >
               Edit
@@ -322,7 +328,7 @@ function TriagePatternCard({
             {/* Keywords link */}
             {pattern.issues.some(i => i.type === 'no_keywords') && (
               <Link
-                href={`/admin/patterns/${pattern.id}/edit?returnUrl=/admin/triage`}
+                href={`/admin/patterns/${pattern.id}/edit?returnUrl=${encodedReturnUrl}`}
                 className="px-2 py-1 text-xs bg-amber-100 hover:bg-amber-200 text-amber-700 rounded"
               >
                 + Add Keywords
