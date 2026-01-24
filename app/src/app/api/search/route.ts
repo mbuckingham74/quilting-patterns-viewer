@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { unauthorized, badRequest, rateLimited, internalError, withErrorHandler } from '@/lib/api-response'
 import { logError, addErrorBreadcrumb } from '@/lib/errors'
+import { getCachedEmbedding, cacheEmbedding } from '@/lib/query-embedding-cache'
 
 const VOYAGE_API_KEY = process.env.VOYAGE_API_KEY
 const VOYAGE_MODEL = 'voyage-multimodal-3'
@@ -71,6 +72,7 @@ interface SearchResult {
   count: number
   searchMethod: SearchMethod
   fallbackUsed?: boolean
+  cacheHit?: boolean
 }
 
 interface Pattern {
@@ -123,7 +125,7 @@ async function textSearch(
 }
 
 // ============================================================================
-// Semantic search using Voyage AI embeddings
+// Semantic search using Voyage AI embeddings (with caching)
 // ============================================================================
 
 async function semanticSearch(
@@ -131,52 +133,70 @@ async function semanticSearch(
   query: string,
   limit: number,
   userId: string
-): Promise<{ patterns: Pattern[]; fallbackUsed: boolean }> {
+): Promise<{ patterns: Pattern[]; fallbackUsed: boolean; cacheHit: boolean }> {
   // Check if Voyage API is configured
   if (!VOYAGE_API_KEY) {
     console.log('Voyage API key not configured, using text search fallback')
     const patterns = await textSearch(supabase, query, limit)
-    return { patterns, fallbackUsed: true }
+    return { patterns, fallbackUsed: true, cacheHit: false }
   }
 
   try {
-    addErrorBreadcrumb('Calling Voyage AI API', 'search', { query })
+    let queryEmbedding: number[] | null = null
+    let cacheHit = false
 
-    // Embed the text query using Voyage AI
-    // Note: Voyage multimodal API expects inputs as array of objects with "content" key
-    const embeddingResponse = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${VOYAGE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: VOYAGE_MODEL,
-        inputs: [{ content: [{ type: 'text', text: query }] }],
-        input_type: 'query',
-      }),
-    })
+    // Step 1: Check cache for existing embedding
+    const cachedEmbedding = await getCachedEmbedding(supabase, query)
 
-    if (!embeddingResponse.ok) {
-      const errorText = await embeddingResponse.text()
-      logError(new Error(`Voyage API error: ${errorText}`), {
-        action: 'voyage_embedding',
-        status: embeddingResponse.status,
-        userId,
+    if (cachedEmbedding) {
+      // Cache hit - use cached embedding
+      queryEmbedding = cachedEmbedding
+      cacheHit = true
+      addErrorBreadcrumb('Using cached query embedding', 'search', { query })
+    } else {
+      // Cache miss - call Voyage AI
+      addErrorBreadcrumb('Calling Voyage AI API (cache miss)', 'search', { query })
+
+      const embeddingResponse = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${VOYAGE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: VOYAGE_MODEL,
+          inputs: [{ content: [{ type: 'text', text: query }] }],
+          input_type: 'query',
+        }),
       })
 
-      // Fall back to text search
-      console.log('Voyage API failed, falling back to text search')
-      const patterns = await textSearch(supabase, query, limit)
-      return { patterns, fallbackUsed: true }
+      if (!embeddingResponse.ok) {
+        const errorText = await embeddingResponse.text()
+        logError(new Error(`Voyage API error: ${errorText}`), {
+          action: 'voyage_embedding',
+          status: embeddingResponse.status,
+          userId,
+        })
+
+        // Fall back to text search
+        console.log('Voyage API failed, falling back to text search')
+        const patterns = await textSearch(supabase, query, limit)
+        return { patterns, fallbackUsed: true, cacheHit: false }
+      }
+
+      const embeddingData = await embeddingResponse.json()
+      queryEmbedding = embeddingData.data[0].embedding
+
+      // Cache the embedding for future queries (non-blocking)
+      cacheEmbedding(supabase, query, queryEmbedding).catch((error) => {
+        // Log but don't fail the request
+        logError(error, { action: 'cache_embedding_background', query })
+      })
+
+      addErrorBreadcrumb('Voyage embedding received and cached', 'search')
     }
 
-    const embeddingData = await embeddingResponse.json()
-    const queryEmbedding = embeddingData.data[0].embedding
-
-    addErrorBreadcrumb('Voyage embedding received, searching database', 'search')
-
-    // Search for similar patterns using pgvector
+    // Step 2: Search for similar patterns using pgvector
     const { data: patterns, error } = await supabase.rpc('search_patterns_semantic', {
       query_embedding: queryEmbedding,
       match_threshold: 0.2,
@@ -189,17 +209,17 @@ async function semanticSearch(
       // Fall back to text search if semantic search fails
       console.log('Semantic search RPC failed, falling back to text search')
       const textPatterns = await textSearch(supabase, query, limit)
-      return { patterns: textPatterns, fallbackUsed: true }
+      return { patterns: textPatterns, fallbackUsed: true, cacheHit }
     }
 
-    return { patterns: patterns || [], fallbackUsed: false }
+    return { patterns: patterns || [], fallbackUsed: false, cacheHit }
 
   } catch (error) {
     // Network errors, timeouts, etc - fall back to text search
     logError(error, { action: 'semantic_search', userId, query })
     console.log('Semantic search failed with exception, falling back to text search')
     const patterns = await textSearch(supabase, query, limit)
-    return { patterns, fallbackUsed: true }
+    return { patterns, fallbackUsed: true, cacheHit: false }
   }
 }
 
@@ -251,7 +271,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     addErrorBreadcrumb('Starting search', 'search', { query, limit: safeLimit })
 
     // Try semantic search with fallback to text search
-    const { patterns, fallbackUsed } = await semanticSearch(supabase, query, safeLimit, user.id)
+    const { patterns, fallbackUsed, cacheHit } = await semanticSearch(supabase, query, safeLimit, user.id)
 
     const result: SearchResult = {
       patterns,
@@ -259,6 +279,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       count: patterns.length,
       searchMethod: fallbackUsed ? 'text' : 'semantic',
       fallbackUsed,
+      cacheHit,
     }
 
     // Log the search (non-blocking)

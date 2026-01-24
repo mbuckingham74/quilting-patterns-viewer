@@ -16,6 +16,12 @@ vi.mock('@/lib/errors', async (importOriginal) => {
   }
 })
 
+// Mock the query embedding cache
+vi.mock('@/lib/query-embedding-cache', () => ({
+  getCachedEmbedding: vi.fn(),
+  cacheEmbedding: vi.fn(),
+}))
+
 // Mock global fetch for Voyage AI API calls using stubGlobal for proper teardown
 const mockFetch = vi.fn()
 
@@ -28,9 +34,12 @@ afterAll(() => {
 })
 
 import { createClient } from '@/lib/supabase/server'
+import { getCachedEmbedding, cacheEmbedding } from '@/lib/query-embedding-cache'
 import { rateLimitStore } from './route'
 
 const mockCreateClient = vi.mocked(createClient)
+const mockGetCachedEmbedding = vi.mocked(getCachedEmbedding)
+const mockCacheEmbedding = vi.mocked(cacheEmbedding)
 
 describe('POST /api/search', () => {
   beforeEach(() => {
@@ -355,6 +364,156 @@ describe('POST /api/search', () => {
       expect(response.status).toBe(200)
       const json = await response.json()
       expect(json.patterns).toEqual([])
+    })
+  })
+
+  describe('embedding cache', () => {
+    it('uses cached embedding when available (cache hit)', async () => {
+      const cachedEmbedding = new Array(1024).fill(0.5)
+      const patterns = [
+        { id: 1, file_name: 'butterfly1.qli', similarity: 0.85 },
+      ]
+      const mockSupabase = createMockSupabase({
+        rpcResult: { data: patterns, error: null },
+      })
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+
+      // Mock cache hit
+      mockGetCachedEmbedding.mockResolvedValueOnce(cachedEmbedding)
+      mockCacheEmbedding.mockResolvedValueOnce(undefined)
+
+      const originalKey = process.env.VOYAGE_API_KEY
+      process.env.VOYAGE_API_KEY = 'test-voyage-key'
+
+      vi.resetModules()
+      vi.doMock('@/lib/supabase/server', () => ({ createClient: vi.fn().mockResolvedValue(mockSupabase) }))
+      vi.doMock('@/lib/errors', async (importOriginal) => {
+        const actual = await importOriginal<typeof import('@/lib/errors')>()
+        return { ...actual, logError: vi.fn(), addErrorBreadcrumb: vi.fn() }
+      })
+      vi.doMock('@/lib/query-embedding-cache', () => ({
+        getCachedEmbedding: mockGetCachedEmbedding,
+        cacheEmbedding: mockCacheEmbedding,
+      }))
+
+      const { POST } = await import('./route')
+      const response = await POST(createRequest({ query: 'butterflies' }))
+
+      expect(response.status).toBe(200)
+      const json = await response.json()
+      expect(json.searchMethod).toBe('semantic')
+      expect(json.cacheHit).toBe(true)
+      // Should NOT have called the Voyage API
+      expect(mockFetch).not.toHaveBeenCalled()
+
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
+    })
+
+    it('calls Voyage API and caches result on cache miss', async () => {
+      const patterns = [
+        { id: 1, file_name: 'butterfly1.qli', similarity: 0.85 },
+      ]
+      const mockSupabase = createMockSupabase({
+        rpcResult: { data: patterns, error: null },
+      })
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+
+      // Mock cache miss
+      mockGetCachedEmbedding.mockResolvedValueOnce(null)
+      mockCacheEmbedding.mockResolvedValueOnce(undefined)
+
+      // Mock Voyage API success
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [{ embedding: new Array(1024).fill(0.1) }],
+        }),
+      })
+
+      const originalKey = process.env.VOYAGE_API_KEY
+      process.env.VOYAGE_API_KEY = 'test-voyage-key'
+
+      vi.resetModules()
+      vi.doMock('@/lib/supabase/server', () => ({ createClient: vi.fn().mockResolvedValue(mockSupabase) }))
+      vi.doMock('@/lib/errors', async (importOriginal) => {
+        const actual = await importOriginal<typeof import('@/lib/errors')>()
+        return { ...actual, logError: vi.fn(), addErrorBreadcrumb: vi.fn() }
+      })
+      vi.doMock('@/lib/query-embedding-cache', () => ({
+        getCachedEmbedding: mockGetCachedEmbedding,
+        cacheEmbedding: mockCacheEmbedding,
+      }))
+
+      const { POST } = await import('./route')
+      const response = await POST(createRequest({ query: 'butterflies' }))
+
+      expect(response.status).toBe(200)
+      const json = await response.json()
+      expect(json.searchMethod).toBe('semantic')
+      expect(json.cacheHit).toBe(false)
+      // Should have called Voyage API
+      expect(mockFetch).toHaveBeenCalled()
+      // Should have cached the embedding
+      expect(mockCacheEmbedding).toHaveBeenCalled()
+
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
+    })
+
+    it('continues search even if cache check fails', async () => {
+      const patterns = [
+        { id: 1, file_name: 'butterfly1.qli', similarity: 0.85 },
+      ]
+      const mockSupabase = createMockSupabase({
+        rpcResult: { data: patterns, error: null },
+      })
+      mockCreateClient.mockResolvedValue(mockSupabase as unknown as Awaited<ReturnType<typeof createClient>>)
+
+      // Mock cache check failure (returns null on error)
+      mockGetCachedEmbedding.mockResolvedValueOnce(null)
+      mockCacheEmbedding.mockResolvedValueOnce(undefined)
+
+      // Mock Voyage API success
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          data: [{ embedding: new Array(1024).fill(0.1) }],
+        }),
+      })
+
+      const originalKey = process.env.VOYAGE_API_KEY
+      process.env.VOYAGE_API_KEY = 'test-voyage-key'
+
+      vi.resetModules()
+      vi.doMock('@/lib/supabase/server', () => ({ createClient: vi.fn().mockResolvedValue(mockSupabase) }))
+      vi.doMock('@/lib/errors', async (importOriginal) => {
+        const actual = await importOriginal<typeof import('@/lib/errors')>()
+        return { ...actual, logError: vi.fn(), addErrorBreadcrumb: vi.fn() }
+      })
+      vi.doMock('@/lib/query-embedding-cache', () => ({
+        getCachedEmbedding: mockGetCachedEmbedding,
+        cacheEmbedding: mockCacheEmbedding,
+      }))
+
+      const { POST } = await import('./route')
+      const response = await POST(createRequest({ query: 'butterflies' }))
+
+      expect(response.status).toBe(200)
+      const json = await response.json()
+      expect(json.searchMethod).toBe('semantic')
+
+      if (originalKey === undefined) {
+        delete process.env.VOYAGE_API_KEY
+      } else {
+        process.env.VOYAGE_API_KEY = originalKey
+      }
     })
   })
 
