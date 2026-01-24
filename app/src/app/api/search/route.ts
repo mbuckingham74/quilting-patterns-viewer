@@ -188,7 +188,8 @@ async function semanticSearch(
       queryEmbedding = embeddingData.data[0].embedding
 
       // Cache the embedding for future queries (non-blocking)
-      cacheEmbedding(supabase, query, queryEmbedding).catch((error) => {
+      // Use non-null assertion since we just assigned it above
+      cacheEmbedding(supabase, query, queryEmbedding!).catch((error) => {
         // Log but don't fail the request
         logError(error, { action: 'cache_embedding_background', query })
       })
