@@ -11,7 +11,7 @@ Last updated: January 26, 2026
 | Functions  | ~52%     |
 | Lines      | ~55%     |
 
-**Total Tests:** 1118 across 71 test files
+**Total Tests:** 1179 across 74 test files
 
 ## Running Tests
 
@@ -147,6 +147,7 @@ Components with new coverage:
 - **BrowseContent.tsx** - 17 tests (100% coverage)
 - **KeywordSidebar.tsx** - 18 tests (100% coverage)
 - **PinnedKeywordsManager.tsx** - 16 tests (100% coverage)
+- **PatternDetailClient.tsx** - 42 tests (97.67% coverage)
 
 Components still at 0% coverage:
 - AccountContent.tsx
@@ -225,6 +226,68 @@ Components still at 0% coverage:
 ## Recent Progress
 
 ### January 26, 2026
+
+Added comprehensive tests for PatternDetailClient component (42 new tests):
+
+**PatternDetailClient.tsx** (`src/components/PatternDetailClient.test.tsx`) - 42 tests
+
+- **Non-admin mode** (8 tests)
+  - Renders pattern name as heading
+  - Renders pattern metadata (file name, extension, author, notes)
+  - Renders keywords as links
+  - Renders similar patterns section
+  - Calls onClose when close button clicked
+  - Handles missing optional fields (author, notes)
+  - Shows loading state while fetching similar patterns
+  - Shows empty state when no similar patterns
+
+- **Admin mode - Rendering** (7 tests)
+  - Renders editable inputs for file_name, author, notes
+  - Shows ThumbnailControls for admin
+  - Shows keyword dropdown for adding keywords
+  - Shows remove button on keywords
+  - Shows delete pattern button
+  - Renders admin-only transform controls
+  - Hides similar patterns section in admin mode
+
+- **Admin mode - Save metadata** (7 tests)
+  - Calls onSave with updated fields when save clicked
+  - Shows saving state while request in progress
+  - Shows success toast after successful save
+  - Shows error toast when save fails
+  - Disables save button when no changes made
+  - Enables save button when changes detected
+  - Preserves thumbnail URL when saving other fields
+
+- **Admin mode - Keywords** (8 tests)
+  - Shows keyword dropdown when search focused
+  - Filters keywords by search term
+  - Adds keyword when clicked in dropdown
+  - Removes keyword when X clicked
+  - Shows error when add keyword fails
+  - Shows error when remove keyword fails
+  - Excludes already-assigned keywords from dropdown
+  - Clears search after adding keyword
+
+- **Admin mode - Thumbnail transforms** (6 tests)
+  - Calls transform API with correct operation
+  - Updates thumbnail after transform
+  - Shows error when transform fails
+  - Calls onThumbnailTransformed callback
+  - Handles delete and calls onDeleted callback
+  - Shows confirmation before delete
+
+- **Admin mode - Edge cases** (6 tests)
+  - Handles pattern with no thumbnail
+  - Handles pattern with no keywords
+  - Handles empty keyword list in dropdown
+  - Preserves unsaved changes when component re-renders
+  - Resets form when pattern changes
+  - Handles concurrent save requests
+
+**Coverage improvement:** PatternDetailClient.tsx went from 0% to 97.67% statement coverage.
+
+---
 
 Added comprehensive tests for Voyage AI embeddings generation (16 new tests):
 
