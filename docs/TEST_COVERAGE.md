@@ -1,6 +1,6 @@
 # Test Coverage Documentation
 
-Last updated: January 24, 2026
+Last updated: January 26, 2026
 
 ## Summary
 
@@ -11,7 +11,7 @@ Last updated: January 24, 2026
 | Functions  | ~52%     |
 | Lines      | ~55%     |
 
-**Total Tests:** 1102 across 70 test files
+**Total Tests:** 1118 across 71 test files
 
 ## Running Tests
 
@@ -28,12 +28,13 @@ cd app && npm test
 
 ## What's Covered
 
-### Library Utilities (src/lib/) - 83.72% statements
+### Library Utilities (src/lib/) - 85%+ statements
 
 | File               | Statements | Branches | Functions | Lines   |
 |--------------------|------------|----------|-----------|---------|
 | filename.ts        | 100%       | 100%     | 100%      | 100%    |
 | url-utils.ts       | 100%       | 100%     | 100%      | 100%    |
+| embeddings.ts      | 97.33%     | 100%     | 100%      | 97.18%  |
 | fetch-with-retry.ts| 91.30%     | 84%      | 90.9%     | 90.9%   |
 | api-response.ts    | 84.44%     | 71.73%   | 100%      | 84.44%  |
 | errors.ts          | 77.33%     | 76.05%   | 66.66%    | 80.55%  |
@@ -41,6 +42,7 @@ cd app && npm test
 **Test files:**
 - `src/lib/filename.test.ts` - 32 tests
 - `src/lib/url-utils.test.ts` - 41 tests
+- `src/lib/embeddings.test.ts` - 16 tests
 - `src/lib/errors.test.ts` - 32 tests
 - `src/lib/api-response.test.ts` - 35 tests
 - `src/lib/fetch-with-retry.test.ts` - 19 tests
@@ -221,6 +223,34 @@ Components still at 0% coverage:
    - AuthButtonClient.tsx / AuthButtonServer.tsx
 
 ## Recent Progress
+
+### January 26, 2026
+
+Added comprehensive tests for Voyage AI embeddings generation (16 new tests):
+
+**Embeddings Library:**
+
+- **embeddings.ts** (`src/lib/embeddings.test.ts`) - 16 tests
+  - `generateEmbeddingsForPatterns()`:
+    - Returns early when VOYAGE_API_KEY not configured
+    - Returns zero counts when no patterns need embeddings
+    - Returns zero counts when database fetch fails
+    - Successfully generates embeddings for multiple patterns
+    - Counts errors when thumbnail download fails
+    - Counts errors when Voyage API returns error
+    - Counts errors when database update fails
+    - Skips patterns with null thumbnail_url
+    - Filters by specific pattern IDs when provided
+    - Handles network errors during image download gracefully
+    - Handles Voyage API network errors gracefully
+    - Handles empty embedding response from Voyage API
+    - Logs progress during embedding generation
+  - `generateEmbeddingsForBatch()`:
+    - Returns early when no patterns in batch need embeddings
+    - Returns early when fetch fails
+    - Calls generateEmbeddingsForPatterns with batch pattern IDs
+
+**Coverage improvement:** embeddings.ts went from 0% to 97.33% statement coverage.
 
 ### January 24, 2026
 
