@@ -1667,3 +1667,65 @@ This actually **helps** performance vs one giant 1.5M vector index.
 3. **Hetzner dedicated servers** are best price/performance for your scale
 4. **$10-18K budget** easily covers 2-3 years of infrastructure even at 500 users
 5. **Don't over-engineer** - a single beefy server handles 500+ users fine
+
+---
+
+## Pre-Migration Checklist (No New Hardware Needed)
+
+Work that can be done on the current codebase while waiting for infrastructure.
+
+### Code Refactoring
+
+- [ ] **Remove user approval workflow** - Delete `/admin/users` page, approval API routes, `admin_emails` table usage
+- [ ] **Remove `is_admin` checks** - Replace with simpler owner check (current user = tenant owner)
+- [ ] **Abstract database queries** - Add a `getTenantSchema()` helper that returns `'public'` for now, will return `'tenant_xyz'` later
+- [ ] **Audit all Supabase queries** - List every table access, flag ones that need tenant scoping
+- [ ] **Extract hardcoded URLs** - Replace `patterns.tachyonfuture.com` with env var for future subdomain support
+
+### Build Share Link Feature (Works on Current Infra)
+
+This is the highest-impact prep work - useful for Mom now, validates the customer voting model, and code transfers directly to multi-tenant.
+
+- [ ] **Create `share_links` table** - Can add to current Supabase now
+- [ ] **Create `share_link_patterns` table** - Junction table for patterns in a share link
+- [ ] **Create `share_link_votes` table** - For guest voting
+- [ ] **Build "Create Share Link" UI** - Select patterns → set expiration → generate link
+- [ ] **Build share link public page** - `/share/[token]` - no auth required
+- [ ] **Build voting UI** - Guest enters name, clicks favorites
+- [ ] **Build "My Share Links" management page** - Owner sees all links + vote results
+- [ ] **Add link expiration** - Default 30 days, show expired state gracefully
+
+### Database Migrations to Write
+
+- [ ] **Write tenant schema template** - SQL script that creates a tenant schema with all tables
+- [ ] **Plan ID strategy** - Tenant-scoped pattern IDs (1, 2, 3 per tenant) or global UUIDs?
+- [ ] **Write `profiles` migration** - Add `is_platform_admin` column (just for you)
+- [ ] **Write `tenants` table migration** - Can create table now, populate later
+
+### UI/UX Changes
+
+- [ ] **Remove "Users" from admin nav** - Won't exist in multi-tenant
+- [ ] **Rename "Admin" section** - Becomes "Settings" or "Manage Patterns"
+- [ ] **Add "Share" button to pattern grid** - Entry point for creating share links
+- [ ] **Design share link results view** - How owner sees aggregated customer votes
+
+### Documentation
+
+- [ ] **Document current API routes** - Which stay, which change, which are removed
+- [ ] **Map current tables → tenant schema** - What moves into tenant schema vs stays global
+- [ ] **Write tenant onboarding flow** - What happens when a new quilter signs up?
+
+### Nice-to-Have (If Time)
+
+- [ ] **Add Stripe integration skeleton** - Pricing page UI, subscription model hooks
+- [ ] **Build "My Account" page** - Where owner manages their subscription/billing
+- [ ] **Add usage tracking** - Pattern count, storage used (needed for billing later)
+- [ ] **Research Gammill file format** - Can we export patterns directly to their machines?
+
+### Priority Order
+
+1. **Share link feature** - Immediate value, validates model
+2. **Code refactoring** - Remove dead code, simplify auth
+3. **Database migrations** - Prep schemas for multi-tenant
+4. **UI/UX changes** - Clean up admin section
+5. **Stripe integration** - Only after beta validates pricing
