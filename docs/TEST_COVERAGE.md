@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 26, 2026
+Last updated: January 27, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | ~55%     |
-| Branches   | ~48%     |
-| Functions  | ~52%     |
-| Lines      | ~55%     |
+| Statements | ~46%     |
+| Branches   | ~40%     |
+| Functions  | ~45%     |
+| Lines      | ~46%     |
 
-**Total Tests:** 1179 across 74 test files
+**Total Tests:** 1262 across 75 test files
 
 ## Running Tests
 
@@ -148,6 +148,8 @@ Components with new coverage:
 - **KeywordSidebar.tsx** - 18 tests (100% coverage)
 - **PinnedKeywordsManager.tsx** - 16 tests (100% coverage)
 - **PatternDetailClient.tsx** - 42 tests (97.67% coverage)
+- **PatternModal.tsx** - 55 tests (98.7% coverage)
+- **KeywordManager.tsx** - 47 tests (95.89% coverage)
 
 Components still at 0% coverage:
 - AccountContent.tsx
@@ -224,6 +226,120 @@ Components still at 0% coverage:
    - AuthButtonClient.tsx / AuthButtonServer.tsx
 
 ## Recent Progress
+
+### January 27, 2026
+
+Added comprehensive tests for PatternModal and KeywordManager components (83 new tests):
+
+**PatternModal.tsx** (`src/components/PatternModal.test.tsx`) - 55 tests total (36 new)
+
+Coverage improved from 69% to 98.7% statements.
+
+- **Admin save metadata** (6 tests)
+  - Shows saving state while request in progress
+  - Shows success toast after successful save
+  - Shows error toast when save fails
+  - Handles empty pattern gracefully
+  - Validates data before saving
+  - Preserves unsaved changes
+
+- **Admin keyword management** (11 tests)
+  - Shows keyword dropdown when search focused
+  - Filters keywords by search term
+  - Adds keyword when clicked in dropdown
+  - Removes keyword when X clicked
+  - Shows error when add keyword fails
+  - Shows error when remove keyword fails
+  - Excludes already-assigned keywords from dropdown
+  - Clears search after adding keyword
+  - Handles keyboard navigation in dropdown
+  - Shows empty state when no keywords match
+  - Handles concurrent keyword operations
+
+- **Edge cases** (12 tests)
+  - Handles pattern with no thumbnail
+  - Handles pattern with no keywords
+  - Handles network errors gracefully
+  - Handles API failures silently for similar patterns
+  - Uses pattern ID as display name when file_name is empty
+  - Handles missing optional fields
+  - Handles rapid modal open/close
+  - Handles escape key to close
+  - Handles click outside to close
+  - Accessibility heading states (loading/error/success)
+
+- **Non-admin keyword behavior** (4 tests)
+  - Displays keywords as clickable links
+  - Does not show remove buttons
+  - Does not show keyword dropdown
+  - Keywords link to browse with keyword filter
+
+**KeywordManager.tsx** (`src/components/KeywordManager.test.tsx`) - 47 tests (new file)
+
+Coverage improved from 0% to 95.89% statements.
+
+- **Loading and display** (8 tests)
+  - Shows loading spinner while fetching keywords
+  - Displays keywords in a table with pattern counts
+  - Shows total keyword count
+  - Handles empty keyword list
+  - Handles fetch error gracefully
+  - Sorts keywords alphabetically by default
+  - Allows sorting by pattern count
+  - Shows search input for filtering
+
+- **Search and filter** (5 tests)
+  - Filters keywords by search term
+  - Shows no results message when filter has no matches
+  - Clears search on X button click
+  - Search is case-insensitive
+  - Preserves sort order when searching
+
+- **Edit keyword modal** (6 tests)
+  - Opens edit modal when edit button clicked
+  - Shows current keyword value in input
+  - Validates keyword is not empty
+  - Validates keyword is not duplicate
+  - Saves keyword and updates list on success
+  - Shows error toast on save failure
+
+- **Delete keyword modal** (5 tests)
+  - Opens delete confirmation modal
+  - Shows warning about affected patterns
+  - Deletes keyword and removes from list on confirm
+  - Cancels delete on cancel button
+  - Shows error toast on delete failure
+
+- **Merge keyword modal** (8 tests)
+  - Opens merge modal when merge button clicked
+  - Shows source keyword name
+  - Shows dropdown with target keywords (excluding source)
+  - Filters target keywords by search
+  - Disables merge button when no target selected
+  - Merges keywords and updates list on confirm
+  - Shows success message with affected pattern count
+  - Shows error toast on merge failure
+
+- **Add keyword modal** (5 tests)
+  - Opens add modal when add button clicked
+  - Validates new keyword is not empty
+  - Validates new keyword is not duplicate
+  - Adds keyword to list on success
+  - Shows error toast on add failure
+
+- **Orphan patterns modal** (4 tests)
+  - Opens orphan patterns modal when link clicked
+  - Shows patterns with no keywords
+  - Closes modal on close button
+  - Handles empty orphan list
+
+- **Error handling** (6 tests)
+  - Retries fetch on retry button click
+  - Shows inline error for individual operations
+  - Handles network timeout gracefully
+  - Handles concurrent operations
+  - Preserves state on partial failure
+  - Logs errors to console
 
 ### January 26, 2026
 
