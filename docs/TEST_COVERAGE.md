@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 27, 2026
+Last updated: January 28, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | ~46%     |
-| Branches   | ~40%     |
-| Functions  | ~45%     |
-| Lines      | ~46%     |
+| Statements | ~47%     |
+| Branches   | ~41%     |
+| Functions  | ~46%     |
+| Lines      | ~47%     |
 
-**Total Tests:** 1262 across 75 test files
+**Total Tests:** 1341 across 77 test files
 
 ## Running Tests
 
@@ -150,13 +150,13 @@ Components with new coverage:
 - **PatternDetailClient.tsx** - 42 tests (97.67% coverage)
 - **PatternModal.tsx** - 55 tests (98.7% coverage)
 - **KeywordManager.tsx** - 47 tests (95.89% coverage)
+- **AuthTabs.tsx** - 41 tests (100% coverage)
+- **AdminUserList.tsx** - 38 tests (100% coverage)
 
 Components still at 0% coverage:
 - AccountContent.tsx
 - AdminUploadForm.tsx
-- AdminUserList.tsx
 - AuthButtonClient.tsx / AuthButtonServer.tsx
-- AuthTabs.tsx
 - DuplicateReview.tsx
 - LandingPage.tsx
 - PatternRanker.tsx
@@ -216,16 +216,120 @@ Components still at 0% coverage:
 
 ### Lower Priority (Admin and edge features)
 
-5. **Admin components** (0% coverage)
-   - AdminUploadForm.tsx
-   - AdminUserList.tsx
-   - DuplicateReview.tsx
+5. **Admin components** (partial coverage)
+   - ~~AdminUserList.tsx~~ ✅ Done (100%)
+   - AdminUploadForm.tsx (0%)
+   - DuplicateReview.tsx (0%)
 
-6. **Auth UI components** (0% coverage)
-   - AuthTabs.tsx
-   - AuthButtonClient.tsx / AuthButtonServer.tsx
+6. **Auth UI components** (partial coverage)
+   - ~~AuthTabs.tsx~~ ✅ Done (100%)
+   - AuthButtonClient.tsx / AuthButtonServer.tsx (0%)
 
 ## Recent Progress
+
+### January 28, 2026
+
+Added comprehensive tests for AuthTabs component (41 new tests):
+
+**AuthTabs.tsx** (`src/components/AuthTabs.test.tsx`) - 41 tests
+
+Coverage improved from 0% to 100% statements.
+
+- **Rendering** (3 tests)
+  - Renders Sign In tab as active by default
+  - Renders sign in form fields by default
+  - Renders Sign In submit button
+
+- **Tab switching** (4 tests)
+  - Switches to Register tab when clicked
+  - Switches back to Sign In tab when clicked
+  - Resets form fields when switching tabs
+  - Clears errors when switching tabs
+
+- **Sign in form** (9 tests)
+  - Updates email field on input
+  - Updates password field on input
+  - Shows loading state while submitting
+  - Redirects to /browse when user is approved
+  - Redirects to /pending-approval when user is not approved
+  - Redirects to /pending-approval when profile has no is_approved field
+  - Shows error when signInWithPassword fails
+  - Shows error when user is null after sign in
+  - Handles unexpected error during sign in
+
+- **Register form** (16 tests)
+  - Renders register form fields when Register tab is active
+  - Shows approval notice on register tab
+  - Updates confirm password field on input
+  - Shows error when passwords do not match
+  - Shows error when password is too short
+  - Shows loading state while registering
+  - Creates profile and redirects to /pending-approval for non-admin user
+  - Sends admin notification for non-admin users
+  - Does not send admin notification for admin users
+  - Redirects to /browse when user is auto-approved
+  - Shows error when signUp fails
+  - Shows error when user is null after signup
+  - Handles profile creation error gracefully
+  - Handles admin notification failure gracefully
+  - Handles unexpected error during registration
+  - Defaults to pending-approval when profile fetch returns null
+
+- **Form validation** (6 tests)
+  - Requires email field
+  - Requires password field
+  - Requires confirm password field on register
+  - Has minLength on register password field
+  - Email input has type email
+  - Password input has type password
+
+- **Accessibility** (3 tests)
+  - Has proper labels for form fields
+  - Has proper placeholder text
+  - Has proper placeholder text on register form
+
+**AdminUserList.tsx** (`src/components/AdminUserList.test.tsx`) - 38 tests
+
+Coverage improved from 0% to 100% statements.
+
+- **Rendering** (10 tests)
+  - Renders tabs with correct counts
+  - Renders pending tab as active by default
+  - Renders user table with headers
+  - Renders user email and display name
+  - Renders admin badge for admin users
+  - Renders pending/approved status
+  - Formats date correctly
+  - Renders empty state when no users
+
+- **Tab filtering** (7 tests)
+  - Shows only pending users by default
+  - Switches to approved/all tabs
+  - Highlights active tab correctly
+  - Shows correct empty states for each tab
+
+- **Approve action** (10 tests)
+  - Shows/hides Approve button based on user status
+  - Calls approve API when clicked
+  - Shows loading state while approving
+  - Updates user to approved on success
+  - Shows empty state after approving last pending user
+  - Shows alert on API error response
+  - Shows alert on network error
+
+- **Reject/Remove action** (10 tests)
+  - Shows/hides Remove button (hidden for admins)
+  - Shows confirmation dialog when clicked
+  - Does not call API when confirmation declined
+  - Calls reject API when confirmed
+  - Shows loading state while removing
+  - Removes user from list on success
+  - Updates counts after removing
+  - Shows alert on API error response
+  - Can remove approved non-admin users
+
+- **Multiple users interaction** (1 test)
+  - Independent loading states per user
 
 ### January 27, 2026
 
