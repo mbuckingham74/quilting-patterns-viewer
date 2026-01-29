@@ -1,17 +1,17 @@
 # Test Coverage Documentation
 
-Last updated: January 28, 2026
+Last updated: January 29, 2026
 
 ## Summary
 
 | Metric     | Coverage |
 |------------|----------|
-| Statements | ~47%     |
-| Branches   | ~41%     |
-| Functions  | ~46%     |
-| Lines      | ~47%     |
+| Statements | ~48%     |
+| Branches   | ~42%     |
+| Functions  | ~47%     |
+| Lines      | ~48%     |
 
-**Total Tests:** 1341 across 77 test files
+**Total Tests:** 1450 across 79 test files
 
 ## Running Tests
 
@@ -152,12 +152,12 @@ Components with new coverage:
 - **KeywordManager.tsx** - 47 tests (95.89% coverage)
 - **AuthTabs.tsx** - 41 tests (100% coverage)
 - **AdminUserList.tsx** - 38 tests (100% coverage)
+- **AdminUploadForm.tsx** - 47 tests (98.21% coverage)
+- **DuplicateReview.tsx** - 62 tests (96.07% coverage)
 
 Components still at 0% coverage:
 - AccountContent.tsx
-- AdminUploadForm.tsx
 - AuthButtonClient.tsx / AuthButtonServer.tsx
-- DuplicateReview.tsx
 - LandingPage.tsx
 - PatternRanker.tsx
 
@@ -216,16 +216,185 @@ Components still at 0% coverage:
 
 ### Lower Priority (Admin and edge features)
 
-5. **Admin components** (partial coverage)
+5. **Admin components** ✅ Completed
    - ~~AdminUserList.tsx~~ ✅ Done (100%)
-   - AdminUploadForm.tsx (0%)
-   - DuplicateReview.tsx (0%)
+   - ~~AdminUploadForm.tsx~~ ✅ Done (98.21%)
+   - ~~DuplicateReview.tsx~~ ✅ Done (96.07%)
 
 6. **Auth UI components** (partial coverage)
    - ~~AuthTabs.tsx~~ ✅ Done (100%)
    - AuthButtonClient.tsx / AuthButtonServer.tsx (0%)
 
 ## Recent Progress
+
+### January 29, 2026
+
+Added comprehensive tests for AdminUploadForm and DuplicateReview components (109 new tests):
+
+**AdminUploadForm.tsx** (`src/components/AdminUploadForm.test.tsx`) - 47 tests
+
+Coverage improved from 0% to 98.21% statements.
+
+- **Rendering** (4 tests)
+  - Renders drop zone with instructions
+  - Renders file input with correct accept attribute
+  - Does not show action buttons initially
+  - Does not show skip review checkbox initially
+
+- **Drag and drop** (6 tests)
+  - Shows dragging state on drag over
+  - Removes dragging state on drag leave
+  - Accepts dropped ZIP file
+  - Shows file size after selecting file
+  - Rejects non-ZIP files on drop
+  - Accepts ZIP file with uppercase extension
+
+- **File selection via input** (3 tests)
+  - Accepts ZIP file via file input
+  - Rejects non-ZIP file via file input
+  - Handles empty file selection
+
+- **Skip review checkbox** (3 tests)
+  - Shows skip review checkbox when file is selected
+  - Checkbox is unchecked by default
+  - Can toggle skip review checkbox
+
+- **Action buttons** (3 tests)
+  - Shows Upload & Review button when file selected and skip review is off
+  - Shows Upload & Commit button when skip review is checked
+  - Shows Clear button when file selected
+
+- **Upload flow** (7 tests)
+  - Calls upload API with FormData
+  - Sends staged=true by default (review mode)
+  - Sends staged=false when skip review is checked
+  - Shows loading state while uploading
+  - Disables file input while uploading
+  - Disables checkbox while uploading
+  - Disables Clear button while uploading
+
+- **Redirect on staged upload** (3 tests)
+  - Redirects to batch review page when staged upload succeeds
+  - Does not redirect when no patterns were uploaded
+  - Does not redirect for non-staged upload
+
+- **Results display** (9 tests)
+  - Shows upload complete message for non-staged success
+  - Shows summary counts
+  - Shows uploaded patterns list
+  - Shows checkmark for patterns with thumbnails
+  - Shows circle for patterns without thumbnails
+  - Shows skipped duplicates count
+  - Shows error list
+  - Clears selected file on successful non-staged upload
+
+- **Error handling** (5 tests)
+  - Shows error message from API response
+  - Shows error details when provided
+  - Handles network error
+  - Handles non-Error exception
+  - Applies error styling to results panel
+
+- **Clear selection** (3 tests)
+  - Clears selected file when Clear clicked
+  - Clears error result when Clear clicked
+  - Hides action buttons after clearing
+
+- **Drop zone styling** (2 tests)
+  - Has green styling when file is selected
+  - Shows checkmark icon when file is selected
+
+**DuplicateReview.tsx** (`src/components/DuplicateReview.test.tsx`) - 62 tests
+
+Coverage improved from 0% to 96.07% statements.
+
+- **Loading state** (2 tests)
+  - Shows loading spinner initially
+  - Shows loading hint about large collections
+
+- **Error state** (5 tests)
+  - Shows error message when fetch fails
+  - Shows default error message when no error text provided
+  - Shows error on network failure
+  - Shows Try Again button on error
+  - Retries fetch when Try Again is clicked
+
+- **Empty state** (3 tests)
+  - Shows no duplicates message when list is empty
+  - Shows threshold in empty state message
+  - Shows threshold dropdown in empty state
+
+- **Duplicate pair display** (8 tests)
+  - Shows pattern names
+  - Shows pattern authors
+  - Shows Unknown author when author is null
+  - Shows pattern IDs
+  - Shows file extension
+  - Shows thumbnails when available
+  - Shows placeholder when thumbnail is null
+  - Shows similarity percentage
+
+- **Similarity color coding** (3 tests)
+  - Shows red for >= 98% similarity
+  - Shows amber for >= 95% similarity
+  - Shows green for < 95% similarity
+
+- **Navigation** (6 tests)
+  - Shows current pair index
+  - Navigates to next pair
+  - Navigates to previous pair
+  - Disables Previous button on first pair
+  - Disables Next button on last pair
+  - Shows keyboard navigation hint
+
+- **Threshold control** (3 tests)
+  - Shows threshold dropdown
+  - Defaults to 95% threshold
+  - Refetches when threshold changes
+
+- **AI verification** (14 tests)
+  - Shows AI verification available message
+  - Shows Analyze with AI button
+  - Calls AI verify endpoint when button clicked
+  - Shows loading state during AI verification
+  - Shows AI verification result
+  - Shows AI reasoning
+  - Shows quality comparison
+  - Shows recommendation badge
+  - Shows Apply AI Recommendation button
+  - Shows AI error with retry button
+  - Clears AI verification when navigating to different pair
+  - Shows not duplicates result
+  - Shows needs human review message
+
+- **Apply AI recommendation** (3 tests)
+  - Deletes pattern 2 when recommendation is keep_first
+  - Deletes pattern 1 when recommendation is keep_second
+  - Keeps both when recommendation is keep_both
+
+- **Delete pattern** (8 tests)
+  - Shows confirmation dialog when delete clicked
+  - Does not call API when confirmation declined
+  - Calls review API with deleted_first when first pattern deleted
+  - Calls review API with deleted_second when second pattern deleted
+  - Shows loading state while deleting
+  - Removes pair from list after successful delete
+  - Shows alert on delete error
+  - Disables buttons while action is loading
+
+- **Keep both** (3 tests)
+  - Shows Keep Both Patterns button
+  - Calls review API with keep_both decision
+  - Removes pair from list after keep both
+
+- **Index adjustment after review** (2 tests)
+  - Adjusts index when reviewing last pair
+  - Shows empty state after reviewing all pairs
+
+- **Confidence indicators** (3 tests)
+  - Shows green badge for high confidence
+  - Shows amber badge for medium confidence
+  - Shows stone badge for low confidence
 
 ### January 28, 2026
 
